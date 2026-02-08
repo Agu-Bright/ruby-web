@@ -15,36 +15,8 @@ const features = [
       'Regular quality assessments',
     ],
   },
-  {
-    icon: '/images/payment.png',
-    title: 'Seamless Payments',
-    desc: 'Pay with your international cards while merchants receive payments in their local accounts.',
-    points: [
-      'No currency conversion needed',
-      'Secure, encrypted transactions',
-      'Instant payment confirmations',
-    ],
-  },
-  {
-    icon: '/images/ruby.png',
-    title: 'Local Expertise',
-    desc: 'Discover hidden gems and local favorites curated by people who know the city best.',
-    points: [
-      'Curated recommendations',
-      'Insider tips and guides',
-      'Authentic local experiences',
-    ],
-  },
-  {
-    icon: '/images/payment.png',
-    title: '24/7 Support',
-    desc: 'Our dedicated support team is always ready to help you with any questions or concerns.',
-    points: [
-      'Round-the-clock assistance',
-      'Multi-language support',
-      'Quick response times',
-    ],
-  },
+
+
 ];
 
 export default function WhyChoose() {

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --ruby-red: #FF0000;
+  --ruby-red: #ff0000;
   --ruby-black: #000000;
   --ruby-dark: #1a1a1a;
   --ruby-gray: #f5f5f5;
@@ -17,7 +17,7 @@
 }
 
 body {
-  font-family: var(--font-poppins), 'Poppins', sans-serif;
+  font-family: var(--font-poppins), "Poppins", sans-serif;
   color: #1a1a1a;
   overflow-x: hidden;
 }
@@ -26,7 +26,9 @@ body {
 .reveal {
   opacity: 0;
   transform: translateY(32px);
-  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .reveal.visible {
@@ -34,16 +36,36 @@ body {
   transform: translateY(0);
 }
 
-.reveal-delay-1 { transition-delay: 0.1s; }
-.reveal-delay-2 { transition-delay: 0.2s; }
-.reveal-delay-3 { transition-delay: 0.3s; }
-.reveal-delay-4 { transition-delay: 0.35s; }
-.reveal-delay-5 { transition-delay: 0.4s; }
-.reveal-delay-6 { transition-delay: 0.45s; }
-.reveal-delay-7 { transition-delay: 0.5s; }
-.reveal-delay-8 { transition-delay: 0.55s; }
-.reveal-delay-9 { transition-delay: 0.6s; }
-.reveal-delay-10 { transition-delay: 0.65s; }
+.reveal-delay-1 {
+  transition-delay: 0.1s;
+}
+.reveal-delay-2 {
+  transition-delay: 0.2s;
+}
+.reveal-delay-3 {
+  transition-delay: 0.3s;
+}
+.reveal-delay-4 {
+  transition-delay: 0.35s;
+}
+.reveal-delay-5 {
+  transition-delay: 0.4s;
+}
+.reveal-delay-6 {
+  transition-delay: 0.45s;
+}
+.reveal-delay-7 {
+  transition-delay: 0.5s;
+}
+.reveal-delay-8 {
+  transition-delay: 0.55s;
+}
+.reveal-delay-9 {
+  transition-delay: 0.6s;
+}
+.reveal-delay-10 {
+  transition-delay: 0.65s;
+}
 
 /* Navbar animation */
 .navbar-animate {
@@ -51,13 +73,21 @@ body {
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Card hover */
 .card-hover {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .card-hover:hover {
@@ -81,7 +111,7 @@ body {
 }
 
 .pattern-overlay::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
@@ -89,8 +119,12 @@ body {
 }
 
 /* Star rating */
-.star-filled { color: #FFC107; }
-.star-empty { color: #ddd; }
+.star-filled {
+  color: #ffc107;
+}
+.star-empty {
+  color: #ddd;
+}
 
 /* ===== Admin Dashboard Styles (untouched) ===== */
 .input-field {
@@ -111,4 +145,12 @@ body {
 
 .btn-sm {
   @apply px-3 py-1.5 text-xs;
+}
+/* Hide scrollbar for horizontal scroll containers */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

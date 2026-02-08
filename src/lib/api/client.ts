@@ -165,16 +165,18 @@ async function request<T>(
     }
   }
 
- const json = await res.json().catch(() => ({
+  const json = await res.json().catch(() => ({
     success: false,
     data: null as unknown as T,
-    error: { code: 'PARSE_ERROR', message: 'Failed to parse response' },
+    error: { code: "PARSE_ERROR", message: "Failed to parse response" },
   }));
 
   if (!res.ok) {
     throw new ApiClientError(
-      json.error?.message || json.message || `Request failed with status ${res.status}`,
-      json.error?.code || json.code || 'UNKNOWN_ERROR',
+      json.error?.message ||
+        json.message ||
+        `Request failed with status ${res.status}`,
+      json.error?.code || json.code || "UNKNOWN_ERROR",
       res.status,
       json.error?.details,
     );
@@ -183,8 +185,8 @@ async function request<T>(
   if (json.success !== undefined) {
     if (!json.success) {
       throw new ApiClientError(
-        json.error?.message || 'Request failed',
-        json.error?.code || 'UNKNOWN_ERROR',
+        json.error?.message || "Request failed",
+        json.error?.code || "UNKNOWN_ERROR",
         res.status,
       );
     }
@@ -205,9 +207,10 @@ export const api = {
         accessToken: string;
         refreshToken: string;
         admin: import("@/lib/types").AdminUser;
+        user: any;
       }>("/auth/admin/login", { method: "POST", body: data, noAuth: true }),
     refresh: (refreshToken: string) =>
-      request<{ accessToken: string; refreshToken: string }>(
+      request<{ accessToken: string; refreshToken: string; }>(
         "/admin/auth/refresh",
         { method: "POST", body: { refreshToken }, noAuth: true },
       ),

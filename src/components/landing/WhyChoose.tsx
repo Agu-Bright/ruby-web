@@ -1,22 +1,30 @@
-'use client';
+"use client";
 
-import { useRef } from 'react';
-import Image from 'next/image';
-import ScrollReveal from './ScrollReveal';
+import { useRef } from "react";
+import Image from "next/image";
+import ScrollReveal from "./ScrollReveal";
 
 const features = [
   {
-    icon: '/images/ruby.png',
-    title: 'Verified Businesses',
-    desc: 'Every restaurant, hotel, club, and service is thoroughly verified to ensure quality and authenticity.',
+    icon: "/images/ruby.png",
+    title: "Verified Businesses",
+    desc: "Every restaurant, hotel, club, and service is thoroughly verified to ensure quality and authenticity.",
     points: [
-      'Background checks for all merchants',
-      'Customer reviews and ratings',
-      'Regular quality assessments',
+      "Background checks for all merchants",
+      "Customer reviews and ratings",
+      "Regular quality assessments",
     ],
   },
-
-
+  {
+    icon: "/images/payment.png",
+    title: "Seamless Payments",
+    desc: "Pay with your international cards while merchants receive payments in their local accounts.",
+    points: [
+      "No currency conversion needed",
+      "Secure, encrypted transactions",
+      "Instant payment confirmations",
+    ],
+  },
 ];
 
 export default function WhyChoose() {
@@ -28,11 +36,15 @@ export default function WhyChoose() {
         {/* Heading */}
         <ScrollReveal>
           <div className="text-center mb-8 sm:mb-10 lg:mb-12">
-            <h2 className="font-playfair text-xl sm:text-2xl lg:text-3xl font-bold text-ruby-black uppercase" style={{ fontVariant: 'small-caps' }}>
+            <h2
+              className="font-playfair text-xl sm:text-2xl lg:text-3xl font-bold text-ruby-black uppercase"
+              style={{ fontVariant: "small-caps" }}
+            >
               Why Choose Ruby+?
             </h2>
             <p className="mt-2 sm:mt-3 text-xs sm:text-sm lg:text-base text-gray-500 max-w-md mx-auto leading-relaxed">
-              The most comprehensive platform for discovering and experiencing Nigerian culture
+              The most comprehensive platform for discovering and experiencing
+              Nigerian culture
             </p>
           </div>
         </ScrollReveal>
@@ -42,7 +54,7 @@ export default function WhyChoose() {
           <div
             ref={scrollRef}
             className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-4 px-4"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {features.map((feat, i) => (
               <ScrollReveal key={feat.title} delay={i + 1}>
@@ -71,11 +83,23 @@ export default function WhyChoose() {
                       {feat.points.map((point) => (
                         <li key={point} className="flex items-start gap-2">
                           <span className="shrink-0 w-4 h-4 mt-0.5 rounded-full bg-red-50 border border-ruby-red/30 flex items-center justify-center">
-                            <svg className="w-2 h-2 text-ruby-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            <svg
+                              className="w-2 h-2 text-ruby-red"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={3}
+                                d="M5 13l4 4L19 7"
+                              />
                             </svg>
                           </span>
-                          <span className="text-[11px] sm:text-xs text-gray-600">{point}</span>
+                          <span className="text-[11px] sm:text-xs text-gray-600">
+                            {point}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -122,11 +146,23 @@ export default function WhyChoose() {
                     {feat.points.map((point) => (
                       <li key={point} className="flex items-center gap-2.5">
                         <span className="shrink-0 w-4 h-4 rounded-full bg-red-50 border border-ruby-red/30 flex items-center justify-center">
-                          <svg className="w-2 h-2 text-ruby-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          <svg
+                            className="w-2 h-2 text-ruby-red"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                         </span>
-                        <span className="text-xs xl:text-sm text-gray-600">{point}</span>
+                        <span className="text-xs xl:text-sm text-gray-600">
+                          {point}
+                        </span>
                       </li>
                     ))}
                   </ul>

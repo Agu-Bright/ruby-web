@@ -54,10 +54,10 @@ export default function ForBusinessOwners() {
                 Expand Your Business Reach
               </p>
               <h2 className="font-playfair text-3xl sm:text-4xl lg:text-5xl font-bold text-ruby-black uppercase leading-tight mb-4" style={{ fontVariant: 'small-caps' }}>
-                For Business Owners
+                For Business Owners & Sellers
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 leading-relaxed mb-8">
-                Whether You&apos;re Discovering Your City Or Visiting Somewhere New, Patrons Helps You Find Trusted Places, Services, And Experiences—Without The Guesswork.
+                Whether You&apos;re Discovering Your City Or Visiting Somewhere New, Ruby+ Helps You Find Trusted Places, Services, And Experiences—Without The Guesswork.
               </p>
             </ScrollReveal>
 

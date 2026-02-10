@@ -14,11 +14,11 @@ export default function CTASection() {
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <ScrollReveal>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
-            Ready To Connect With Nigeria
+            Ready to Discover Nigeria
           </h2>
           <p className="mt-4 text-base sm:text-lg text-gray-300 max-w-2xl mx-auto">
-            Join thousands of discovering authentic Nigerian culture,
-            businesses, and businesses through verified platforms.
+            Join Thousands in Discovering Authentic Nigerian Culture, Verified
+            Businesses and Experiences Through the Ruby+ App.
           </p>
           <button className="btn-ruby mt-8 inline-flex items-center gap-2 px-8 py-3.5 bg-ruby-red text-white font-semibold rounded-lg text-sm">
             GET STARTED

@@ -32,7 +32,7 @@ export default function MissionAndStats() {
                     Ruby+ is a platform that collates premium Nigerian businesses and services for display to diaspora Nigerians and tourists visiting Nigeria to drive tourism and commerce.
                   </p>
                   <p>
-                    Our mobile app allows Nigerian brands to have a virtual storefront from where patrons can get information, navigate to visit while in Nigeria and order for products and services. Businesses receive payment from Apple Pay and International Cards through the app.
+                    Our mobile app allows Nigerian brands to have a virtual storefront from where customers can get information, navigate to visit while in Nigeria and order for products and services. Businesses receive payment from Apple Pay and International Cards through the app.
                   </p>
                 </div>
               </ScrollReveal>

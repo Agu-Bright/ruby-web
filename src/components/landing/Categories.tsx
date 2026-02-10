@@ -8,52 +8,52 @@ const categories = [
   {
     icon: '/images/concierge.png',
     title: 'Concierge Services',
-    desc: 'Your wish is our command. From airport pickups, private security, event planning, last-minute reservations and verified concierge partners handle the details for you, our focus is giving you the best.',
+    desc: 'Your wish is our command. From airport pickups, private security to special requests and last-minute reservations, our verified concierge partners handle the details so you can focus on living your best life.',
   },
   {
     icon: '/images/restaurant.png',
-    title: 'Restaurant',
-    desc: 'Taste cities like never before. Discover hidden gems and trending restaurants, from national delicacies to cocktail fusion, explore the dining scene that tourists need to discover.',
+    title: 'Restaurants',
+    desc: 'Taste cities like never before. Discover hidden gems and iconic spots serving everything from authentic suya to world-class fine dining. Your next favorite meal is waiting.',
   },
   {
     icon: '/images/MoonStars.png',
     title: 'Nightlife',
-    desc: 'Where the city comes alive. Discover the hottest lounges, rooftop bars, clubs, cocktail spots and skip the lines with Ruby+ verified venues.',
+    desc: 'Where the city comes alive. Rooftop lounges, pulsing clubs, beach bars—find the hottest spots and skip the velvet rope with Ruby+ verified venues.',
   },
   {
     icon: '/images/health.png',
     title: 'Health & Wellness',
-    desc: 'Find top spas and gyms, fitness programs and wellness services with real verified reviews and optional pricing transparency.',
+    desc: "Glow up, inside and out. Spas, gyms, salons, and wellness retreats—all vetted, all premium. Because self-care isn't optional, it's essential.",
   },
   {
     icon: '/images/home.png',
     title: 'Home Services',
-    desc: 'Your home, but fixed. Cleaners, electricians, plumbers, painters and handymen. Reliable service near your location.',
+    desc: 'Your home, handled. Cleaners, electricians, plumbers, and more—trusted professionals at your fingertips. Reliable service, zero stress.',
   },
   {
     icon: '/images/shopping.png',
     title: 'Shopping',
-    desc: 'Discover Trends. Deliver. From boutique fashion to local artisan treasures, explore businesses, check real reviews, and get it delivered straight to you.',
+    desc: 'Discover. Desire. Deliver. From boutique fashion to local artisan finds, shop verified merchants and get it delivered straight to your doorstep.',
   },
   {
     icon: '/images/local.png',
     title: 'Local Services',
-    desc: 'Get it done the easy way. Delivery, courier and rapid response services. Find things near you that make life seamless.',
+    desc: 'Get it done, the easy way. Tailors, laundry, car wash, repairs—whatever you need, whenever you need it. City life, simplified.',
   },
   {
     icon: '/images/Buildings.png',
     title: 'Professional Services',
-    desc: 'Expertise on demand. Legal, consulting and marketing professionals — get matched with verified professionals who deliver.',
+    desc: 'Expertise on demand. Legal, financial, consulting—connect with verified professionals who get things done right the first time.',
   },
   {
     icon: '/images/Crown.png',
     title: 'Arts & Entertainment',
-    desc: 'Culture Connects. Live-performances, museums, festivals, galleries, and experiences that inspire and connect every visit.',
+    desc: 'Culture. Concerts. Unforgettable moments. Galleries, live shows, festivals, and experiences that feed your soul. Never miss what\'s happening.',
   },
   {
     icon: '/images/Suitcase.png',
-    title: 'Hotel & Travel',
-    desc: 'Adventures and extraordinary experiences await. Let Ruby+ find your next trip, adventure or resort. A travel guide at your fingertips.',
+    title: 'Hotels & Travel',
+    desc: 'Stay somewhere extraordinary. From luxury hotels to stunning shortlets, find your perfect stay—verified, reviewed, and ready for you.',
   },
 ];
 

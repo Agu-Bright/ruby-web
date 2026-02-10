@@ -15,7 +15,7 @@ const features = [
   {
     icon: "/images/fast.png",
     title: "Feel Confident Anywhere",
-    desc: "From everyday hangouts to new experiences, Patrons helps you navigate safely and confidently, whether you're a local or just passing through.",
+    desc: "From everyday hangouts to new experiences, Ruby+ helps you navigate safely and confidently, whether you're a local or just passing through.",
   },
 ];
 
@@ -44,11 +44,11 @@ export default function ForPatrons() {
                 className="font-playfair text-3xl sm:text-4xl lg:text-5xl font-bold text-ruby-black uppercase leading-tight mb-4"
                 style={{ fontVariant: "small-caps" }}
               >
-                For Patrons
+                For Customers & Buyers
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 leading-relaxed mb-8">
                 Whether You&apos;re Discovering Your City Or Visiting Somewhere
-                New, Patrons Helps You Find Trusted Places, Services, And
+                New, Ruby+ Helps You Find Trusted Places, Services, And
                 Experiences—Without The Guesswork.
               </p>
             </ScrollReveal>
@@ -107,7 +107,7 @@ export default function ForPatrons() {
               <div className="relative w-[320px] sm:w-[400px] lg:w-[460px]">
                 <Image
                   src="/images/patron.png"
-                  alt="Patrons enjoying Nigerian businesses"
+                  alt="Customers enjoying Nigerian businesses"
                   width={460}
                   height={520}
                   className="w-full h-auto object-contain"

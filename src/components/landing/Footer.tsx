@@ -173,9 +173,11 @@ export default function Footer() {
                     />
                   </svg>
                   <span className="text-xs text-white/50 leading-relaxed">
-                    E1B Got Oboh Drive,
+                    E1B Gat Oboh Drive, VI, Lagos.
                     <br />
-                    VI, Lagos.
+                    308 Jarvis Street, Toronto,
+                    <br />
+                    ON, Canada. M5B 0E3.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">

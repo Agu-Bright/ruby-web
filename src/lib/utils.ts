@@ -97,3 +97,8 @@ export function getStatusColor(status: string): string {
 export function getInitials(firstName: string, lastName: string): string {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
+
+/** Extract a raw string ID from a locationId entry that may be populated or raw */
+export function toLocationId(loc: string | { _id: string; [key: string]: unknown }): string {
+  return typeof loc === 'object' && loc !== null ? loc._id : loc;
+}

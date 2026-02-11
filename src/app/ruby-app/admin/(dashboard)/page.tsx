@@ -8,13 +8,13 @@ import {
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
-import { formatCurrency, formatRelativeTime } from '@/lib/utils';
+import { formatCurrency, formatRelativeTime, toLocationId } from '@/lib/utils';
 import type { DashboardAnalytics } from '@/lib/types';
 
 export default function DashboardPage() {
   const { admin, isSuperAdmin } = useAuth();
 
-  const locationId = !isSuperAdmin && admin?.locationIds?.[0] ? admin.locationIds[0] : undefined;
+  const locationId = !isSuperAdmin && admin?.locationIds?.[0] ? toLocationId(admin.locationIds[0]) : undefined;
 
   const { data, isLoading } = useApi<DashboardAnalytics>(
     () => api.analytics.dashboard({ locationId }),

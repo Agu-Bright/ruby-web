@@ -251,7 +251,7 @@ export const api = {
       }),
     update: (id: string, data: import("@/lib/types").UpdateAdminRequest) =>
       request<import("@/lib/types").AdminUser>(`/admin/users/${id}`, {
-        method: "PATCH",
+        method: "PUT",
         body: data,
       }),
     delete: (id: string) =>

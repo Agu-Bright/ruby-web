@@ -7,7 +7,7 @@ import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { PageHeader, DataTable, StatusBadge, Modal, type Column } from '@/components/ui';
 import type { Booking, BookingFilterParams, BookingStatus } from '@/lib/types';
-import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils';
+import { formatDate, formatDateTime, formatCurrency, toLocationId } from '@/lib/utils';
 
 const STATUS_OPTIONS: BookingStatus[] = ['REQUESTED', 'CONFIRMED', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
 
@@ -16,7 +16,7 @@ export default function BookingsPage() {
   const [filters, setFilters] = useState<BookingFilterParams>({
     page: 1,
     limit: 20,
-    ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: admin.locationIds[0] } : {}),
+    ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: toLocationId(admin.locationIds[0]) } : {}),
   });
   const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
 

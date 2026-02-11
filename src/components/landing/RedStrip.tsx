@@ -168,7 +168,7 @@ export default function RedStrip() {
         <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <ScrollReveal>
             <h2 className="font-playfair text-xl sm:text-2xl lg:text-3xl font-bold text-white italic leading-snug">
-              “A Discovery & Donnection Point For Tourists, Local Residents,
+              “A Discovery & Connection Point For Tourists, Local Residents,
               Diasporas And Local Businesses”
             </h2>
             <p className="mt-2.5 text-sm sm:text-base text-white/60 tracking-wide">

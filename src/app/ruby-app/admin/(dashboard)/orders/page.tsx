@@ -7,7 +7,7 @@ import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { PageHeader, DataTable, StatusBadge, Modal, type Column } from '@/components/ui';
 import type { Order, OrderFilterParams, OrderStatus } from '@/lib/types';
-import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils';
+import { formatDate, formatDateTime, formatCurrency, toLocationId } from '@/lib/utils';
 
 const STATUS_OPTIONS: OrderStatus[] = ['PLACED', 'ACCEPTED', 'REJECTED', 'PREPARING', 'READY', 'DISPATCHED', 'PICKED_UP', 'DELIVERED', 'COMPLETED', 'CANCELLED'];
 
@@ -16,7 +16,7 @@ export default function OrdersPage() {
   const [filters, setFilters] = useState<OrderFilterParams>({
     page: 1,
     limit: 20,
-    ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: admin.locationIds[0] } : {}),
+    ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: toLocationId(admin.locationIds[0]) } : {}),
   });
   const [search, setSearch] = useState('');
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);

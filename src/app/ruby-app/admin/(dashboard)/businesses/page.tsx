@@ -8,7 +8,7 @@ import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { PageHeader, DataTable, StatusBadge, Modal, type Column } from '@/components/ui';
 import type { Business, BusinessFilterParams, BusinessStatus, BusinessApprovalAction } from '@/lib/types';
-import { formatDate } from '@/lib/utils';
+import { formatDate, toLocationId } from '@/lib/utils';
 
 const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'LIVE', 'REJECTED', 'SUSPENDED'];
 
@@ -17,7 +17,7 @@ export default function BusinessesPage() {
   const [filters, setFilters] = useState<BusinessFilterParams>({
     page: 1,
     limit: 20,
-    ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: admin.locationIds[0] } : {}),
+    ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: toLocationId(admin.locationIds[0]) } : {}),
   });
   const [search, setSearch] = useState('');
   const [detailBusiness, setDetailBusiness] = useState<Business | null>(null);

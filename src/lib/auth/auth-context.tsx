@@ -78,7 +78,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (locationId: string) => {
       if (!admin) return false;
       if (admin.scope === 'GLOBAL') return true;
-      return admin.locationIds?.includes(locationId) ?? false;
+      return admin.locationIds?.some(loc => {
+        const id = typeof loc === 'object' && loc !== null ? loc._id : loc;
+        return id === locationId;
+      }) ?? false;
     },
     [admin]
   );

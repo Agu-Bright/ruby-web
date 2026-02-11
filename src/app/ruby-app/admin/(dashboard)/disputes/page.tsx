@@ -8,7 +8,7 @@ import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { PageHeader, DataTable, StatusBadge, Modal, type Column } from '@/components/ui';
 import type { Dispute, DisputeFilterParams, DisputeStatus, DisputeType, DisputeResolutionRequest } from '@/lib/types';
-import { formatDate, formatDateTime, formatCurrency } from '@/lib/utils';
+import { formatDate, formatDateTime, formatCurrency, toLocationId } from '@/lib/utils';
 
 const STATUS_OPTIONS: DisputeStatus[] = ['OPEN', 'UNDER_REVIEW', 'RESOLVED', 'ESCALATED', 'CLOSED'];
 
@@ -17,7 +17,7 @@ export default function DisputesPage() {
   const [filters, setFilters] = useState<DisputeFilterParams>({
     page: 1,
     limit: 20,
-    ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: admin.locationIds[0] } : {}),
+    ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: toLocationId(admin.locationIds[0]) } : {}),
   });
   const [detailDispute, setDetailDispute] = useState<Dispute | null>(null);
   const [resolveModal, setResolveModal] = useState<Dispute | null>(null);

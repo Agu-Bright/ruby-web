@@ -59,13 +59,16 @@ export interface AdminUser {
   email: string;
   firstName: string;
   lastName: string;
+  phone?: string;
+  avatarUrl?: string;
   type?: string;
   roles: AdminRole[];
   scope: AdminScope;
-  locationIds: string[];
+  locationIds: (string | { _id: string; name: string; type?: string; status?: string })[];
   isActive?: boolean;
   status?: AdminStatus;
   lastLoginAt?: string;
+  createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -83,10 +86,11 @@ export interface CreateAdminRequest {
 export interface UpdateAdminRequest {
   firstName?: string;
   lastName?: string;
+  phone?: string;
+  password?: string;
   roles?: AdminRole[];
   scope?: AdminScope;
   locationIds?: string[];
-  status?: AdminStatus;
   isActive?: boolean;
 }
 

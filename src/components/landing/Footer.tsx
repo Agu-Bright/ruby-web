@@ -59,10 +59,7 @@ export default function Footer() {
   return (
     <footer className="relative">
       <div className="absolute inset-0 bg-cover bg-center" />
-      <div
-        className="absolute inset-0"
-        style={{ background: "black" }}
-      />
+      <div className="absolute inset-0" style={{ background: "black" }} />
 
       <div className="relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
@@ -77,9 +74,9 @@ export default function Footer() {
                 className="h-8 w-auto brightness-0 invert mb-4"
               />
               <p className="text-[11px] text-white/50 leading-relaxed mb-6">
-                Connecting Diaspora Nigerians And Tourists With Authentic
-                Nigerian Experiences. Your Trusted Platform For Discovering,
-                Exploring And Enjoying Nigeria.
+                Ruby helps people discover trusted Nigerian brands, products,
+                and services — and enables businesses to reach a global
+                audience, get discovered, and receive seamless payments.
               </p>
               <h4 className="text-sm font-semibold text-white mb-3">
                 Join Our Newsletter

@@ -5,7 +5,7 @@ import type { AdminUser, AdminRole } from '@/lib/types';
 import { api, clearTokens } from '@/lib/api';
 
 interface AuthContextType {
-  admin: AdminUser | null  | any;
+  admin: AdminUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -28,7 +28,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (stored && token) {
       try {
-        setAdmin(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        // Normalize: ensure _id exists (login response uses 'id')
+        if (!parsed._id && parsed.id) {
+          parsed._id = parsed.id;
+        }
+        setAdmin(parsed);
       } catch {
         clearTokens();
       }
@@ -38,7 +43,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.auth.login({ email, password });
-    const { accessToken, refreshToken, admin: adminUser } = res.data;
+    const { accessToken, refreshToken } = res.data;
+    // Backend returns 'user' key, handle both 'admin' and 'user'
+    const adminUser = res.data.admin || res.data.user;
+
+    // Normalize: ensure _id exists
+    if (!adminUser._id && adminUser.id) {
+      adminUser._id = adminUser.id;
+    }
 
     localStorage.setItem('ruby_access_token', accessToken);
     localStorage.setItem('ruby_refresh_token', refreshToken);
@@ -57,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasRole = useCallback(
     (...roles: AdminRole[]) => {
       if (!admin) return false;
-      return roles.includes(admin.role);
+      return admin.roles?.some((r) => roles.includes(r)) ?? false;
     },
     [admin]
   );
@@ -66,12 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (locationId: string) => {
       if (!admin) return false;
       if (admin.scope === 'GLOBAL') return true;
-      return admin.locationIds.includes(locationId);
+      return admin.locationIds?.includes(locationId) ?? false;
     },
     [admin]
   );
 
-  const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
+  // Super admin = has 'super_admin' role OR has GLOBAL scope (backend treats GLOBAL scope as full access)
+  const isSuperAdmin =
+    (admin?.roles?.includes('super_admin') || admin?.scope === 'GLOBAL') ?? false;
 
   return (
     <AuthContext.Provider

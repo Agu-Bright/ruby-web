@@ -9,6 +9,21 @@ import { PageHeader, DataTable, StatusBadge, Modal, type Column } from '@/compon
 import { formatDate, getInitials } from '@/lib/utils';
 import type { AdminUser, CreateAdminRequest, AdminRole, AdminScope, PaginationParams } from '@/lib/types';
 
+// Display-friendly role labels
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Admin',
+  location_admin: 'Location Admin',
+  support: 'Support',
+  support_admin: 'Support Admin',
+  finance: 'Finance',
+  content: 'Content',
+};
+
+function formatRole(role: string): string {
+  return ROLE_LABELS[role] || role.replace(/_/g, ' ');
+}
+
 export default function AdminUsersPage() {
   const [filters, setFilters] = useState<PaginationParams>({ page: 1, limit: 20 });
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -20,9 +35,11 @@ export default function AdminUsersPage() {
   );
 
   const handleStatusToggle = async (user: AdminUser) => {
-    const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    const id = user._id || user.id;
+    if (!id) return;
+    const newStatus = user.isActive === false ? 'ACTIVE' : 'SUSPENDED';
     try {
-      await api.adminUsers.update(user._id, { status: newStatus });
+      await api.adminUsers.update(id, { status: newStatus });
       toast.success(`Admin ${newStatus === 'ACTIVE' ? 'activated' : 'suspended'}`);
       refetch();
     } catch {
@@ -58,7 +75,7 @@ export default function AdminUsersPage() {
       render: (u) => (
         <div className="flex items-center gap-1.5">
           <Shield className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-sm">{u.role.replace(/_/g, ' ')}</span>
+          <span className="text-sm capitalize">{formatRole(u.roles?.[0] || 'admin')}</span>
         </div>
       ),
     },
@@ -68,7 +85,7 @@ export default function AdminUsersPage() {
       render: (u) => (
         <div>
           <span className="badge-neutral">{u.scope}</span>
-          {u.scope === 'LOCATION' && u.locationIds.length > 0 && (
+          {u.scope === 'LOCATION' && u.locationIds?.length > 0 && (
             <div className="text-xs text-gray-400 mt-1">{u.locationIds.length} location(s)</div>
           )}
         </div>
@@ -77,24 +94,31 @@ export default function AdminUsersPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (u) => <StatusBadge status={u.status} />,
+      render: (u) => {
+        // Backend uses isActive boolean, normalize to status string
+        const status = u.status || (u.isActive === false ? 'SUSPENDED' : 'ACTIVE');
+        return <StatusBadge status={status} />;
+      },
     },
     {
       key: 'created',
       header: 'Created',
-      render: (u) => <span className="text-gray-500">{formatDate(u.createdAt)}</span>,
+      render: (u) => <span className="text-gray-500">{u.createdAt ? formatDate(u.createdAt) : '—'}</span>,
     },
     {
       key: 'actions',
       header: '',
-      render: (u) => (
-        <button
-          onClick={(e) => { e.stopPropagation(); handleStatusToggle(u); }}
-          className={`btn-sm ${u.status === 'ACTIVE' ? 'btn-ghost text-red-600 hover:bg-red-50' : 'btn-ghost text-emerald-600 hover:bg-emerald-50'}`}
-        >
-          {u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
-        </button>
-      ),
+      render: (u) => {
+        const isActive = u.isActive !== false && u.status !== 'SUSPENDED';
+        return (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleStatusToggle(u); }}
+            className={`btn-sm ${isActive ? 'btn-ghost text-red-600 hover:bg-red-50' : 'btn-ghost text-emerald-600 hover:bg-emerald-50'}`}
+          >
+            {isActive ? 'Suspend' : 'Activate'}
+          </button>
+        );
+      },
     },
   ];
 
@@ -146,7 +170,7 @@ function CreateAdminModal({
 }: { isOpen: boolean; onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState<CreateAdminRequest>({
     email: '', password: '', firstName: '', lastName: '',
-    role: 'LOCATION_ADMIN', scope: 'LOCATION', locationIds: [],
+    roles: ['location_admin'], scope: 'LOCATION', locationIds: [],
   });
   const [locationIdInput, setLocationIdInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -200,16 +224,17 @@ function CreateAdminModal({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label-text">Role</label>
-            <select value={form.role} onChange={(e) => {
+            <select value={form.roles?.[0] || 'location_admin'} onChange={(e) => {
               const role = e.target.value as AdminRole;
-              const scope: AdminScope = role === 'SUPER_ADMIN' ? 'GLOBAL' : 'LOCATION';
-              setForm({ ...form, role, scope });
+              const scope: AdminScope = role === 'super_admin' ? 'GLOBAL' : 'LOCATION';
+              setForm({ ...form, roles: [role], scope });
             }} className="input-field">
-              <option value="SUPER_ADMIN">Super Admin</option>
-              <option value="LOCATION_ADMIN">Location Admin</option>
-              <option value="FINANCE_ADMIN">Finance Admin</option>
-              <option value="CONTENT_ADMIN">Content Admin</option>
-              <option value="OPS_ADMIN">Ops Admin</option>
+              <option value="super_admin">Super Admin</option>
+              <option value="admin">Admin</option>
+              <option value="location_admin">Location Admin</option>
+              <option value="support">Support</option>
+              <option value="finance">Finance</option>
+              <option value="content">Content</option>
             </select>
           </div>
           <div>

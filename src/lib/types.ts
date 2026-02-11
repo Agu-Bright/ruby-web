@@ -47,22 +47,27 @@ export interface RefreshResponse {
 // ============================================================
 // Admin Users & RBAC
 // ============================================================
-export type AdminRole = 'SUPER_ADMIN' | 'LOCATION_ADMIN' | 'FINANCE_ADMIN' | 'CONTENT_ADMIN' | 'OPS_ADMIN';
+// Backend AdminRole enum values (lowercase, matching NestJS schema)
+export type AdminRole = 'super_admin' | 'admin' | 'location_admin' | 'support' | 'finance' | 'content';
 export type AdminScope = 'GLOBAL' | 'LOCATION';
 export type AdminStatus = 'ACTIVE' | 'SUSPENDED';
 
 export interface AdminUser {
   _id: string;
+  // Login response uses 'id', listing uses '_id' — support both
+  id?: string;
   email: string;
   firstName: string;
   lastName: string;
-  role: AdminRole;
+  type?: string;
+  roles: AdminRole[];
   scope: AdminScope;
   locationIds: string[];
-  status: AdminStatus;
+  isActive?: boolean;
+  status?: AdminStatus;
   lastLoginAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateAdminRequest {
@@ -70,7 +75,7 @@ export interface CreateAdminRequest {
   password: string;
   firstName: string;
   lastName: string;
-  role: AdminRole;
+  roles: AdminRole[];
   scope: AdminScope;
   locationIds: string[];
 }
@@ -78,10 +83,11 @@ export interface CreateAdminRequest {
 export interface UpdateAdminRequest {
   firstName?: string;
   lastName?: string;
-  role?: AdminRole;
+  roles?: AdminRole[];
   scope?: AdminScope;
   locationIds?: string[];
   status?: AdminStatus;
+  isActive?: boolean;
 }
 
 // ============================================================
@@ -90,12 +96,27 @@ export interface UpdateAdminRequest {
 export type LocationType = 'COUNTRY' | 'STATE' | 'CITY' | 'AREA';
 export type LocationStatus = 'ACTIVE' | 'INACTIVE';
 
+export interface DeliveryConfig {
+  pricingMode: 'FLAT' | 'DISTANCE_BASED' | 'PROVIDER_QUOTE';
+  baseFee?: number;
+  perKmFee?: number;
+  minFee?: number;
+  maxFee?: number;
+  freeDeliveryThreshold?: number;
+}
+
+export interface PlatformFees {
+  orderCommissionPercent: number;
+  bookingCommissionPercent: number;
+  paymentProcessingPercent: number;
+}
+
 export interface Location {
   _id: string;
   name: string;
   slug: string;
   type: LocationType;
-  parentId?: string;
+  parentId?: string | { _id: string; name: string; slug: string; type: LocationType };
   countryCode: string;
   centerLat: number;
   centerLng: number;
@@ -111,6 +132,17 @@ export interface Location {
   supportedCurrencies: string[];
   defaultLanguage: string;
   supportedLanguages: string[];
+  deliveryConfig?: DeliveryConfig;
+  platformFees?: PlatformFees;
+  metadata?: {
+    population?: number;
+    phoneCode?: string;
+    flagEmoji?: string;
+    flagUrl?: string;
+  };
+  displayOrder?: number;
+  activatedAt?: string;
+  activatedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -121,6 +153,7 @@ export interface CreateLocationRequest {
   type: LocationType;
   parentId?: string;
   countryCode: string;
+  titles?: Record<string, string>;
   centerLat: number;
   centerLng: number;
   bounds?: {
@@ -134,11 +167,23 @@ export interface CreateLocationRequest {
   supportedCurrencies: string[];
   defaultLanguage: string;
   supportedLanguages: string[];
+  deliveryConfig?: DeliveryConfig;
+  platformFees?: PlatformFees;
+}
+
+export interface CreateLocationResponse {
+  location: Location;
+  adminCredentials: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    roles: AdminRole[];
+  };
 }
 
 export interface UpdateLocationRequest {
   name?: string;
-  status?: LocationStatus;
   timezone?: string;
   defaultCurrency?: string;
   supportedCurrencies?: string[];
@@ -149,6 +194,16 @@ export interface UpdateLocationRequest {
     south: number;
     east: number;
     west: number;
+  };
+  centerLat?: number;
+  centerLng?: number;
+  deliveryConfig?: DeliveryConfig;
+  platformFees?: PlatformFees;
+  displayOrder?: number;
+  metadata?: {
+    population?: number;
+    phoneCode?: string;
+    flagEmoji?: string;
   };
 }
 

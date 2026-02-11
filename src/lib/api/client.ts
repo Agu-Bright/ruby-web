@@ -1,7 +1,7 @@
 import type { ApiResponse } from "@/lib/types";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
 function generateRequestId(): string {
   return `web-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -67,7 +67,7 @@ async function refreshAccessToken(): Promise<boolean> {
     if (!refreshToken) return false;
 
     try {
-      const res = await fetch(`${API_URL}/admin/auth/refresh`, {
+      const res = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
@@ -193,6 +193,20 @@ async function request<T>(
     return json;
   }
 
+  // Handle paginated responses: { items: [...], pagination: {...} }
+  if (json.items !== undefined && json.pagination !== undefined) {
+    return {
+      success: true,
+      data: json.items as T,
+      meta: {
+        page: json.pagination.page,
+        limit: json.pagination.limit,
+        total: json.pagination.total,
+        totalPages: json.pagination.totalPages,
+      },
+    } as ApiResponse<T>;
+  }
+
   return { success: true, data: json as T } as ApiResponse<T>;
 }
 
@@ -210,12 +224,16 @@ export const api = {
         user: any;
       }>("/auth/admin/login", { method: "POST", body: data, noAuth: true }),
     refresh: (refreshToken: string) =>
-      request<{ accessToken: string; refreshToken: string; }>(
-        "/admin/auth/refresh",
+      request<{ accessToken: string; refreshToken: string }>(
+        "/auth/refresh",
         { method: "POST", body: { refreshToken }, noAuth: true },
       ),
-    me: () => request<import("@/lib/types").AdminUser>("/admin/auth/me"),
-    logout: () => request<void>("/admin/auth/logout", { method: "POST" }),
+    me: () => request<import("@/lib/types").AdminUser>("/admin/users/me"),
+    logout: () => {
+      // Backend has no logout endpoint — handled client-side
+      clearTokens();
+      return Promise.resolve({ success: true, data: undefined as unknown as void });
+    },
   },
 
   // Admin Users
@@ -240,36 +258,46 @@ export const api = {
       request<void>(`/admin/users/${id}`, { method: "DELETE" }),
   },
 
-  // Locations
+  // Locations — backend controller is @Controller('locations')
   locations: {
     list: (params?: import("@/lib/types").LocationFilterParams) =>
-      request<import("@/lib/types").Location[]>("/admin/locations", {
+      request<import("@/lib/types").Location[]>("/locations", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
     get: (id: string) =>
-      request<import("@/lib/types").Location>(`/admin/locations/${id}`),
+      request<import("@/lib/types").Location>(`/locations/${id}`),
     create: (data: import("@/lib/types").CreateLocationRequest) =>
-      request<import("@/lib/types").Location>("/admin/locations", {
+      request<import("@/lib/types").CreateLocationResponse>("/locations", {
         method: "POST",
         body: data,
       }),
     update: (id: string, data: import("@/lib/types").UpdateLocationRequest) =>
-      request<import("@/lib/types").Location>(`/admin/locations/${id}`, {
-        method: "PATCH",
+      request<import("@/lib/types").Location>(`/locations/${id}`, {
+        method: "PUT",
         body: data,
       }),
-    activate: (id: string) =>
+    activate: (id: string, data?: { deliveryConfig?: import("@/lib/types").DeliveryConfig; platformFees?: import("@/lib/types").PlatformFees }) =>
       request<import("@/lib/types").Location>(
-        `/admin/locations/${id}/activate`,
-        { method: "POST" },
+        `/locations/${id}/activate`,
+        { method: "PUT", body: data },
       ),
     deactivate: (id: string) =>
       request<import("@/lib/types").Location>(
-        `/admin/locations/${id}/deactivate`,
-        { method: "POST" },
+        `/locations/${id}/deactivate`,
+        { method: "PUT" },
+      ),
+    delete: (id: string) =>
+      request<void>(`/locations/${id}`, { method: "DELETE" }),
+    hierarchy: (id: string) =>
+      request<import("@/lib/types").Location[]>(
+        `/locations/${id}/hierarchy`,
+      ),
+    children: (id: string) =>
+      request<import("@/lib/types").Location[]>(
+        `/locations/${id}/children`,
       ),
     search: (query: string) =>
-      request<import("@/lib/types").Location[]>("/admin/locations/search", {
+      request<import("@/lib/types").Location[]>("/locations/search", {
         params: { q: query },
       }),
   },
@@ -470,7 +498,7 @@ export const api = {
         search?: string;
       } & import("@/lib/types").PaginationParams,
     ) =>
-      request<import("@/lib/types").Wallet[]>("/admin/finance/wallets", {
+      request<import("@/lib/types").Wallet[]>("/admin/wallets", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
   },
@@ -482,22 +510,37 @@ export const api = {
         locationId?: string;
       } & import("@/lib/types").PaginationParams,
     ) =>
-      request<import("@/lib/types").LedgerEntry[]>("/admin/finance/ledger", {
+      request<import("@/lib/types").LedgerEntry[]>("/admin/wallets/ledger", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
   },
 
   payouts: {
     list: (params?: import("@/lib/types").PayoutFilterParams) =>
-      request<import("@/lib/types").Payout[]>("/admin/finance/payouts", {
+      request<import("@/lib/types").Payout[]>("/admin/payouts", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
     get: (id: string) =>
-      request<import("@/lib/types").Payout>(`/admin/finance/payouts/${id}`),
-    action: (id: string, data: import("@/lib/types").PayoutActionRequest) =>
+      request<import("@/lib/types").Payout>(`/admin/payouts/${id}`),
+    approve: (id: string) =>
       request<import("@/lib/types").Payout>(
-        `/admin/finance/payouts/${id}/action`,
+        `/admin/payouts/${id}/approve`,
+        { method: "POST" },
+      ),
+    reject: (id: string, data?: { reason?: string }) =>
+      request<import("@/lib/types").Payout>(
+        `/admin/payouts/${id}/reject`,
         { method: "POST", body: data },
+      ),
+    process: (id: string) =>
+      request<import("@/lib/types").Payout>(
+        `/admin/payouts/${id}/process`,
+        { method: "POST" },
+      ),
+    complete: (id: string) =>
+      request<import("@/lib/types").Payout>(
+        `/admin/payouts/${id}/complete`,
+        { method: "POST" },
       ),
   },
 
@@ -508,21 +551,21 @@ export const api = {
         locationId?: string;
       } & import("@/lib/types").PaginationParams,
     ) =>
-      request<import("@/lib/types").FeeConfig[]>("/admin/finance/fee-configs", {
+      request<import("@/lib/types").FeeConfig[]>("/admin/fees", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
     get: (id: string) =>
       request<import("@/lib/types").FeeConfig>(
-        `/admin/finance/fee-configs/${id}`,
+        `/admin/fees/${id}`,
       ),
     create: (data: Partial<import("@/lib/types").FeeConfig>) =>
-      request<import("@/lib/types").FeeConfig>("/admin/finance/fee-configs", {
+      request<import("@/lib/types").FeeConfig>("/admin/fees", {
         method: "POST",
         body: data,
       }),
     update: (id: string, data: Partial<import("@/lib/types").FeeConfig>) =>
       request<import("@/lib/types").FeeConfig>(
-        `/admin/finance/fee-configs/${id}`,
+        `/admin/fees/${id}`,
         { method: "PATCH", body: data },
       ),
   },

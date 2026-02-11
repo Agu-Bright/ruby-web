@@ -20,7 +20,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useApi, useMutation } from '@/lib/hooks';
+import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, DataTable, Modal, StatusBadge, type Column } from '@/components/ui';
@@ -45,6 +45,7 @@ export default function FinancePage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedPayout, setSelectedPayout] = useState<Payout | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const {
     data: payouts,
@@ -83,21 +84,29 @@ export default function FinancePage() {
     [page],
   );
 
-  const payoutAction = useMutation<Payout, { id: string; action: string; reason?: string }>(
-    ({ id, action, reason }) =>
-      api.payouts.action(id, { action: action as 'APPROVE' | 'DENY' | 'RETRY', reason })
-  );
-
   const handlePayoutAction = async (payout: Payout, action: string) => {
     const reason = action === 'DENY' ? prompt('Reason for denial:') : undefined;
     if (action === 'DENY' && !reason) return;
+    setActionLoading(true);
     try {
-      await payoutAction.mutate({ id: payout._id, action, reason: reason || undefined });
+      switch (action) {
+        case 'APPROVE':
+          await api.payouts.approve(payout._id);
+          break;
+        case 'DENY':
+          await api.payouts.reject(payout._id, { reason: reason || undefined });
+          break;
+        case 'RETRY':
+          await api.payouts.process(payout._id);
+          break;
+      }
       toast.success(`Payout ${action.toLowerCase()}d successfully`);
       refetchPayouts();
       setShowDetailModal(false);
     } catch {
       toast.error(`Failed to ${action.toLowerCase()} payout`);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -282,7 +291,7 @@ export default function FinancePage() {
           <div className="relative">
             <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white appearance-none">
+              className="pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white appearance-none">
               <option value="">All statuses</option>
               {PAYOUT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -293,7 +302,7 @@ export default function FinancePage() {
           <div className="relative flex-1 max-w-xs">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="Search wallets..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-lg" />
+              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg" />
           </div>
         )}
       </div>
@@ -347,15 +356,15 @@ export default function FinancePage() {
             )}
             {selectedPayout.status === 'PENDING' && (
               <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
-                <button onClick={() => handlePayoutAction(selectedPayout, 'APPROVE')} disabled={payoutAction.isLoading}
+                <button onClick={() => handlePayoutAction(selectedPayout, 'APPROVE')} disabled={actionLoading}
                   className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50">Approve Payout</button>
-                <button onClick={() => handlePayoutAction(selectedPayout, 'DENY')} disabled={payoutAction.isLoading}
+                <button onClick={() => handlePayoutAction(selectedPayout, 'DENY')} disabled={actionLoading}
                   className="flex-1 bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50">Deny Payout</button>
               </div>
             )}
             {selectedPayout.status === 'FAILED' && (
               <div className="pt-4 border-t border-gray-200">
-                <button onClick={() => handlePayoutAction(selectedPayout, 'RETRY')} disabled={payoutAction.isLoading}
+                <button onClick={() => handlePayoutAction(selectedPayout, 'RETRY')} disabled={actionLoading}
                   className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">Retry Payout</button>
               </div>
             )}

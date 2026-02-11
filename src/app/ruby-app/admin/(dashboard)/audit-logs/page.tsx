@@ -165,12 +165,12 @@ export default function AuditLogsPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" placeholder="Search by admin, resource ID..." value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500" />
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500" />
         </div>
         <div className="relative">
           <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <select value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-            className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white appearance-none">
+            className="pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white appearance-none">
             <option value="">All actions</option>
             {ACTION_TYPES.map(a => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
           </select>

@@ -9,7 +9,7 @@ export default function CTASection() {
           backgroundImage: "url(https://picsum.photos/seed/ctabg/1920/600)",
         }}
       />
-      <div className="absolute inset-0 bg-black/70" />
+      <div className="absolute inset-0 bg-black/70"/>
 
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <ScrollReveal>

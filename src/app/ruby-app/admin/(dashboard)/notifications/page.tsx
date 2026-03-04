@@ -98,7 +98,7 @@ export default function NotificationsPage() {
 
   const {
     data: response,
-    loading,
+    isLoading,
     refetch,
   } = useApi<AdminNotificationListResponse>(
     () =>
@@ -189,7 +189,7 @@ export default function NotificationsPage() {
 
         {/* Notification List */}
         <div className="divide-y divide-gray-50">
-          {loading && notifications.length === 0 ? (
+          {isLoading && notifications.length === 0 ? (
             <div className="flex items-center justify-center py-16">
               <div className="w-6 h-6 border-2 border-ruby-600 border-t-transparent rounded-full animate-spin" />
             </div>

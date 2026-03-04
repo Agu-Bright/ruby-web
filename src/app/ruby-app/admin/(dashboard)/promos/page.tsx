@@ -17,7 +17,7 @@ const EMPTY_PROMO = {
   title: '',
   description: '',
   imageUrl: '',
-  linkType: 'BUSINESS' as const,
+  linkType: 'BUSINESS' as 'BUSINESS' | 'EXTERNAL',
   businessId: '',
   externalUrl: '',
   locationId: '',

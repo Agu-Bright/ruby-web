@@ -5,3 +5,4 @@ export { PageHeader } from './page-header';
 export { StatCard } from './stat-card';
 export { ToastProvider } from './toast-provider';
 export { SearchableSelect, type SelectOption } from './searchable-select';
+export { ImageUpload } from './image-upload';

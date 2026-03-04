@@ -90,6 +90,16 @@ export function getStatusColor(status: string): string {
     CANCELLED: 'badge-danger',
     ESCALATED: 'badge-danger',
     NO_SHOW: 'badge-danger',
+    FAILED: 'badge-danger',
+    // Delivery statuses
+    CREATED: 'badge-neutral',
+    ASSIGNED: 'badge-info',
+    RIDER_ACCEPTED: 'badge-info',
+    RIDER_AT_PICKUP: 'badge-warning',
+    PICKED_UP: 'badge-warning',
+    IN_TRANSIT: 'badge-info',
+    RIDER_AT_DROPOFF: 'badge-warning',
+    READY: 'badge-success',
   };
   return colors[status] || 'badge-neutral';
 }
@@ -102,3 +112,125 @@ export function getInitials(firstName: string, lastName: string): string {
 export function toLocationId(loc: string | { _id: string; [key: string]: unknown }): string {
   return typeof loc === 'object' && loc !== null ? loc._id : loc;
 }
+
+// ============================================================
+// Business Field Helpers — Handle Populated & String Fields
+// ============================================================
+
+/**
+ * Safely extract owner ID from potentially populated ownerId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOwnerId(owner: any): string {
+  if (!owner) return '';
+  return typeof owner === 'object' && owner !== null ? owner._id : owner;
+}
+
+/**
+ * Safely extract owner name from potentially populated ownerId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOwnerName(owner: any): string {
+  if (!owner) return '';
+  if (typeof owner === 'string') return '';
+  return owner?.fullName || `${owner?.firstName || ''} ${owner?.lastName || ''}`.trim() || '';
+}
+
+/**
+ * Safely extract owner email from potentially populated ownerId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOwnerEmail(owner: any): string {
+  if (!owner) return '';
+  if (typeof owner === 'string') return '';
+  return owner?.email || '';
+}
+
+/**
+ * Safely extract category ID from potentially populated categoryId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getCategoryId(category: any): string {
+  if (!category) return '';
+  return typeof category === 'object' && category !== null ? category._id : category;
+}
+
+/**
+ * Safely extract category name from potentially populated categoryId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getCategoryName(category: any): string {
+  if (!category) return '';
+  if (typeof category === 'string') return '';
+  return category?.name || '';
+}
+
+/**
+ * Safely extract subcategory ID from potentially populated subcategoryId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getSubcategoryId(subcategory: any): string {
+  if (!subcategory) return '';
+  return typeof subcategory === 'object' && subcategory !== null ? subcategory._id : subcategory;
+}
+
+/**
+ * Safely extract subcategory name from potentially populated subcategoryId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getSubcategoryName(subcategory: any): string {
+  if (!subcategory) return '';
+  if (typeof subcategory === 'string') return '';
+  return subcategory?.name || '';
+}
+
+/**
+ * Safely extract location ID from potentially populated locationId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getLocationId(location: any): string {
+  if (!location) return '';
+  return typeof location === 'object' && location !== null ? location._id : location;
+}
+
+/**
+ * Safely extract location name from potentially populated locationId
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getLocationName(location: any): string {
+  if (!location) return '';
+  if (typeof location === 'string') return '';
+  return location?.name || '';
+}
+
+const AD_TYPE_LABELS: Record<string, string> = {
+  FEATURED_LISTING: 'Featured Listing',
+  SLIDESHOW_AD: 'Slideshow Ad',
+  EXPLORE_REELS_AD: 'Explore Reels Ad',
+  PUSH_NOTIFICATION: 'Push Notification',
+};
+
+export function getAdTypeName(type: string): string {
+  return AD_TYPE_LABELS[type] || type;
+}
+
+const AD_STATUS_LABELS: Record<string, string> = {
+  PENDING_REVIEW: 'Pending Review',
+  ACTIVE: 'Active',
+  PAUSED: 'Paused',
+  COMPLETED: 'Completed',
+  REJECTED: 'Rejected',
+  CANCELLED: 'Cancelled',
+};
+
+export function getAdStatusLabel(status: string): string {
+  return AD_STATUS_LABELS[status] || status;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getBusinessName(business: any): string {
+  if (!business) return '';
+  if (typeof business === 'string') return '';
+  return business?.name || '';
+}
+

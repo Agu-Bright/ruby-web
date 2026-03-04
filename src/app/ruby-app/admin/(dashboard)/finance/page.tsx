@@ -18,6 +18,7 @@ import {
   CreditCard,
   TrendingUp,
   AlertTriangle,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApi } from '@/lib/hooks';
@@ -46,6 +47,7 @@ export default function FinancePage() {
   const [selectedPayout, setSelectedPayout] = useState<Payout | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<LedgerEntry | null>(null);
 
   const {
     data: payouts,
@@ -308,7 +310,7 @@ export default function FinancePage() {
       </div>
 
       {tab === 'payouts' && <DataTable columns={payoutColumns} data={payouts || []} meta={payoutsMeta} isLoading={payoutsLoading} currentPage={page} onPageChange={setPage} emptyMessage="No payout requests found" onRowClick={(p) => { setSelectedPayout(p); setShowDetailModal(true); }} />}
-      {tab === 'ledger' && <DataTable columns={ledgerColumns} data={ledger || []} meta={ledgerMeta} isLoading={ledgerLoading} currentPage={page} onPageChange={setPage} emptyMessage="No ledger entries found" />}
+      {tab === 'ledger' && <DataTable columns={ledgerColumns} data={ledger || []} meta={ledgerMeta} isLoading={ledgerLoading} currentPage={page} onPageChange={setPage} emptyMessage="No ledger entries found" onRowClick={(entry) => setSelectedLedgerEntry(entry)} />}
       {tab === 'wallets' && <DataTable columns={walletColumns} data={wallets || []} meta={walletsMeta} isLoading={walletsLoading} currentPage={page} onPageChange={setPage} emptyMessage="No wallets found" />}
       {tab === 'fees' && <DataTable columns={feeColumns} data={fees || []} meta={feesMeta} isLoading={feesLoading} currentPage={page} onPageChange={setPage} emptyMessage="No fee configurations found" />}
 
@@ -371,6 +373,127 @@ export default function FinancePage() {
           </div>
         )}
       </Modal>
+
+      {/* Ledger Entry Detail Modal */}
+      {selectedLedgerEntry && (
+        <LedgerDetailModal
+          entry={selectedLedgerEntry}
+          onClose={() => setSelectedLedgerEntry(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Ledger Detail Modal ──────────────────────────────────
+
+const TX_TYPE_LABELS: Record<string, string> = {
+  DEPOSIT: 'Wallet Top-up',
+  WITHDRAWAL: 'Withdrawal',
+  ORDER_PAYMENT: 'Order Payment',
+  BOOKING_PAYMENT: 'Booking Payment',
+  TRANSFER_IN: 'Money Received',
+  TRANSFER_OUT: 'Money Sent',
+  REFUND_RECEIVED: 'Refund Received',
+  REFUND_ISSUED: 'Refund Issued',
+  PAYMENT_RECEIVED: 'Payment Received',
+  PLATFORM_FEE: 'Platform Fee',
+  DELIVERY_FEE: 'Delivery Fee',
+  PAYOUT: 'Payout',
+  PAYOUT_REVERSAL: 'Payout Reversal',
+  CANCELLATION_FEE: 'Cancellation Fee',
+  AD_PURCHASE: 'Ad Purchase',
+  AD_REFUND: 'Ad Refund',
+  ADJUSTMENT_CREDIT: 'Adjustment (Credit)',
+  ADJUSTMENT_DEBIT: 'Adjustment (Debit)',
+};
+
+const TX_STATUS_STYLES: Record<string, string> = {
+  COMPLETED: 'bg-emerald-100 text-emerald-700',
+  PENDING: 'bg-amber-100 text-amber-700',
+  FAILED: 'bg-red-100 text-red-700',
+  REVERSED: 'bg-gray-100 text-gray-700',
+};
+
+function LedgerDetailModal({
+  entry, onClose,
+}: {
+  entry: LedgerEntry; onClose: () => void;
+}) {
+  const isCredit = entry.direction === 'CREDIT' || entry.type === 'CREDIT';
+  const typeLabel = TX_TYPE_LABELS[entry.referenceType] || entry.referenceType?.replace(/_/g, ' ') || entry.type;
+  const status = entry.status || 'COMPLETED';
+  const meta = entry.metadata || {};
+
+  const senderName = (meta.customerName as string) || (meta.senderName as string) || null;
+  const receiverName = (meta.businessName as string) || (meta.receiverName as string) || null;
+
+  const rows: { label: string; value: string; mono?: boolean }[] = [
+    { label: 'Type', value: typeLabel },
+    { label: 'Description', value: entry.description || '—' },
+    ...(senderName ? [{ label: 'From', value: senderName }] : []),
+    ...(receiverName ? [{ label: 'To', value: receiverName }] : []),
+    { label: 'Amount', value: `${isCredit ? '+' : '-'}${formatCurrency(entry.amount, entry.currency)}` },
+    { label: 'Balance Before', value: formatCurrency(entry.balanceBefore, entry.currency) },
+    { label: 'Balance After', value: formatCurrency(entry.balanceAfter, entry.currency) },
+    { label: 'Currency', value: entry.currency || 'NGN' },
+    ...(entry.transactionRef ? [{ label: 'Reference', value: entry.transactionRef, mono: true }] : []),
+    { label: 'Reference Type', value: entry.referenceType || '—' },
+    ...(entry.referenceId ? [{ label: 'Reference ID', value: entry.referenceId, mono: true }] : []),
+    { label: 'Wallet ID', value: entry.walletId, mono: true },
+    { label: 'Date & Time', value: formatDateTime(entry.createdAt) },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-slide-up max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
+          <h2 className="text-base font-semibold text-gray-900">Ledger Entry Details</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 overflow-y-auto flex-1">
+          {/* Amount hero */}
+          <div className="text-center mb-5">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${isCredit ? 'bg-emerald-100' : 'bg-red-100'}`}>
+              {isCredit ? <ArrowDownLeft className="w-5 h-5 text-emerald-600" /> : <ArrowUpRight className="w-5 h-5 text-red-600" />}
+            </div>
+            <p className={`text-2xl font-bold ${isCredit ? 'text-emerald-600' : 'text-red-600'}`}>
+              {isCredit ? '+' : '-'}{formatCurrency(entry.amount, entry.currency)}
+            </p>
+            <p className="text-sm text-gray-500 mt-1">{typeLabel}</p>
+            <span className={`inline-block mt-2 px-2.5 py-0.5 text-[11px] font-semibold rounded-full ${TX_STATUS_STYLES[status] || TX_STATUS_STYLES.COMPLETED}`}>
+              {status}
+            </span>
+          </div>
+
+          {/* Detail rows */}
+          <div className="divide-y divide-gray-100">
+            {rows.map((row) => (
+              <div key={row.label} className="flex items-start justify-between py-2.5">
+                <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">{row.label}</span>
+                <span className={`text-sm text-gray-800 font-medium text-right max-w-[60%] break-all ${row.mono ? 'font-mono text-xs' : ''}`}>
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Metadata */}
+          {Object.keys(meta).length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Metadata</p>
+              <div className="bg-gray-50 rounded-lg p-3 text-xs font-mono text-gray-600 break-all whitespace-pre-wrap">
+                {JSON.stringify(meta, null, 2)}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

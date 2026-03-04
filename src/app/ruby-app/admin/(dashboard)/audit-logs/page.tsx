@@ -117,7 +117,7 @@ export default function AuditLogsPage() {
           {log.locationId ? (
             <span className="flex items-center gap-1">
               <MapPin size={12} />
-              <span className="font-mono">{log.locationId.slice(-8)}</span>
+              <span className="font-mono">{typeof log.locationId === 'object' ? log.locationId.name : log.locationId.slice(-8)}</span>
             </span>
           ) : (
             <span className="text-gray-400">Global</span>
@@ -229,7 +229,7 @@ export default function AuditLogsPage() {
               {selectedLog.locationId && (
                 <div className="bg-gray-50 rounded-lg p-3">
                   <p className="text-gray-500 text-xs uppercase font-medium mb-1">Location</p>
-                  <p className="text-gray-900 font-mono text-xs">{selectedLog.locationId}</p>
+                  <p className="text-gray-900 font-mono text-xs">{typeof selectedLog.locationId === 'object' ? selectedLog.locationId.name : selectedLog.locationId}</p>
                 </div>
               )}
               {selectedLog.ipAddress && (

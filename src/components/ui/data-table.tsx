@@ -33,8 +33,8 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="card">
+        <div className="overflow-x-auto overflow-y-visible">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50">
@@ -73,8 +73,8 @@ export function DataTable<T>({
   const totalPages = meta?.totalPages || 1;
 
   return (
-    <div className="card overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="card min-h-[400px]">
+      <div>
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50/50">

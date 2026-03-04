@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
   // Fix HMR on WSL2 — use polling instead of inotify for file watching

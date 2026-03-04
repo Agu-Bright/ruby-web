@@ -67,10 +67,13 @@ export function useApi<T>(
 }
 
 export function useMutation<TData, TInput = void>(
-  mutator: (input: TInput) => Promise<ApiResponse<TData>>
+  mutator: (input: TInput) => Promise<ApiResponse<TData>>,
+  options?: { onError?: (message: string) => void }
 ) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const onErrorRef = useRef(options?.onError);
+  onErrorRef.current = options?.onError;
 
   const mutate = useCallback(
     async (input: TInput): Promise<TData | null> => {
@@ -80,11 +83,11 @@ export function useMutation<TData, TInput = void>(
         const res = await mutator(input);
         return res.data;
       } catch (err) {
-        if (err instanceof ApiClientError) {
-          setError(err.message);
-        } else {
-          setError('An unexpected error occurred');
-        }
+        const message = err instanceof ApiClientError
+          ? err.message
+          : 'An unexpected error occurred';
+        setError(message);
+        onErrorRef.current?.(message);
         return null;
       } finally {
         setIsLoading(false);

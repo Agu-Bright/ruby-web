@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   MapPin,
   Users,
+  UserCircle,
   FolderTree,
   FileText,
   Store,
@@ -21,10 +22,13 @@ import {
   X,
   ChevronRight,
   ExternalLink,
-  Bell,
+  Megaphone,
+  Truck,
+  Tag,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
+import { NotificationDropdown } from "@/components/ui/notification-dropdown";
 import { getInitials } from "@/lib/utils";
 
 interface NavItem {
@@ -32,6 +36,7 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   superOnly?: boolean;
+  hiddenForRoles?: string[];
 }
 
 interface NavGroup {
@@ -49,19 +54,23 @@ const navGroups: NavGroup[] = [
   {
     title: "Platform",
     items: [
-      { label: "Locations", href: "/ruby-app/admin/locations", icon: MapPin },
+      { label: "Locations", href: "/ruby-app/admin/locations", icon: MapPin, hiddenForRoles: ["location_admin"] },
       { label: "Admin Users", href: "/ruby-app/admin/users", icon: Users, superOnly: true },
-      { label: "Taxonomy", href: "/ruby-app/admin/taxonomy", icon: FolderTree },
-      { label: "Templates", href: "/ruby-app/admin/templates", icon: FileText },
+      { label: "Taxonomy", href: "/ruby-app/admin/taxonomy", icon: FolderTree, hiddenForRoles: ["location_admin"] },
+      { label: "Templates", href: "/ruby-app/admin/templates", icon: FileText, hiddenForRoles: ["location_admin"] },
     ],
   },
   {
     title: "Operations",
     items: [
+      { label: "Customers", href: "/ruby-app/admin/customers", icon: UserCircle },
       { label: "Businesses", href: "/ruby-app/admin/businesses", icon: Store },
       { label: "Orders", href: "/ruby-app/admin/orders", icon: ShoppingCart },
+      { label: "Delivery", href: "/ruby-app/admin/delivery", icon: Truck },
       { label: "Bookings", href: "/ruby-app/admin/bookings", icon: CalendarCheck },
       { label: "Disputes", href: "/ruby-app/admin/disputes", icon: AlertTriangle },
+      { label: "Campaigns", href: "/ruby-app/admin/campaigns", icon: Megaphone },
+      { label: "Promos", href: "/ruby-app/admin/promos", icon: Tag },
     ],
   },
   {
@@ -101,7 +110,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const filteredGroups = navGroups.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !(item.superOnly && !isSuperAdmin)),
+    items: group.items.filter((item) => {
+      if (item.superOnly && !isSuperAdmin) return false;
+      if (item.hiddenForRoles && admin.roles?.some((r) => item.hiddenForRoles!.includes(r))) return false;
+      return true;
+    }),
   })).filter((group) => group.items.length > 0);
 
   const isActive = (href: string) => {
@@ -155,11 +168,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Notification bell */}
-            <button className="relative p-2.5 rounded-xl hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
-              <Bell className="w-[18px] h-[18px]" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-ruby-600 rounded-full ring-2 ring-white" />
-            </button>
+            <NotificationDropdown />
 
             <div className="w-px h-8 bg-gray-200 mx-1" />
 

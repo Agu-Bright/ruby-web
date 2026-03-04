@@ -15,8 +15,24 @@ import type { SelectOption } from '@/components/ui';
 import { formatDate, formatDateTime, getInitials } from '@/lib/utils';
 import type {
   AdminUser, AdminRole, AdminScope, CreateAdminRequest, UpdateAdminRequest,
-  PaginationParams, Location,
+  PaginationParams, Location, ApiResponse,
 } from '@/lib/types';
+
+/** Fetch all CITY locations across pages (backend max limit=100) */
+async function fetchAllCityLocations(): Promise<ApiResponse<Location[]>> {
+  const all: Location[] = [];
+  let page = 1;
+  let hasMore = true;
+  while (hasMore) {
+    const res = await api.locations.list({ page, limit: 100, type: 'CITY' });
+    const items = Array.isArray(res.data) ? res.data : [];
+    all.push(...items);
+    const total = res.meta?.total || 0;
+    hasMore = all.length < total;
+    page++;
+  }
+  return { success: true, data: all };
+}
 
 // ─── Helpers & Constants ────────────────────────────────────
 
@@ -600,7 +616,7 @@ function CreateAdminModal({
 
   // Fetch city locations for the searchable select
   const { data: cityLocations } = useApi<Location[]>(
-    () => api.locations.list({ limit: 200, type: 'CITY' }),
+    fetchAllCityLocations,
     [],
     { enabled: isOpen },
   );
@@ -1075,7 +1091,7 @@ function EditAdminModal({
 
   // Fetch city locations
   const { data: cityLocations } = useApi<Location[]>(
-    () => api.locations.list({ limit: 200, type: 'CITY' }),
+    fetchAllCityLocations,
     [],
   );
 

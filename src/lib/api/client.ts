@@ -1,4 +1,4 @@
-import type { ApiResponse } from "@/lib/types";
+import type { ApiResponse, UploadResult } from "@/lib/types";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
@@ -210,6 +210,75 @@ async function request<T>(
   return { success: true, data: json as T } as ApiResponse<T>;
 }
 
+async function uploadFile(
+  path: string,
+  file: File,
+  folder?: string,
+): Promise<ApiResponse<UploadResult>> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const url = buildUrl(path, folder ? { folder } : undefined);
+
+  const headers: Record<string, string> = {
+    "X-Request-Id": generateRequestId(),
+  };
+
+  const token = getAccessToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  let res = await fetch(url, { method: "POST", headers, body: formData });
+
+  if (res.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      const newToken = getAccessToken();
+      if (newToken) {
+        headers["Authorization"] = `Bearer ${newToken}`;
+      }
+      res = await fetch(url, { method: "POST", headers, body: formData });
+    }
+
+    if (res.status === 401) {
+      clearTokens();
+      if (typeof window !== "undefined") {
+        window.location.href = "/ruby-app/admin/login";
+      }
+      throw new ApiClientError("Session expired", "AUTH_EXPIRED", 401);
+    }
+  }
+
+  const json = await res.json().catch(() => ({
+    success: false,
+    data: null as unknown as UploadResult,
+    error: { code: "PARSE_ERROR", message: "Failed to parse response" },
+  }));
+
+  if (!res.ok) {
+    throw new ApiClientError(
+      json.error?.message || json.message || `Upload failed with status ${res.status}`,
+      json.error?.code || "UPLOAD_ERROR",
+      res.status,
+      json.error?.details,
+    );
+  }
+
+  if (json.success !== undefined) {
+    if (!json.success) {
+      throw new ApiClientError(
+        json.error?.message || "Upload failed",
+        json.error?.code || "UPLOAD_ERROR",
+        res.status,
+      );
+    }
+    return json;
+  }
+
+  return { success: true, data: json as UploadResult };
+}
+
 // ============================================================
 // API Client Methods
 // ============================================================
@@ -234,6 +303,16 @@ export const api = {
       clearTokens();
       return Promise.resolve({ success: true, data: undefined as unknown as void });
     },
+  },
+
+  // Media
+  media: {
+    upload: (file: File, folder?: string) =>
+      uploadFile("/admin/media/upload", file, folder),
+    delete: (key: string) =>
+      request<void>(`/admin/media/${encodeURIComponent(key)}`, {
+        method: "DELETE",
+      }),
   },
 
   // Admin Users
@@ -306,15 +385,18 @@ export const api = {
   categoryGroups: {
     list: () =>
       request<import("@/lib/types").CategoryGroup[]>("/admin/taxonomy/groups"),
-    create: (data: Partial<import("@/lib/types").CategoryGroup>) =>
+    create: (data: import("@/lib/types").CreateCategoryGroupRequest) =>
       request<import("@/lib/types").CategoryGroup>("/admin/taxonomy/groups", {
         method: "POST",
         body: data,
       }),
-    update: (id: string, data: Partial<import("@/lib/types").CategoryGroup>) =>
+    update: (
+      id: string,
+      data: Partial<import("@/lib/types").CreateCategoryGroupRequest>,
+    ) =>
       request<import("@/lib/types").CategoryGroup>(
         `/admin/taxonomy/groups/${id}`,
-        { method: "PATCH", body: data },
+        { method: "PUT", body: data },
       ),
     delete: (id: string) =>
       request<void>(`/admin/taxonomy/groups/${id}`, { method: "DELETE" }),
@@ -340,7 +422,7 @@ export const api = {
     ) =>
       request<import("@/lib/types").Category>(
         `/admin/taxonomy/categories/${id}`,
-        { method: "PATCH", body: data },
+        { method: "PUT", body: data },
       ),
     delete: (id: string) =>
       request<void>(`/admin/taxonomy/categories/${id}`, { method: "DELETE" }),
@@ -372,7 +454,7 @@ export const api = {
     ) =>
       request<import("@/lib/types").Subcategory>(
         `/admin/taxonomy/subcategories/${id}`,
-        { method: "PATCH", body: data },
+        { method: "PUT", body: data },
       ),
     delete: (id: string) =>
       request<void>(`/admin/taxonomy/subcategories/${id}`, {
@@ -383,26 +465,26 @@ export const api = {
   locationCategoryConfig: {
     list: (locationId: string) =>
       request<import("@/lib/types").LocationCategoryConfig[]>(
-        `/admin/taxonomy/locations/${locationId}/categories`,
+        `/admin/taxonomy/location-configs/categories/${locationId}`,
       ),
     upsert: (data: import("@/lib/types").UpsertLocationCategoryConfigRequest) =>
       request<import("@/lib/types").LocationCategoryConfig>(
-        "/admin/taxonomy/location-category-config",
-        { method: "PUT", body: data },
+        "/admin/taxonomy/location-configs/categories",
+        { method: "POST", body: data },
       ),
   },
 
   locationSubcategoryConfig: {
     list: (locationId: string) =>
       request<import("@/lib/types").LocationSubcategoryConfig[]>(
-        `/admin/taxonomy/locations/${locationId}/subcategories`,
+        `/admin/taxonomy/location-configs/subcategories/${locationId}`,
       ),
     upsert: (
       data: import("@/lib/types").UpsertLocationSubcategoryConfigRequest,
     ) =>
       request<import("@/lib/types").LocationSubcategoryConfig>(
-        "/admin/taxonomy/location-subcategory-config",
-        { method: "PUT", body: data },
+        "/admin/taxonomy/location-configs/subcategories",
+        { method: "POST", body: data },
       ),
   },
 
@@ -414,7 +496,7 @@ export const api = {
 
   // Templates
   templates: {
-    list: (params?: { subcategoryId?: string; isActive?: boolean }) =>
+    list: (params?: { search?: string; isActive?: boolean; includeAllVersions?: boolean } & import("@/lib/types").PaginationParams) =>
       request<import("@/lib/types").Template[]>("/admin/templates", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
@@ -427,7 +509,16 @@ export const api = {
       }),
     update: (id: string, data: import("@/lib/types").UpdateTemplateRequest) =>
       request<import("@/lib/types").Template>(`/admin/templates/${id}`, {
-        method: "PATCH",
+        method: "PUT",
+        body: data,
+      }),
+    deactivate: (id: string) =>
+      request<import("@/lib/types").Template>(`/admin/templates/${id}/deactivate`, {
+        method: "PUT",
+      }),
+    createVersion: (id: string, data: { description?: string; fields?: import("@/lib/types").TemplateField[]; sections?: import("@/lib/types").TemplateSection[] }) =>
+      request<import("@/lib/types").Template>(`/admin/templates/${id}/version`, {
+        method: "POST",
         body: data,
       }),
     delete: (id: string) =>
@@ -440,8 +531,49 @@ export const api = {
       request<import("@/lib/types").Business[]>("/admin/businesses", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
+    pendingReview: (params?: import("@/lib/types").PaginationParams) =>
+      request<import("@/lib/types").Business[]>("/admin/businesses/pending-review", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    stats: (params?: { locationId?: string }) =>
+      request<import("@/lib/types").BusinessStats>("/admin/businesses/stats", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
     get: (id: string) =>
       request<import("@/lib/types").Business>(`/admin/businesses/${id}`),
+    approve: (id: string, data?: { notes?: string }) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/approve`,
+        { method: "POST", body: data },
+      ),
+    reject: (id: string, data: { reason: string }) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/reject`,
+        { method: "POST", body: data },
+      ),
+    suspend: (id: string, data: { reason: string }) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/suspend`,
+        { method: "POST", body: data },
+      ),
+    reinstate: (id: string) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/reinstate`,
+        { method: "POST" },
+      ),
+    feature: (id: string, data: { isFeatured: boolean; featuredUntil?: string }) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/feature`,
+        { method: "PATCH", body: data },
+      ),
+    verifyCac: (id: string, data: import("@/lib/types").VerifyCacRequest) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/verify-cac`,
+        { method: "POST", body: data },
+      ),
+    delete: (id: string) =>
+      request<null>(`/admin/businesses/${id}`, { method: "DELETE" }),
+    // Keep backward-compat alias
     updateStatus: (
       id: string,
       data: import("@/lib/types").BusinessApprovalAction,
@@ -460,6 +592,41 @@ export const api = {
       }),
     get: (id: string) =>
       request<import("@/lib/types").Order>(`/admin/orders/${id}`),
+    cancel: (id: string, reason: string) =>
+      request<import("@/lib/types").Order>(`/admin/orders/${id}/cancel`, {
+        method: "POST",
+        body: { reason },
+      }),
+    updateStatus: (id: string, status: string, note?: string) =>
+      request<import("@/lib/types").Order>(`/admin/orders/${id}/status`, {
+        method: "PATCH",
+        body: { status, note },
+      }),
+  },
+
+  // Delivery Jobs
+  delivery: {
+    listJobs: (params?: import("@/lib/types").DeliveryJobFilterParams) =>
+      request<import("@/lib/types").DeliveryJob[]>("/admin/delivery/jobs", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    getJob: (id: string) =>
+      request<import("@/lib/types").DeliveryJob>(`/admin/delivery/jobs/${id}`),
+    assignRider: (id: string, data: { name: string; phone: string; vehicleType?: string; vehiclePlate?: string }) =>
+      request<import("@/lib/types").DeliveryJob>(`/admin/delivery/jobs/${id}/rider`, {
+        method: "PUT",
+        body: data,
+      }),
+    updateJobStatus: (id: string, status: string, note?: string) =>
+      request<import("@/lib/types").DeliveryJob>(`/admin/delivery/jobs/${id}/status`, {
+        method: "PUT",
+        body: { status, note },
+      }),
+    cancelJob: (id: string, reason: string) =>
+      request<import("@/lib/types").DeliveryJob>(`/admin/delivery/jobs/${id}/cancel`, {
+        method: "POST",
+        body: { reason },
+      }),
   },
 
   // Bookings
@@ -570,6 +737,37 @@ export const api = {
       ),
   },
 
+  // Customers (end-users)
+  customers: {
+    list: (params?: import("@/lib/types").CustomerFilterParams) =>
+      request<import("@/lib/types").Customer[]>("/users", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").Customer>(`/users/${id}`),
+    activate: (id: string) =>
+      request<import("@/lib/types").Customer>(`/users/${id}/activate`, {
+        method: "PUT",
+      }),
+    deactivate: (id: string) =>
+      request<import("@/lib/types").Customer>(`/users/${id}/deactivate`, {
+        method: "PUT",
+      }),
+    delete: (id: string) =>
+      request<void>(`/users/${id}`, { method: "DELETE" }),
+    getWallets: (userId: string) =>
+      request<import("@/lib/types").Wallet[]>(`/admin/wallets/by-user/${userId}`),
+    fundWallet: (walletId: string, data: { amount: number; currency?: string; description?: string }) =>
+      request<import("@/lib/types").LedgerEntry>(`/admin/wallets/${walletId}/fund`, {
+        method: "POST",
+        body: data,
+      }),
+    getWalletTransactions: (walletId: string, params?: { page?: number; limit?: number; type?: string }) =>
+      request<import("@/lib/types").LedgerEntry[]>(`/admin/wallets/${walletId}/transactions`, {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+  },
+
   // Audit Logs
   auditLogs: {
     list: (params?: import("@/lib/types").AuditLogFilterParams) =>
@@ -590,6 +788,90 @@ export const api = {
           >,
         },
       ),
+  },
+
+  // Promos
+  promos: {
+    list: (params?: import("@/lib/types").PromoFilterParams) =>
+      request<import("@/lib/types").Promo[]>("/admin/promos", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").Promo>(`/admin/promos/${id}`),
+    create: (data: Partial<import("@/lib/types").Promo>) =>
+      request<import("@/lib/types").Promo>("/admin/promos", {
+        method: "POST",
+        body: data,
+      }),
+    update: (id: string, data: Partial<import("@/lib/types").Promo>) =>
+      request<import("@/lib/types").Promo>(`/admin/promos/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+    delete: (id: string) =>
+      request<void>(`/admin/promos/${id}`, { method: "DELETE" }),
+    stats: () =>
+      request<{ total: number; active: number; totalImpressions: number; totalClicks: number }>("/admin/promos/stats"),
+  },
+
+  adCampaigns: {
+    list: (params?: import("@/lib/types").AdCampaignFilterParams) =>
+      request<import("@/lib/types").AdCampaign[]>("/admin/ads", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").AdCampaign>(`/admin/ads/${id}`),
+    stats: (params?: { locationId?: string }) =>
+      request<import("@/lib/types").AdCampaignStats>("/admin/ads/stats", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    approve: (id: string) =>
+      request<import("@/lib/types").AdCampaign>(`/admin/ads/${id}/approve`, {
+        method: "POST",
+      }),
+    reject: (id: string, data: { rejectionReason?: string }) =>
+      request<import("@/lib/types").AdCampaign>(`/admin/ads/${id}/reject`, {
+        method: "POST",
+        body: data,
+      }),
+  },
+
+  adProducts: {
+    list: () =>
+      request<import("@/lib/types").AdProduct[]>("/admin/ads/products"),
+    updatePrice: (type: string, ratePerUnit: number) =>
+      request<import("@/lib/types").AdProduct>(
+        `/admin/ads/products/${type}`,
+        {
+          method: "PATCH",
+          body: { ratePerUnit },
+        },
+      ),
+  },
+
+  notifications: {
+    list: (params?: { page?: number; limit?: number; type?: string; isRead?: boolean }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.set("page", String(params.page));
+      if (params?.limit) searchParams.set("limit", String(params.limit));
+      if (params?.type) searchParams.set("type", params.type);
+      if (params?.isRead !== undefined) searchParams.set("isRead", String(params.isRead));
+      const qs = searchParams.toString();
+      return request<import("@/lib/types").AdminNotificationListResponse>(
+        `/admin/notifications${qs ? `?${qs}` : ""}`,
+      );
+    },
+    unreadCount: () =>
+      request<{ count: number }>("/admin/notifications/unread-count"),
+    markRead: (ids: string[]) =>
+      request<{ success: boolean }>("/admin/notifications/mark-read", {
+        method: "POST",
+        body: { ids },
+      }),
+    markAllRead: () =>
+      request<{ success: boolean }>("/admin/notifications/mark-all-read", {
+        method: "POST",
+      }),
   },
 };
 

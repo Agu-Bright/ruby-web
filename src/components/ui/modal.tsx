@@ -9,6 +9,7 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  subtitle?: string;
 }
 
 const sizeClasses = {
@@ -18,7 +19,7 @@ const sizeClasses = {
   xl: 'max-w-4xl',
 };
 
-export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = 'md', subtitle }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,10 +52,13 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       }}
     >
       <div className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} animate-slide-up max-h-[90vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+            {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors -mr-1">
+            <X className="w-4 h-4 text-gray-400" />
           </button>
         </div>
         <div className="px-6 py-4 overflow-y-auto flex-1">{children}</div>

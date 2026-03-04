@@ -3,13 +3,13 @@
 import {
   Store, ShoppingCart, CalendarCheck, AlertTriangle,
   Wallet, MapPin, Clock, TrendingUp, Activity,
-  ArrowUpRight, ArrowDownRight, Gem,
+  Users, Gem, CheckCircle2, Ban,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { formatCurrency, formatRelativeTime, toLocationId } from '@/lib/utils';
-import type { DashboardAnalytics } from '@/lib/types';
+import type { DashboardAnalytics, AuditLog } from '@/lib/types';
 
 export default function DashboardPage() {
   const { admin, isSuperAdmin } = useAuth();
@@ -21,71 +21,76 @@ export default function DashboardPage() {
     [locationId]
   );
 
+  const { data: recentLogs, isLoading: logsLoading } = useApi<AuditLog[]>(
+    () => api.auditLogs.list({ limit: 10, page: 1 }),
+    []
+  );
+
+  const totalRevenue = (data?.orderRevenue ?? 0) + (data?.bookingRevenue ?? 0);
+
   const stats = [
     {
       title: 'Total Businesses',
       value: data?.totalBusinesses ?? 0,
+      sub: `${data?.liveBusinesses ?? 0} live`,
       icon: Store,
-      color: 'from-ruby-500 to-ruby-700',
       iconBg: 'bg-ruby-50',
       iconColor: 'text-ruby-600',
     },
     {
       title: 'Pending Approvals',
-      value: data?.pendingApprovals ?? 0,
+      value: data?.pendingBusinesses ?? 0,
       icon: Clock,
-      color: 'from-amber-500 to-amber-600',
       iconBg: 'bg-amber-50',
       iconColor: 'text-amber-600',
     },
     {
-      title: 'Total Orders',
-      value: data?.totalOrders ?? 0,
-      icon: ShoppingCart,
-      color: 'from-blue-500 to-blue-600',
-      iconBg: 'bg-blue-50',
-      iconColor: 'text-blue-600',
+      title: 'Total Users',
+      value: data?.totalUsers ?? 0,
+      sub: `${data?.newUsers ?? 0} new (30d)`,
+      icon: Users,
+      iconBg: 'bg-indigo-50',
+      iconColor: 'text-indigo-600',
     },
     {
-      title: 'Total Bookings',
-      value: data?.totalBookings ?? 0,
-      icon: CalendarCheck,
-      color: 'from-emerald-500 to-emerald-600',
+      title: 'Total Revenue',
+      value: formatCurrency(totalRevenue),
+      sub: data?.currency || 'NGN',
+      icon: TrendingUp,
       iconBg: 'bg-emerald-50',
       iconColor: 'text-emerald-600',
     },
     {
-      title: 'Revenue',
-      value: formatCurrency(data?.totalRevenue ?? 0),
-      icon: TrendingUp,
-      color: 'from-ruby-500 to-ruby-700',
-      iconBg: 'bg-ruby-50',
-      iconColor: 'text-ruby-600',
-      isRevenue: true,
+      title: 'Orders',
+      value: data?.totalOrders ?? 0,
+      sub: `${data?.completedOrders ?? 0} completed`,
+      icon: ShoppingCart,
+      iconBg: 'bg-blue-50',
+      iconColor: 'text-blue-600',
+    },
+    {
+      title: 'Bookings',
+      value: data?.totalBookings ?? 0,
+      sub: `${data?.completedBookings ?? 0} completed`,
+      icon: CalendarCheck,
+      iconBg: 'bg-teal-50',
+      iconColor: 'text-teal-600',
     },
     {
       title: 'Open Disputes',
-      value: data?.totalDisputes ?? 0,
+      value: data?.openDisputes ?? 0,
+      sub: `${data?.totalDisputes ?? 0} total`,
       icon: AlertTriangle,
-      color: 'from-orange-500 to-orange-600',
       iconBg: 'bg-orange-50',
       iconColor: 'text-orange-600',
     },
     {
-      title: 'Pending Payouts',
-      value: data?.pendingPayouts ?? 0,
+      title: 'Payouts',
+      value: data?.totalPayouts ?? 0,
+      sub: formatCurrency(data?.payoutAmount ?? 0) + ' paid',
       icon: Wallet,
-      color: 'from-violet-500 to-violet-600',
       iconBg: 'bg-violet-50',
       iconColor: 'text-violet-600',
-    },
-    {
-      title: 'Active Locations',
-      value: data?.activeLocations ?? 0,
-      icon: MapPin,
-      color: 'from-ruby-500 to-ruby-700',
-      iconBg: 'bg-ruby-50',
-      iconColor: 'text-ruby-600',
     },
   ];
 
@@ -165,6 +170,9 @@ export default function DashboardPage() {
                     stat.value
                   )}
                 </p>
+                {stat.sub && !isLoading && (
+                  <p className="mt-1 text-xs text-gray-400">{stat.sub}</p>
+                )}
               </div>
               <div className={`p-2.5 rounded-xl ${stat.iconBg} ring-1 ring-black/5 group-hover:scale-110 transition-transform`}>
                 <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
@@ -173,6 +181,44 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Revenue Breakdown */}
+      {!isLoading && data && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="card p-5">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                <ShoppingCart className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 text-sm">Order Revenue</h3>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(data.orderRevenue)}</p>
+            <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                {data.completedOrders} completed
+              </span>
+              <span>{data.totalOrders - data.completedOrders} in progress</span>
+            </div>
+          </div>
+          <div className="card p-5">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-teal-50 flex items-center justify-center">
+                <CalendarCheck className="w-3.5 h-3.5 text-teal-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900 text-sm">Booking Revenue</h3>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatCurrency(data.bookingRevenue)}</p>
+            <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                {data.completedBookings} completed
+              </span>
+              <span>{data.totalBookings - data.completedBookings} in progress</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Recent Activity */}
       <div className="card overflow-hidden">
@@ -184,11 +230,11 @@ export default function DashboardPage() {
             <h2 className="font-semibold text-gray-900">Recent Activity</h2>
           </div>
           <span className="text-xs text-gray-400 font-medium">
-            {data?.recentActivity?.length || 0} events
+            {recentLogs?.length || 0} events
           </span>
         </div>
         <div className="divide-y divide-gray-100">
-          {isLoading ? (
+          {logsLoading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="px-5 py-3.5 flex items-center gap-3">
                 <div className="skeleton w-9 h-9 rounded-xl" />
@@ -198,8 +244,8 @@ export default function DashboardPage() {
                 </div>
               </div>
             ))
-          ) : data?.recentActivity?.length ? (
-            data.recentActivity.slice(0, 10).map((log, i) => (
+          ) : recentLogs?.length ? (
+            recentLogs.slice(0, 10).map((log, i) => (
               <div key={i} className="px-5 py-3.5 flex items-start gap-3 hover:bg-gray-50/50 transition-colors">
                 <div className="w-9 h-9 bg-gradient-to-br from-ruby-50 to-ruby-100 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 ring-ruby-200/50">
                   <span className="text-xs font-bold text-ruby-700">
@@ -217,7 +263,7 @@ export default function DashboardPage() {
                     {formatRelativeTime(log.createdAt)}
                     {log.locationId && (
                       <>
-                        <span className="text-gray-300">·</span>
+                        <span className="text-gray-300">&middot;</span>
                         <MapPin className="w-3 h-3" />
                         Location scoped
                       </>
@@ -232,7 +278,7 @@ export default function DashboardPage() {
                 <Activity className="w-7 h-7 text-gray-300" />
               </div>
               <p className="text-sm font-medium text-gray-500 mb-1">No recent activity</p>
-              <p className="text-xs text-gray-400">Activity will appear here once the backend is connected.</p>
+              <p className="text-xs text-gray-400">Activity will appear here as admins perform actions.</p>
             </div>
           )}
         </div>

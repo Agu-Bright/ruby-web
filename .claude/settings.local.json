@@ -1,13 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wc:*)",
-      "Bash(npx tsc:*)",
-      "Bash(npx next build:*)",
-      "Bash(find:*)",
-      "Bash(node -e:*)",
-      "Bash(npm install:*)",
-      "Bash(npx nest build:*)"
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "WebFetch(*)",
+      "WebSearch"
     ]
   }
 }

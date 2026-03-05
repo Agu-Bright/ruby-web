@@ -13,8 +13,10 @@ export function formatCurrency(amount: number, currency = 'NGN'): string {
   }).format(amount);
 }
 
-export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(date: string | Date | undefined | null, options?: Intl.DateTimeFormatOptions): string {
+  if (!date) return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -23,8 +25,10 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
   });
 }
 
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date | undefined | null): string {
+  if (!date) return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -34,8 +38,10 @@ export function formatDateTime(date: string | Date): string {
   });
 }
 
-export function formatRelativeTime(date: string | Date): string {
+export function formatRelativeTime(date: string | Date | undefined | null): string {
+  if (!date) return '—';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '—';
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMins = Math.floor(diffMs / 60000);
@@ -85,6 +91,9 @@ export function getStatusColor(status: string): string {
     OPEN: 'badge-info',
     PLACED: 'badge-info',
     ACCEPTED: 'badge-info',
+    OUT_OF_STOCK: 'badge-warning',
+    DISCONTINUED: 'badge-neutral',
+    ARCHIVED: 'badge-neutral',
     REJECTED: 'badge-danger',
     SUSPENDED: 'badge-danger',
     CANCELLED: 'badge-danger',
@@ -100,6 +109,8 @@ export function getStatusColor(status: string): string {
     IN_TRANSIT: 'badge-info',
     RIDER_AT_DROPOFF: 'badge-warning',
     READY: 'badge-success',
+    ACKNOWLEDGED: 'badge-warning',
+    FALSE_ALARM: 'badge-neutral',
   };
   return colors[status] || 'badge-neutral';
 }
@@ -232,5 +243,118 @@ export function getBusinessName(business: any): string {
   if (!business) return '';
   if (typeof business === 'string') return '';
   return business?.name || '';
+}
+
+// ── Order helpers (handle backend populated fields + field name mismatches) ──
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderBusinessName(order: any): string {
+  if (order.businessName) return order.businessName;
+  if (typeof order.businessId === 'object' && order.businessId?.name) return order.businessId.name;
+  return '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderBusinessLogo(order: any): string {
+  if (typeof order.businessId === 'object' && order.businessId?.logoUrl) return order.businessId.logoUrl;
+  return '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderCustomerName(order: any): string {
+  if (order.customerName) return order.customerName;
+  if (typeof order.userId === 'object' && order.userId?.firstName) {
+    return `${order.userId.firstName} ${order.userId.lastName || ''}`.trim();
+  }
+  return '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderCustomerEmail(order: any): string {
+  if (typeof order.userId === 'object' && order.userId?.email) return order.userId.email;
+  return '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderCustomerPhone(order: any): string {
+  if (typeof order.userId === 'object' && order.userId?.phone) return order.userId.phone;
+  return '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderFulfillmentType(order: any): string {
+  return order.fulfillmentType || order.type || 'DELIVERY';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderTotal(order: any): number {
+  return order.totalAmount ?? order.fees?.total ?? order.total ?? 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderSubtotal(order: any): number {
+  return order.fees?.subtotal ?? order.subtotal ?? 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderDeliveryFee(order: any): number {
+  return order.fees?.deliveryFee ?? order.deliveryFee ?? 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderPlatformFee(order: any): number {
+  return order.fees?.platformFee ?? order.platformFee ?? 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderDiscount(order: any): number {
+  return order.fees?.discount ?? order.discount ?? 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderNotes(order: any): string {
+  return order.customerNote || order.notes || '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getOrderDeliveryAddressStr(order: any): string {
+  const addr = order.deliveryAddress;
+  if (!addr) return '';
+  if (typeof addr === 'string') return addr;
+  const parts = [addr.street, addr.street2, addr.landmark, addr.city, addr.state].filter(Boolean);
+  return parts.join(', ');
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getItemPrice(item: any): number {
+  return item.basePrice ?? item.price ?? 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getItemTotal(item: any): number {
+  return item.subtotal ?? item.total ?? (getItemPrice(item) * (item.quantity || 1));
+}
+
+// ── Delivery job helpers ──
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getDeliveryBusinessName(job: any): string {
+  if (typeof job.businessId === 'object' && job.businessId?.name) return job.businessId.name;
+  return '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getDeliveryCustomerName(job: any): string {
+  if (typeof job.userId === 'object' && job.userId?.firstName) {
+    return `${job.userId.firstName} ${job.userId.lastName || ''}`.trim();
+  }
+  return '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getEntityId(field: any): string {
+  if (!field) return '';
+  if (typeof field === 'string') return field;
+  return field._id || '';
 }
 

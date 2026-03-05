@@ -9,6 +9,7 @@ import {
   Banknote,
   CheckCircle,
   Clock,
+  ShieldAlert,
 } from "lucide-react";
 import api from "@/lib/api/client";
 import type { AdminNotification, AdminNotificationType } from "@/lib/types";
@@ -34,6 +35,12 @@ const TYPE_CONFIG: Record<
     color: "text-blue-600",
     bg: "bg-blue-50",
     route: "/ruby-app/admin/finance",
+  },
+  ADMIN_EMERGENCY_SOS: {
+    icon: ShieldAlert,
+    color: "text-red-700",
+    bg: "bg-red-100",
+    route: "/ruby-app/admin/emergency",
   },
 };
 

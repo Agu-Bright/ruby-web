@@ -28,6 +28,7 @@ import { PageHeader, DataTable, Modal, StatusBadge, type Column } from '@/compon
 import type {
   Payout,
   PayoutStatus,
+  PayoutStats,
   LedgerEntry,
   Wallet as WalletType,
   FeeConfig,
@@ -84,6 +85,11 @@ export default function FinancePage() {
   } = useApi<FeeConfig[]>(
     () => api.feeConfigs.list({ page, limit: 20 }),
     [page],
+  );
+
+  const { data: payoutStats } = useApi<PayoutStats>(
+    () => api.payouts.stats(),
+    [],
   );
 
   const handlePayoutAction = async (payout: Payout, action: string) => {
@@ -249,10 +255,10 @@ export default function FinancePage() {
     { key: 'fees', label: 'Fee Configs', icon: DollarSign },
   ];
 
-  const pendingCount = payouts?.filter(p => p.status === 'PENDING').length || 0;
-  const processingCount = payouts?.filter(p => p.status === 'PROCESSING').length || 0;
-  const completedCount = payouts?.filter(p => p.status === 'COMPLETED').length || 0;
-  const failedCount = payouts?.filter(p => p.status === 'FAILED').length || 0;
+  const pendingCount = payoutStats?.pendingCount ?? 0;
+  const completedCount = payoutStats?.completedCount ?? 0;
+  const failedCount = payoutStats?.failedCount ?? 0;
+  const totalRequested = payoutStats?.totalRequested ?? 0;
 
   return (
     <div>
@@ -260,11 +266,11 @@ export default function FinancePage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Pending Payouts', count: pendingCount, color: 'yellow', Icon: Clock },
-          { label: 'Processing', count: processingCount, color: 'blue', Icon: RefreshCw },
-          { label: 'Completed', count: completedCount, color: 'green', Icon: CheckCircle2 },
-          { label: 'Failed', count: failedCount, color: 'red', Icon: AlertTriangle },
-        ].map(({ label, count, color, Icon }) => (
+          { label: 'Total Requested', count: totalRequested, sub: formatCurrency(payoutStats?.totalAmount ?? 0), color: 'yellow', Icon: Clock },
+          { label: 'Pending', count: pendingCount, sub: formatCurrency(payoutStats?.pendingAmount ?? 0), color: 'blue', Icon: RefreshCw },
+          { label: 'Completed', count: completedCount, sub: formatCurrency(payoutStats?.completedAmount ?? 0), color: 'green', Icon: CheckCircle2 },
+          { label: 'Failed', count: failedCount, sub: undefined as string | undefined, color: 'red', Icon: AlertTriangle },
+        ].map(({ label, count, sub, color, Icon }) => (
           <div key={label} className="bg-white rounded-xl border border-gray-200 p-4">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-lg bg-${color}-100 flex items-center justify-center`}>
@@ -273,6 +279,7 @@ export default function FinancePage() {
               <div>
                 <p className="text-xs text-gray-500 font-medium">{label}</p>
                 <p className="text-xl font-bold text-gray-900">{count}</p>
+                {sub && <p className="text-xs text-gray-400">{sub}</p>}
               </div>
             </div>
           </div>

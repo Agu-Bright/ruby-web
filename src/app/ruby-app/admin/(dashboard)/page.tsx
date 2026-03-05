@@ -16,7 +16,7 @@ export default function DashboardPage() {
 
   const locationId = !isSuperAdmin && admin?.locationIds?.[0] ? toLocationId(admin.locationIds[0]) : undefined;
 
-  const { data, isLoading } = useApi<DashboardAnalytics>(
+  const { data, isLoading, error } = useApi<DashboardAnalytics>(
     () => api.analytics.dashboard({ locationId }),
     [locationId]
   );
@@ -150,6 +150,13 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <strong>Dashboard error:</strong> {error}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

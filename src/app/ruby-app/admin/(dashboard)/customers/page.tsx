@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Search, UserCircle, Users, UserCheck, UserX, UserPlus,
   Eye, Power, Trash2, Mail, Phone, Calendar, Clock,
@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
 import { useApi, useMutation } from '@/lib/hooks';
 import { StatCard, Modal, DataTable, type Column } from '@/components/ui';
 import { formatDate, formatDateTime, formatCurrency, getInitials } from '@/lib/utils';
-import type { Customer, CustomerFilterParams, Wallet as WalletType, LedgerEntry } from '@/lib/types';
+import type { Customer, CustomerFilterParams, CustomerStats, Wallet as WalletType, LedgerEntry } from '@/lib/types';
 
 // ─── Inline UI Components ───────────────────────────────────
 
@@ -101,18 +101,12 @@ export default function CustomersPage() {
   );
   const isProcessing = activating || deactivating || deleting;
 
-  // Stats (page-level approximation + meta.total for accurate total)
-  const stats = useMemo(() => {
-    if (!customers) return { total: 0, active: 0, inactive: 0, newThisMonth: 0 };
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    return {
-      total: meta?.total || customers.length,
-      active: customers.filter((c) => c.isActive).length,
-      inactive: customers.filter((c) => !c.isActive).length,
-      newThisMonth: customers.filter((c) => new Date(c.createdAt) >= monthStart).length,
-    };
-  }, [customers, meta]);
+  // Stats from dedicated backend endpoint
+  const { data: customerStats, refetch: refetchStats } = useApi<CustomerStats>(
+    () => api.customers.stats(),
+    [],
+  );
+  const stats = customerStats || { total: 0, active: 0, inactive: 0, newThisMonth: 0 };
 
   // Action handler
   const handleAction = useCallback(async () => {
@@ -140,11 +134,12 @@ export default function CustomersPage() {
       setActionModal(null);
       setDeleteConfirmText('');
       refetch();
+      refetchStats();
       if (detailCustomer?._id === customer._id) {
         setDetailCustomer(null);
       }
     }
-  }, [actionModal, activateCustomer, deactivateCustomer, deleteCustomer, refetch, detailCustomer]);
+  }, [actionModal, activateCustomer, deactivateCustomer, deleteCustomer, refetch, refetchStats, detailCustomer]);
 
   const openAction = (customer: Customer, action: CustomerAction) => {
     setActionModal({ customer, action });

@@ -25,6 +25,7 @@ import {
   Megaphone,
   Truck,
   Tag,
+  ShieldAlert,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -63,6 +64,7 @@ const navGroups: NavGroup[] = [
   {
     title: "Operations",
     items: [
+      { label: "Emergency", href: "/ruby-app/admin/emergency", icon: ShieldAlert },
       { label: "Customers", href: "/ruby-app/admin/customers", icon: UserCircle },
       { label: "Businesses", href: "/ruby-app/admin/businesses", icon: Store },
       { label: "Orders", href: "/ruby-app/admin/orders", icon: ShoppingCart },

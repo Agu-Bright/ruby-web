@@ -573,6 +573,19 @@ export const api = {
       ),
     delete: (id: string) =>
       request<null>(`/admin/businesses/${id}`, { method: "DELETE" }),
+    adminCreate: (data: import("@/lib/types").AdminCreateBusinessRequest) =>
+      request<import("@/lib/types").Business>("/admin/businesses", {
+        method: "POST",
+        body: data,
+      }),
+    unclaimed: (params?: import("@/lib/types").PaginationParams & { search?: string; locationId?: string }) =>
+      request<import("@/lib/types").Business[]>("/admin/businesses/unclaimed", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    regenerateClaimCode: (id: string) =>
+      request<{ claimCode: string }>(`/admin/businesses/${id}/regenerate-claim-code`, {
+        method: "POST",
+      }),
     // Keep backward-compat alias
     updateStatus: (
       id: string,
@@ -581,6 +594,63 @@ export const api = {
       request<import("@/lib/types").Business>(
         `/admin/businesses/${id}/status`,
         { method: "PATCH", body: data },
+      ),
+  },
+
+  // Admin Products
+  products: {
+    list: (params?: import("@/lib/types").ProductFilterParams) =>
+      request<import("@/lib/types").Product[]>("/admin/products", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").Product>(`/admin/products/${id}`),
+    update: (id: string, data: import("@/lib/types").UpdateProductRequest) =>
+      request<import("@/lib/types").Product>(`/admin/products/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+    delete: (id: string) =>
+      request<void>(`/admin/products/${id}`, { method: "DELETE" }),
+    suspend: (id: string) =>
+      request<import("@/lib/types").Product>(`/admin/products/${id}/suspend`, {
+        method: "POST",
+      }),
+    activate: (id: string) =>
+      request<import("@/lib/types").Product>(`/admin/products/${id}/activate`, {
+        method: "POST",
+      }),
+  },
+
+  // Admin Services
+  services: {
+    list: (params?: import("@/lib/types").ServiceFilterParams) =>
+      request<import("@/lib/types").ServiceListing[]>("/admin/services", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").ServiceListing>(`/admin/services/${id}`),
+    update: (id: string, data: import("@/lib/types").UpdateServiceRequest) =>
+      request<import("@/lib/types").ServiceListing>(`/admin/services/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+    delete: (id: string) =>
+      request<void>(`/admin/services/${id}`, { method: "DELETE" }),
+    suspend: (id: string) =>
+      request<import("@/lib/types").ServiceListing>(
+        `/admin/services/${id}/suspend`,
+        { method: "POST" },
+      ),
+    activate: (id: string) =>
+      request<import("@/lib/types").ServiceListing>(
+        `/admin/services/${id}/activate`,
+        { method: "POST" },
+      ),
+    archive: (id: string) =>
+      request<import("@/lib/types").ServiceListing>(
+        `/admin/services/${id}/archive`,
+        { method: "POST" },
       ),
   },
 
@@ -601,6 +671,10 @@ export const api = {
       request<import("@/lib/types").Order>(`/admin/orders/${id}/status`, {
         method: "PATCH",
         body: { status, note },
+      }),
+    stats: (params?: { locationId?: string; businessId?: string; startDate?: string; endDate?: string }) =>
+      request<import("@/lib/types").OrderStats>("/admin/orders/stats", {
+        params: params as Record<string, string | number | boolean | undefined>,
       }),
   },
 
@@ -627,6 +701,10 @@ export const api = {
         method: "POST",
         body: { reason },
       }),
+    stats: (params?: { locationId?: string }) =>
+      request<import("@/lib/types").DeliveryStats>("/admin/delivery/stats", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
   },
 
   // Bookings
@@ -637,6 +715,8 @@ export const api = {
       }),
     get: (id: string) =>
       request<import("@/lib/types").Booking>(`/admin/bookings/${id}`),
+    stats: () =>
+      request<import("@/lib/types").BookingStats>("/admin/bookings/stats"),
   },
 
   // Disputes
@@ -709,6 +789,8 @@ export const api = {
         `/admin/payouts/${id}/complete`,
         { method: "POST" },
       ),
+    stats: () =>
+      request<import("@/lib/types").PayoutStats>("/admin/payouts/stats"),
   },
 
   feeConfigs: {
@@ -766,6 +848,8 @@ export const api = {
       request<import("@/lib/types").LedgerEntry[]>(`/admin/wallets/${walletId}/transactions`, {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
+    stats: () =>
+      request<import("@/lib/types").CustomerStats>("/users/stats"),
   },
 
   // Audit Logs
@@ -847,6 +931,24 @@ export const api = {
           body: { ratePerUnit },
         },
       ),
+  },
+
+  emergency: {
+    list: (params?: import("@/lib/types").EmergencyAlertFilterParams) =>
+      request<import("@/lib/types").EmergencyAlert[]>("/admin/emergency/alerts", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").EmergencyAlert>(`/admin/emergency/alerts/${id}`),
+    update: (id: string, data: import("@/lib/types").UpdateEmergencyAlertRequest) =>
+      request<import("@/lib/types").EmergencyAlert>(`/admin/emergency/alerts/${id}`, {
+        method: "PATCH",
+        body: data,
+      }),
+    stats: (params?: { locationId?: string }) =>
+      request<import("@/lib/types").EmergencyAlertStats>("/admin/emergency/alerts/stats", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
   },
 
   notifications: {

@@ -583,6 +583,16 @@ export interface Business {
   viewCount?: number;
   orderCount?: number;
   bookingCount?: number;
+  // Claim fields
+  isClaimed?: boolean;
+  createdByAdminId?: string;
+  claimCode?: string;
+  claimContactPhone?: string;
+  claimContactEmail?: string;
+  claimedAt?: string;
+  claimedBy?: string;
+  // Merchant code
+  merchantCode?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -602,9 +612,45 @@ export interface BusinessStats {
   suspended: number;
 }
 
+export interface PayoutStats {
+  totalRequested: number;
+  totalAmount: number;
+  pendingCount: number;
+  pendingAmount: number;
+  completedCount: number;
+  completedAmount: number;
+  failedCount: number;
+}
+
+export interface CustomerStats {
+  total: number;
+  active: number;
+  inactive: number;
+  newThisMonth: number;
+}
+
 export interface VerifyCacRequest {
   status: 'VERIFIED' | 'REJECTED';
   rejectionReason?: string;
+}
+
+export interface AdminCreateBusinessRequest {
+  name: string;
+  locationId: string;
+  categoryId: string;
+  subcategoryId: string;
+  longitude: number;
+  latitude: number;
+  description?: string;
+  tagline?: string;
+  address?: BusinessAddress;
+  contact?: BusinessContact;
+  logoUrl?: string;
+  coverImageUrl?: string;
+  media?: { url: string; type?: string; caption?: string; order?: number; isPrimary?: boolean }[];
+  hours?: BusinessHoursEntry[];
+  claimContactPhone?: string;
+  claimContactEmail?: string;
 }
 
 // ============================================================
@@ -616,62 +662,113 @@ export type FulfillmentType = 'DELIVERY' | 'PICKUP';
 export interface Order {
   _id: string;
   orderNumber: string;
-  userId: string;
+  // Populated by backend as objects
+  userId: string | { _id: string; firstName?: string; lastName?: string; email?: string; phone?: string };
   customerId?: string;
   customerName?: string;
-  businessId: string;
+  businessId: string | { _id: string; name?: string; slug?: string; logoUrl?: string };
   businessName?: string;
-  locationId: string;
+  locationId: string | { _id: string; name?: string };
   status: OrderStatus;
-  fulfillmentType: FulfillmentType;
+  // Backend uses `type`, frontend uses `fulfillmentType` — support both
+  type?: FulfillmentType;
+  fulfillmentType?: FulfillmentType;
   items: OrderItem[];
-  subtotal: number;
-  deliveryFee: number;
-  platformFee: number;
-  discount: number;
-  total: number;
+  // Backend nests fees as object
+  fees?: OrderFees;
+  // Legacy flat fields
+  subtotal?: number;
+  deliveryFee?: number;
+  platformFee?: number;
+  discount?: number;
+  total?: number;
   totalAmount?: number;
-  fees?: { label: string; amount: number }[];
   currency: string;
-  deliveryAddress?: string;
+  // Backend sends object, may also be string
+  deliveryAddress?: string | OrderDeliveryAddress;
   deliveryQuoteId?: string;
   deliveryJobId?: string;
-  statusHistory: StatusEvent[];
+  // Backend uses `statusHistory`
+  statusHistory?: StatusEvent[];
+  // Backend uses `customerNote`
+  customerNote?: string;
   notes?: string;
   cancellationReason?: string;
+  rejectionReason?: string;
+  paymentStatus?: string;
+  estimatedPrepTime?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface OrderFees {
+  subtotal?: number;
+  deliveryFee?: number;
+  platformFee?: number;
+  serviceFee?: number;
+  tax?: number;
+  discount?: number;
+  tip?: number;
+  total?: number;
+}
+
+export interface OrderDeliveryAddress {
+  street?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  landmark?: string;
+  latitude?: number;
+  longitude?: number;
+  contactName?: string;
+  contactPhone?: string;
 }
 
 export interface OrderItem {
   productId: string;
   name: string;
-  price: number;
+  // Backend uses basePrice, frontend used price
+  basePrice?: number;
+  price?: number;
   quantity: number;
+  // Backend uses subtotal, frontend used total
+  subtotal?: number;
+  total?: number;
   options?: Record<string, string>;
-  total: number;
+  variations?: { name: string; option: string; priceAdjustment?: number }[];
+  addOns?: { name: string; price: number; quantity: number; subtotal: number }[];
+  specialInstructions?: string;
 }
 
 export interface StatusEvent {
   status: string;
   timestamp: string;
   actor?: string;
+  updatedBy?: string;
   note?: string;
+}
+
+export interface OrderStats {
+  total: number;
+  totalRevenue: number;
+  byStatus: Record<string, { count: number; revenue: number }>;
 }
 
 // ============================================================
 // Delivery Jobs (Admin)
 // ============================================================
 export type DeliveryJobStatus = 'CREATED' | 'ASSIGNED' | 'RIDER_ACCEPTED' | 'RIDER_AT_PICKUP' | 'PICKED_UP' | 'IN_TRANSIT' | 'RIDER_AT_DROPOFF' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
-export type DeliveryProvider = 'MANUAL' | 'INTERNAL' | 'TOPSHIP';
+export type DeliveryProvider = 'MANUAL' | 'INTERNAL' | 'TOPSHIP' | 'UBER_DIRECT';
 
 export interface DeliveryJob {
   _id: string;
   orderId?: string;
   bookingId?: string;
-  businessId: string;
-  userId: string;
-  locationId: string;
+  businessId: string | { _id: string; name?: string; slug?: string };
+  userId: string | { _id: string; firstName?: string; lastName?: string };
+  locationId: string | { _id: string; name?: string };
   provider: DeliveryProvider;
   externalId?: string;
   pickup: { lat?: number; lng?: number; address: string; city?: string; state?: string; landmark?: string; contactName?: string; contactPhone?: string; instructions?: string };
@@ -703,37 +800,67 @@ export interface DeliveryJobFilterParams extends PaginationParams {
   endDate?: string;
 }
 
+export interface DeliveryStats {
+  total: number;
+  statusBreakdown: { _id: string; count: number }[];
+}
+
 // ============================================================
 // Bookings
 // ============================================================
-export type BookingStatus = 'REQUESTED' | 'CONFIRMED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+export type BookingStatus = 'PENDING' | 'REQUESTED' | 'CONFIRMED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
 export type FulfillmentMode = 'ON_SITE' | 'AT_HOME';
 
-export interface Booking {
-  _id: string;
-  bookingNumber: string;
-  userId: string;
-  customerId?: string;
-  customerName?: string;
-  businessId: string;
-  serviceListingId: string;
-  serviceName?: string;
-  businessName?: string;
-  locationId: string;
-  status: BookingStatus;
-  fulfillmentMode: FulfillmentMode;
-  scheduledAt: string;
-  duration: number;
-  durationMinutes?: number;
+export interface BookingFeeBreakdown {
   serviceFee: number;
   travelFee: number;
   platformFee: number;
+  discount: number;
+  deposit: number;
+  tax: number;
   total: number;
+  amountPaid: number;
+  balanceDue: number;
+}
+
+export interface Booking {
+  _id: string;
+  // Backend fields
+  bookingRef?: string;
+  bookingDate?: string;
+  startTime?: string;
+  endTime?: string;
+  feeBreakdown?: BookingFeeBreakdown;
+  statusTimeline?: StatusEvent[];
+  serviceId?: string | { _id: string; name: string; slug?: string };
+  serviceSnapshot?: { name: string; description?: string; pricingType?: string; basePrice?: number };
+  isPaid?: boolean;
+  // Legacy / computed fields (backward compat)
+  bookingNumber?: string;
+  userId: string | { _id: string; email?: string; firstName?: string; lastName?: string; fullName?: string };
+  customerId?: string;
+  customerName?: string;
+  businessId: string | { _id: string; name: string; slug?: string };
+  serviceListingId?: string;
+  serviceName?: string;
+  businessName?: string;
+  locationId?: string | { _id: string; name: string };
+  status: BookingStatus;
+  fulfillmentMode: FulfillmentMode;
+  scheduledAt?: string;
+  duration?: number;
+  durationMinutes?: number;
+  timezone?: string;
+  serviceFee?: number;
+  travelFee?: number;
+  platformFee?: number;
+  total?: number;
   fees?: { label: string; amount: number }[];
   currency: string;
   address?: string;
-  statusHistory: StatusEvent[];
+  statusHistory?: StatusEvent[];
   safetyEvents?: StatusEvent[];
+  safetyCheckIns?: unknown[];
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -945,6 +1072,7 @@ export interface OrderFilterParams extends PaginationParams {
   businessId?: string;
   startDate?: string;
   endDate?: string;
+  search?: string;
 }
 
 export interface BookingFilterParams extends PaginationParams {
@@ -953,6 +1081,20 @@ export interface BookingFilterParams extends PaginationParams {
   businessId?: string;
   startDate?: string;
   endDate?: string;
+  fulfillmentMode?: FulfillmentMode;
+  search?: string;
+}
+
+export interface BookingStats {
+  total: number;
+  pending: number;
+  confirmed: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+  totalRevenue: number;
+  totalPlatformFee: number;
 }
 
 export interface DisputeFilterParams extends PaginationParams {
@@ -1140,7 +1282,8 @@ export interface AdProduct {
 export type AdminNotificationType =
   | 'ADMIN_BUSINESS_PENDING'
   | 'ADMIN_DISPUTE_FILED'
-  | 'ADMIN_PAYOUT_REQUESTED';
+  | 'ADMIN_PAYOUT_REQUESTED'
+  | 'ADMIN_EMERGENCY_SOS';
 
 export interface AdminNotification {
   _id: string;
@@ -1165,4 +1308,241 @@ export interface AdminNotificationListResponse {
     total: number;
     totalPages: number;
   };
+}
+
+// ============================================================
+// Emergency Alerts
+// ============================================================
+export type EmergencyAlertStatus = 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED' | 'FALSE_ALARM';
+
+export interface EmergencyAlert {
+  _id: string;
+  userId: string | { _id: string; firstName?: string; lastName?: string; email?: string; phone?: string; avatarUrl?: string };
+  location: { type: 'Point'; coordinates: [number, number] }; // [lng, lat]
+  status: EmergencyAlertStatus;
+  contactInfo: { name: string; phone?: string; email?: string };
+  emergencyContacts: { name: string; relation: string; phone: string; email?: string }[];
+  locationId?: string | { _id: string; name: string };
+  message?: string;
+  acknowledgedBy?: string | { _id: string; firstName?: string; lastName?: string };
+  acknowledgedAt?: string;
+  resolvedBy?: string | { _id: string; firstName?: string; lastName?: string };
+  resolvedAt?: string;
+  notes?: string;
+  resolutionNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmergencyAlertStats {
+  total: number;
+  active: number;
+  acknowledged: number;
+  resolved: number;
+  falseAlarm: number;
+}
+
+export interface EmergencyAlertFilterParams extends PaginationParams {
+  status?: EmergencyAlertStatus;
+  locationId?: string;
+}
+
+export interface UpdateEmergencyAlertRequest {
+  status: EmergencyAlertStatus;
+  notes?: string;
+}
+
+// ============================================================
+// Products
+// ============================================================
+export type ProductStatus = 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK' | 'DISCONTINUED';
+
+export interface ProductImage {
+  url: string;
+  alt?: string;
+  order: number;
+  isPrimary: boolean;
+}
+
+export interface ProductVariationOption {
+  name: string;
+  priceAdjustment: number;
+  isAvailable: boolean;
+  sku?: string;
+}
+
+export interface ProductVariation {
+  name: string;
+  type: 'SINGLE' | 'MULTIPLE';
+  required: boolean;
+  options: ProductVariationOption[];
+  order: number;
+}
+
+export interface ProductAddOn {
+  name: string;
+  price: number;
+  isAvailable: boolean;
+  maxQuantity: number;
+  order: number;
+}
+
+export interface ProductNutritionalInfo {
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  allergens?: string[];
+}
+
+export interface Product {
+  _id: string;
+  businessId: string;
+  locationId: string;
+  name: string;
+  description?: string;
+  basePrice: number;
+  compareAtPrice?: number;
+  currency: string;
+  sku?: string;
+  barcode?: string;
+  category?: string;
+  status: ProductStatus;
+  variations: ProductVariation[];
+  addOns: ProductAddOn[];
+  images: ProductImage[];
+  trackInventory: boolean;
+  stockQuantity: number;
+  allowBackorder: boolean;
+  isAvailable: boolean;
+  availableDays?: number[];
+  availableFrom?: string;
+  availableTo?: string;
+  prepTimeMinutes?: number;
+  tags: string[];
+  nutritionalInfo?: ProductNutritionalInfo;
+  displayOrder: number;
+  isFeatured: boolean;
+  orderCount: number;
+  viewCount: number;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductFilterParams extends PaginationParams {
+  businessId?: string;
+  search?: string;
+  category?: string;
+  status?: ProductStatus;
+  isAvailable?: boolean;
+  isFeatured?: boolean;
+}
+
+export interface UpdateProductRequest {
+  name?: string;
+  description?: string;
+  basePrice?: number;
+  compareAtPrice?: number;
+  category?: string;
+  status?: ProductStatus;
+  isAvailable?: boolean;
+  isFeatured?: boolean;
+  stockQuantity?: number;
+  tags?: string[];
+}
+
+// ============================================================
+// Service Listings
+// ============================================================
+export type ServiceStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+export type PricingType = 'FIXED' | 'STARTS_FROM' | 'QUOTE_REQUIRED';
+export type ServiceFulfillmentMode = 'ON_SITE' | 'AT_HOME' | 'BOTH';
+
+export interface ServicePricing {
+  type: PricingType;
+  basePrice?: number;
+  currency: string;
+  displayText?: string;
+  depositPercent: number;
+}
+
+export interface ServiceDuration {
+  minutes: number;
+  isFlexible: boolean;
+  minMinutes?: number;
+  maxMinutes?: number;
+}
+
+export interface ServiceMedia {
+  url: string;
+  type: 'IMAGE' | 'VIDEO';
+  caption?: string;
+  order: number;
+}
+
+export interface ServiceAvailabilitySlot {
+  dayOfWeek: number;
+  slots: string[];
+  isAvailable: boolean;
+  capacityPerSlot: number;
+}
+
+export interface ServiceCancellationPolicy {
+  freeCancellationHours?: number;
+  cancellationFeePercent?: number;
+}
+
+export interface ServiceListing {
+  _id: string;
+  businessId: string;
+  locationId: string;
+  categoryId: string | { _id: string; name: string; slug: string };
+  subcategoryId?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  shortDescription?: string;
+  category?: string;
+  pricing: ServicePricing;
+  duration: ServiceDuration;
+  fulfillmentMode: ServiceFulfillmentMode;
+  status: ServiceStatus;
+  media: ServiceMedia[];
+  coverImageUrl?: string;
+  availability: ServiceAvailabilitySlot[];
+  useBusinessHours: boolean;
+  cancellationPolicy?: ServiceCancellationPolicy;
+  requirements: string[];
+  includes: string[];
+  excludes: string[];
+  tags: string[];
+  templateData?: Record<string, unknown>;
+  averageRating: number;
+  totalReviews: number;
+  totalBookings: number;
+  viewCount: number;
+  isFeatured: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceFilterParams extends PaginationParams {
+  businessId?: string;
+  locationId?: string;
+  categoryId?: string;
+  status?: ServiceStatus;
+  fulfillmentMode?: ServiceFulfillmentMode;
+  search?: string;
+}
+
+export interface UpdateServiceRequest {
+  name?: string;
+  description?: string;
+  pricing?: Partial<ServicePricing>;
+  duration?: Partial<ServiceDuration>;
+  fulfillmentMode?: ServiceFulfillmentMode;
+  status?: ServiceStatus;
+  isFeatured?: boolean;
 }

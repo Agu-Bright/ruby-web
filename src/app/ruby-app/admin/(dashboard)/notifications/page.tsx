@@ -10,6 +10,7 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  ShieldAlert,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import { useApi } from "@/lib/hooks";
@@ -45,13 +46,21 @@ const TYPE_CONFIG: Record<
     route: "/ruby-app/admin/finance",
     label: "Payout Request",
   },
+  ADMIN_EMERGENCY_SOS: {
+    icon: ShieldAlert,
+    color: "text-red-700",
+    bg: "bg-red-100",
+    route: "/ruby-app/admin/emergency",
+    label: "Emergency SOS",
+  },
 };
 
-type FilterTab = "all" | "unread" | "businesses" | "disputes" | "finance";
+type FilterTab = "all" | "unread" | "businesses" | "disputes" | "finance" | "emergency";
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
+  { key: "emergency", label: "Emergency" },
   { key: "businesses", label: "Businesses" },
   { key: "disputes", label: "Disputes" },
   { key: "finance", label: "Finance" },
@@ -67,6 +76,8 @@ function getFilterParams(tab: FilterTab): { type?: string; isRead?: boolean } {
       return { type: "ADMIN_DISPUTE_FILED" };
     case "finance":
       return { type: "ADMIN_PAYOUT_REQUESTED" };
+    case "emergency":
+      return { type: "ADMIN_EMERGENCY_SOS" };
     default:
       return {};
   }

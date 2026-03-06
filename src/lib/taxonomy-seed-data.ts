@@ -156,9 +156,9 @@ export interface SeedSubcategory extends Omit<CreateSubcategoryRequest, 'categor
 
 export const SEED_SUBCATEGORIES: SeedSubcategory[] = [
   // Concierge Services — all BOOKING_VISIT
-  { _categorySeedKey: 'concierge-services', name: 'Airport Pickup', slug: 'airport-pickup', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 1, riskTier: 'MEDIUM' },
-  { _categorySeedKey: 'concierge-services', name: 'Private Security', slug: 'private-security', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 2, riskTier: 'HIGH' },
-  { _categorySeedKey: 'concierge-services', name: 'Personal Assistant', slug: 'personal-assistant', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 3, riskTier: 'LOW' },
+  { _categorySeedKey: 'concierge-services', _templatePresetId: 'concierge', name: 'Airport Pickup', slug: 'airport-pickup', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 1, riskTier: 'MEDIUM' },
+  { _categorySeedKey: 'concierge-services', _templatePresetId: 'concierge', name: 'Private Security', slug: 'private-security', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 2, riskTier: 'HIGH' },
+  { _categorySeedKey: 'concierge-services', _templatePresetId: 'concierge', name: 'Personal Assistant', slug: 'personal-assistant', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 3, riskTier: 'LOW' },
 
   // Restaurants — mixed
   { _categorySeedKey: 'restaurants', _templatePresetId: 'restaurant', name: 'Takeout & Fast Food', slug: 'takeout-fast-food', businessModel: 'ORDER_DELIVERY' as BusinessModel, displayOrder: 1, riskTier: 'LOW' },
@@ -187,7 +187,7 @@ export const SEED_SUBCATEGORIES: SeedSubcategory[] = [
 
   // Local Services — mixed
   { _categorySeedKey: 'local-services', _templatePresetId: 'salon', name: 'Tailoring', slug: 'tailoring', businessModel: 'VISIT_ONLY' as BusinessModel, displayOrder: 1, riskTier: 'LOW' },
-  { _categorySeedKey: 'local-services', name: 'Laundry & Dry Cleaning', slug: 'laundry-dry-cleaning', businessModel: 'ORDER_DELIVERY' as BusinessModel, displayOrder: 2, riskTier: 'LOW' },
+  { _categorySeedKey: 'local-services', _templatePresetId: 'home_services', name: 'Laundry & Dry Cleaning', slug: 'laundry-dry-cleaning', businessModel: 'ORDER_DELIVERY' as BusinessModel, displayOrder: 2, riskTier: 'LOW' },
   { _categorySeedKey: 'local-services', _templatePresetId: 'car_services', name: 'Car Wash', slug: 'car-wash', businessModel: 'VISIT_ONLY' as BusinessModel, displayOrder: 3, riskTier: 'LOW' },
   { _categorySeedKey: 'local-services', _templatePresetId: 'home_services', name: 'Repairs', slug: 'repairs', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 4, riskTier: 'MEDIUM' },
 
@@ -197,9 +197,9 @@ export const SEED_SUBCATEGORIES: SeedSubcategory[] = [
   { _categorySeedKey: 'professional-services', _templatePresetId: 'professional', name: 'Consulting', slug: 'consulting', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 3, riskTier: 'LOW' },
 
   // Arts & Entertainment — mixed
-  { _categorySeedKey: 'arts-entertainment', name: 'Galleries & Museums', slug: 'galleries-museums', businessModel: 'VISIT_ONLY' as BusinessModel, displayOrder: 1, riskTier: 'LOW' },
+  { _categorySeedKey: 'arts-entertainment', _templatePresetId: 'arts_entertainment', name: 'Galleries & Museums', slug: 'galleries-museums', businessModel: 'VISIT_ONLY' as BusinessModel, displayOrder: 1, riskTier: 'LOW' },
   { _categorySeedKey: 'arts-entertainment', _templatePresetId: 'nightlife', name: 'Live Shows & Concerts', slug: 'live-shows-concerts', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 2, riskTier: 'MEDIUM' },
-  { _categorySeedKey: 'arts-entertainment', name: 'Festivals & Events', slug: 'festivals-events', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 3, riskTier: 'MEDIUM' },
+  { _categorySeedKey: 'arts-entertainment', _templatePresetId: 'arts_entertainment', name: 'Festivals & Events', slug: 'festivals-events', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 3, riskTier: 'MEDIUM' },
 
   // Hotels & Travel — all BOOKING_VISIT
   { _categorySeedKey: 'hotels-travel', _templatePresetId: 'hotel', name: 'Hotels', slug: 'hotels', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 1, riskTier: 'LOW' },

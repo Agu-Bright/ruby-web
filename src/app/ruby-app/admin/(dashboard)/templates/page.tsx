@@ -3,8 +3,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   FileText, Plus, Pencil, Eye, Power, PowerOff, Search, RefreshCw,
-  ChevronDown, Activity, Check, X, AlertCircle, Hash, Trash2,
-  GripVertical, Filter, Settings, Layers, Type, Sparkles,
+  ChevronDown, ChevronRight, Activity, Check, X, AlertCircle, Hash, Trash2,
+  GripVertical, Filter, Settings, Layers, Type, Sparkles, Link2,
+  FolderOpen, ArrowRight, ArrowLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApi } from '@/lib/hooks';
@@ -14,6 +15,7 @@ import { TEMPLATE_PRESETS } from '@/lib/template-presets';
 import type {
   Template, TemplateField, TemplateFieldOption,
   CreateTemplateRequest, FieldType, FilterType,
+  Category, Subcategory,
 } from '@/lib/types';
 
 // ─── Config & Constants ────────────────────────────────────
@@ -187,14 +189,51 @@ function EmptyState({ icon: Icon, title, description, actionLabel, onAction }: {
 
 export default function TemplatesPage() {
   const { data: templates, isLoading, error, refetch } = useApi<Template[]>(() => api.templates.list(), []);
+  const { data: categories } = useApi<Category[]>(() => api.categories.list(), []);
+  const { data: subcategories, refetch: refetchSubs } = useApi<Subcategory[]>(() => api.subcategories.list(), []);
+
+  // Map templateId → subcategory names
+  const templateSubcategoryMap = useMemo(() => {
+    const map: Record<string, { name: string; businessModel?: string }[]> = {};
+    if (!subcategories) return map;
+    for (const sub of subcategories) {
+      const tid = typeof sub.templateId === 'object' ? sub.templateId?._id : sub.templateId;
+      if (!tid) continue;
+      if (!map[tid]) map[tid] = [];
+      map[tid].push({ name: sub.name, businessModel: sub.businessModel });
+    }
+    return map;
+  }, [subcategories]);
+
+  // Group subcategories by categoryId
+  const subcategoriesByCategoryId = useMemo(() => {
+    const map: Record<string, Subcategory[]> = {};
+    if (!subcategories) return map;
+    for (const sub of subcategories) {
+      const catId = typeof sub.categoryId === 'object' ? sub.categoryId._id : sub.categoryId;
+      if (!catId) continue;
+      if (!map[catId]) map[catId] = [];
+      map[catId].push(sub);
+    }
+    return map;
+  }, [subcategories]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
+  const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null);
   const [viewTemplate, setViewTemplate] = useState<Template | null>(null);
   const [editTemplate, setEditTemplate] = useState<Template | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState<CreateTemplateRequest>({ name: '', description: '', fields: [emptyField(0)] });
+
+  // Derived data for create flow
+  const selectedCategory = useMemo(() => categories?.find(c => c._id === selectedCategoryId) || null, [categories, selectedCategoryId]);
+  const selectedSubcategory = useMemo(() => subcategories?.find(s => s._id === selectedSubcategoryId) || null, [subcategories, selectedSubcategoryId]);
 
   const stats = useMemo(() => {
     const total = templates?.length || 0;
@@ -223,6 +262,10 @@ export default function TemplatesPage() {
 
   const openCreate = () => {
     resetForm();
+    setCreateStep(1);
+    setSelectedCategoryId(null);
+    setSelectedSubcategoryId(null);
+    setExpandedCategoryId(null);
     setShowCreate(true);
   };
 
@@ -238,14 +281,24 @@ export default function TemplatesPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name) { toast.error('Template name is required'); return; }
+    if (!selectedSubcategoryId) { toast.error('Please select a subcategory first'); return; }
     setIsSubmitting(true);
     try {
       const validFields = (form.fields || []).filter(f => f.key && f.label).map((f, i) => ({ ...f, order: i }));
-      await api.templates.create({ ...form, fields: validFields });
-      toast.success('Template created');
+      const created = await api.templates.create({ ...form, fields: validFields });
+      // Link the template to the selected subcategory
+      const templateId = (created as any)?._id || (created as any)?.data?._id;
+      if (templateId && selectedSubcategoryId) {
+        await api.subcategories.update(selectedSubcategoryId, { templateId } as any);
+      }
+      toast.success('Template created and linked to subcategory');
       setShowCreate(false);
       resetForm();
+      setCreateStep(1);
+      setSelectedCategoryId(null);
+      setSelectedSubcategoryId(null);
       refetch();
+      refetchSubs();
     } catch {
       toast.error('Failed to create template');
     } finally {
@@ -503,7 +556,7 @@ export default function TemplatesPage() {
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Template</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Linked Subcategories</th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Version</th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
@@ -532,7 +585,18 @@ export default function TemplatesPage() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="text-xs text-gray-500 max-w-[200px] truncate block">{tmpl.description || '—'}</span>
+                        {(() => {
+                          const linked = templateSubcategoryMap[tmpl._id] || [];
+                          if (linked.length === 0) return <span className="text-xs text-gray-400">No subcategories</span>;
+                          return (
+                            <div className="flex flex-wrap gap-1 max-w-[260px]">
+                              {linked.slice(0, 3).map((s, i) => (
+                                <span key={i} className="text-[10px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 font-medium truncate max-w-[120px]">{s.name}</span>
+                              ))}
+                              {linked.length > 3 && <span className="text-[10px] text-gray-500 font-medium">+{linked.length - 3} more</span>}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">
@@ -567,72 +631,290 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* Create Modal */}
-      <Modal isOpen={showCreate} onClose={() => { setShowCreate(false); resetForm(); }} title="Create Template" size="xl">
-        <form onSubmit={handleCreate} className="space-y-6">
-          {/* Preset Suggestions */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <h3 className="text-sm font-semibold text-gray-800">Start from a Preset</h3>
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">Optional</span>
+      {/* Create Modal — Stepped Flow */}
+      <Modal isOpen={showCreate} onClose={() => { setShowCreate(false); resetForm(); setCreateStep(1); setSelectedCategoryId(null); setSelectedSubcategoryId(null); }} title="Create Template" size="xl">
+        {/* Step Indicator */}
+        <div className="flex items-center gap-2 mb-6">
+          {[
+            { step: 1 as const, label: 'Select Subcategory' },
+            { step: 2 as const, label: 'Define Template' },
+            { step: 3 as const, label: 'Review & Create' },
+          ].map(({ step, label }, i) => (
+            <div key={step} className="flex items-center gap-2 flex-1">
+              <div className={`flex items-center gap-2 flex-1 ${i > 0 ? '' : ''}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors
+                  ${createStep === step ? 'bg-ruby-600 text-white shadow-sm shadow-ruby-500/30' :
+                    createStep > step ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                  {createStep > step ? <Check className="w-3.5 h-3.5" /> : step}
+                </div>
+                <span className={`text-xs font-medium hidden sm:inline ${createStep === step ? 'text-gray-900' : 'text-gray-400'}`}>{label}</span>
+              </div>
+              {i < 2 && <div className={`h-px flex-1 ${createStep > step ? 'bg-emerald-300' : 'bg-gray-200'}`} />}
             </div>
-            <p className="text-xs text-gray-500">Choose a preset to auto-fill fields, or start from scratch below.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-              {TEMPLATE_PRESETS.map(preset => {
-                const Icon = preset.icon;
-                const isSelected = form.name === preset.name + ' Template';
+          ))}
+        </div>
+
+        {/* Step 1: Select Category → Subcategory */}
+        {createStep === 1 && (
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+              <p className="text-xs text-blue-700 font-medium">Select a category, then choose the subcategory this template will be linked to.</p>
+            </div>
+
+            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+              {!categories || categories.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">No categories found</p>
+              ) : categories.filter(c => c.isActive).map(cat => {
+                const catSubs = subcategoriesByCategoryId[cat._id] || [];
+                const isExpanded = expandedCategoryId === cat._id;
                 return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => {
-                      setForm({
-                        name: preset.name + ' Template',
-                        description: preset.description,
-                        fields: preset.fields.map(f => ({ ...f })),
-                      });
-                      toast.success(`Loaded "${preset.name}" preset with ${preset.fields.length} fields`);
-                    }}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all duration-200 text-center
-                      ${isSelected
-                        ? 'border-ruby-400 bg-ruby-50/50 shadow-sm shadow-ruby-500/10'
-                        : 'border-gray-150 bg-white hover:border-gray-300 hover:shadow-sm'
-                      }`}
-                  >
-                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${preset.color} flex items-center justify-center shadow-sm`}>
-                      <Icon className="w-4 h-4 text-white" />
-                    </div>
-                    <span className={`text-[11px] font-semibold leading-tight ${isSelected ? 'text-ruby-700' : 'text-gray-700'}`}>{preset.name}</span>
-                  </button>
+                  <div key={cat._id} className="border border-gray-200 rounded-xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCategoryId(isExpanded ? null : cat._id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 ${isExpanded ? 'bg-gray-50 border-b border-gray-100' : ''}`}
+                    >
+                      <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-lg flex items-center justify-center shadow-sm shrink-0">
+                        <FolderOpen className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-semibold text-gray-900">{cat.name}</span>
+                        <span className="text-[10px] text-gray-400 ml-2">{catSubs.length} subcategor{catSubs.length === 1 ? 'y' : 'ies'}</span>
+                      </div>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${cat.defaultGroupType === 'TOP_TILES' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+                        {cat.defaultGroupType === 'TOP_TILES' ? 'Top Tiles' : 'More'}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-2 py-2 space-y-1 bg-white">
+                        {catSubs.length === 0 ? (
+                          <p className="text-xs text-gray-400 text-center py-3">No subcategories</p>
+                        ) : catSubs.map(sub => {
+                          const isSelected = selectedSubcategoryId === sub._id;
+                          const existingTemplate = typeof sub.templateId === 'object' ? sub.templateId?.name : sub.templateId ? 'Linked' : null;
+                          return (
+                            <button
+                              key={sub._id}
+                              type="button"
+                              onClick={() => { setSelectedCategoryId(cat._id); setSelectedSubcategoryId(sub._id); }}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all
+                                ${isSelected ? 'bg-ruby-50 border-2 border-ruby-400 shadow-sm' : 'hover:bg-gray-50 border-2 border-transparent'}`}
+                            >
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors
+                                ${isSelected ? 'border-ruby-500 bg-ruby-500' : 'border-gray-300'}`}>
+                                {isSelected && <Check className="w-3 h-3 text-white" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className={`text-sm font-medium ${isSelected ? 'text-ruby-800' : 'text-gray-800'}`}>{sub.name}</span>
+                              </div>
+                              {sub.businessModel && (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                                  {sub.businessModel.replace(/_/g, ' ')}
+                                </span>
+                              )}
+                              {existingTemplate && (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">
+                                  has template
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
-          </div>
 
-          <div className="border-t border-gray-200" />
+            {selectedSubcategory && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <p className="text-xs text-emerald-700 font-medium">
+                  Selected: <span className="font-bold">{selectedCategory?.name}</span> <ArrowRight className="w-3 h-3 inline" /> <span className="font-bold">{selectedSubcategory.name}</span>
+                  {typeof selectedSubcategory.templateId === 'object' && selectedSubcategory.templateId?.name && (
+                    <span className="text-amber-600 ml-2">(will replace: {selectedSubcategory.templateId.name})</span>
+                  )}
+                </p>
+              </div>
+            )}
 
-          <div className="space-y-4">
-            <SectionHeader icon={FileText} title="Basic Information" description="Name and describe this template" />
-            <div>
-              <label className="label-text">Template Name</label>
-              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" required placeholder="e.g. Restaurant Onboarding" />
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+              <button type="button" onClick={() => { setShowCreate(false); resetForm(); }} className="btn-secondary">Cancel</button>
+              <button
+                type="button"
+                disabled={!selectedSubcategoryId}
+                onClick={() => {
+                  if (!selectedSubcategory) return;
+                  // Pre-fill template name from subcategory
+                  setForm(prev => ({
+                    ...prev,
+                    name: prev.name || selectedSubcategory.name + ' Template',
+                  }));
+                  setCreateStep(2);
+                }}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-            <div>
-              <label className="label-text">Description</label>
-              <textarea value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field resize-none" rows={2} placeholder="What is this template for?" />
+          </div>
+        )}
+
+        {/* Step 2: Define Template */}
+        {createStep === 2 && (
+          <div className="space-y-6">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 text-xs p-2.5 bg-gray-50 rounded-lg border border-gray-100">
+              <FolderOpen className="w-3.5 h-3.5 text-purple-500" />
+              <span className="font-semibold text-gray-600">{selectedCategory?.name}</span>
+              <ChevronRight className="w-3 h-3 text-gray-400" />
+              <span className="font-semibold text-ruby-600">{selectedSubcategory?.name}</span>
+              {selectedSubcategory?.businessModel && (
+                <span className="text-[9px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-semibold ml-auto">
+                  {selectedSubcategory.businessModel.replace(/_/g, ' ')}
+                </span>
+              )}
+            </div>
+
+            {/* Preset Suggestions */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-semibold text-gray-800">Start from a Preset</h3>
+                <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">Optional</span>
+              </div>
+              <p className="text-xs text-gray-500 -mt-1">Choose a preset to auto-fill fields, or skip to build from scratch.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                {TEMPLATE_PRESETS.map(preset => {
+                  const Icon = preset.icon;
+                  const isSelected = form.name === preset.name + ' Template';
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setForm({
+                          name: preset.name + ' Template',
+                          description: preset.description,
+                          fields: preset.fields.map(f => ({ ...f })),
+                        });
+                        toast.success(`Loaded "${preset.name}" preset with ${preset.fields.length} fields`);
+                      }}
+                      className={`group/preset flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 text-left
+                        ${isSelected
+                          ? 'border-ruby-400 bg-ruby-50/50 shadow-md shadow-ruby-500/10 ring-1 ring-ruby-200'
+                          : 'border-gray-150 bg-white hover:border-gray-300 hover:shadow-sm hover:bg-gray-50/50'
+                        }`}
+                    >
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${preset.color} flex items-center justify-center shadow-sm shrink-0 transition-transform group-hover/preset:scale-105`}>
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-xs font-semibold leading-tight truncate ${isSelected ? 'text-ruby-700' : 'text-gray-800'}`}>{preset.name}</span>
+                          {isSelected && <Check className="w-3 h-3 text-ruby-500 shrink-0" />}
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-medium">{preset.fields.length} fields</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200" />
+
+            <div className="space-y-4">
+              <SectionHeader icon={FileText} title="Basic Information" description="Name and describe this template" />
+              <div>
+                <label className="label-text">Template Name</label>
+                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" placeholder="e.g. Restaurant Onboarding" />
+              </div>
+              <div>
+                <label className="label-text">Description</label>
+                <textarea value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field resize-none" rows={2} placeholder="What is this template for?" />
+              </div>
+            </div>
+
+            {renderFieldBuilder()}
+
+            <div className="flex items-center justify-between pt-5 border-t border-gray-200">
+              <button type="button" onClick={() => setCreateStep(1)} className="btn-secondary flex items-center gap-2">
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button
+                type="button"
+                disabled={!form.name}
+                onClick={() => setCreateStep(3)}
+                className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Review <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
+        )}
 
-          {renderFieldBuilder()}
+        {/* Step 3: Review & Create */}
+        {createStep === 3 && (
+          <form onSubmit={handleCreate} className="space-y-6">
+            <div className="p-4 bg-gradient-to-br from-gray-50 via-white to-gray-50 rounded-xl border border-gray-100 space-y-4">
+              <h3 className="text-sm font-bold text-gray-900">Review Template</h3>
 
-          <div className="flex items-center justify-end gap-3 pt-5 border-t border-gray-200">
-            <button type="button" onClick={() => { setShowCreate(false); resetForm(); }} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center gap-2">
-              {isSubmitting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Creating...</> : <><Plus className="w-4 h-4" /> Create Template</>}
-            </button>
-          </div>
-        </form>
+              <div className="grid grid-cols-2 gap-3">
+                <DetailCard icon={FolderOpen} label="Category" value={selectedCategory?.name || '—'} />
+                <DetailCard icon={Link2} label="Subcategory" value={selectedSubcategory?.name || '—'} />
+                <DetailCard icon={FileText} label="Template Name" value={form.name} />
+                <DetailCard icon={Layers} label="Fields" value={`${(form.fields || []).filter(f => f.key && f.label).length} fields defined`} />
+              </div>
+
+              {form.description && (
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-1">Description</p>
+                  <p className="text-sm text-gray-700">{form.description}</p>
+                </div>
+              )}
+
+              {/* Field summary */}
+              {(form.fields || []).filter(f => f.key && f.label).length > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-2">Fields Preview</p>
+                  <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                    {(form.fields || []).filter(f => f.key && f.label).map((f, i) => (
+                      <div key={i} className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg text-xs">
+                        <span className="text-gray-400 font-semibold w-5">{i + 1}</span>
+                        <span className="font-mono text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded">{f.key}</span>
+                        <span className="font-medium text-gray-800 flex-1">{f.label}</span>
+                        <FieldTypeBadge type={f.type} />
+                        {f.required && <span className="text-[9px] bg-red-50 text-red-600 px-1 py-0.5 rounded font-semibold">Req</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {typeof selectedSubcategory?.templateId === 'object' && selectedSubcategory?.templateId?.name && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700">
+                    This will replace the existing template <span className="font-bold">&quot;{selectedSubcategory.templateId.name}&quot;</span> for this subcategory.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-5 border-t border-gray-200">
+              <button type="button" onClick={() => setCreateStep(2)} className="btn-secondary flex items-center gap-2">
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center gap-2">
+                {isSubmitting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Creating...</> : <><Plus className="w-4 h-4" /> Create & Link Template</>}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* View Modal */}
@@ -665,6 +947,31 @@ export default function TemplatesPage() {
                 <DetailCard icon={Filter} label="Filter Fields" value={String(viewTemplate.fields.filter(f => f.isFilter).length)} />
               </div>
             </div>
+
+            {/* Linked Subcategories */}
+            {(() => {
+              const linked = templateSubcategoryMap[viewTemplate._id] || [];
+              return (
+                <div>
+                  <SectionHeader icon={Link2} title="Linked Subcategories" description={linked.length > 0 ? `Used by ${linked.length} subcategor${linked.length === 1 ? 'y' : 'ies'}` : 'Not linked to any subcategory'} />
+                  <div className="mt-4">
+                    {linked.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">No subcategories are using this template</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {linked.map((s, i) => (
+                          <span key={i} className="inline-flex items-center gap-1.5 text-xs font-medium bg-purple-50 text-purple-700 px-2.5 py-1.5 rounded-lg border border-purple-200">
+                            <Link2 className="w-3 h-3" />
+                            {s.name}
+                            {s.businessModel && <span className="text-[9px] bg-purple-200/50 text-purple-600 px-1 py-0.5 rounded">{s.businessModel.replace(/_/g, ' ')}</span>}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Fields */}
             <div>

@@ -1,6 +1,6 @@
 import {
   Utensils, Hotel, Scissors, Dumbbell, ShoppingBag, Wrench,
-  Briefcase, Music, Car, Stethoscope,
+  Briefcase, Music, Car, Sparkles, Crown, Palette,
 } from 'lucide-react';
 import type { TemplateField } from '@/lib/types';
 
@@ -235,7 +235,7 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
     id: 'spa_wellness',
     name: 'Spa & Wellness',
     description: 'Spas, massage, and wellness centers',
-    icon: Stethoscope,
+    icon: Sparkles,
     color: 'from-rose-400 to-pink-500',
     fields: [
       { key: 'services_offered', label: 'Services Offered', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 0, options: [
@@ -250,6 +250,65 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
       { key: 'accepts_appointments', label: 'Online Booking', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 3, options: [] },
       { key: 'home_service', label: 'Home Service Available', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 4, options: [] },
       { key: 'couples_service', label: 'Couples Packages', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 5, options: [] },
+    ],
+  },
+  {
+    id: 'concierge',
+    name: 'Concierge Services',
+    description: 'Airport pickup, private security, personal assistants',
+    icon: Crown,
+    color: 'from-slate-500 to-slate-700',
+    fields: [
+      { key: 'service_type', label: 'Service Type', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 0, options: [
+        { value: 'airport_pickup', label: 'Airport Pickup' }, { value: 'airport_dropoff', label: 'Airport Drop-off' },
+        { value: 'executive_protection', label: 'Executive Protection' }, { value: 'event_security', label: 'Event Security' },
+        { value: 'personal_assistant', label: 'Personal Assistant' }, { value: 'errand_runner', label: 'Errand Runner' },
+        { value: 'tour_guide', label: 'Tour Guide' },
+      ] },
+      { key: 'response_time', label: 'Response Time', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 1, options: [
+        { value: 'immediate', label: 'Immediate (Under 1hr)' }, { value: 'same_day', label: 'Same Day' },
+        { value: 'next_day', label: 'Next Day' }, { value: 'scheduled', label: 'Scheduled Only' },
+      ] },
+      { key: 'availability', label: 'Availability', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 2, options: [
+        { value: '24_7', label: '24/7' }, { value: 'daytime', label: 'Daytime (6AM-10PM)' },
+        { value: 'nighttime', label: 'Nighttime (10PM-6AM)' }, { value: 'weekdays', label: 'Weekdays Only' },
+        { value: 'weekends', label: 'Weekends Only' },
+      ] },
+      { key: 'languages', label: 'Languages Spoken', type: 'MULTISELECT', required: false, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 3, options: [
+        { value: 'english', label: 'English' }, { value: 'yoruba', label: 'Yoruba' }, { value: 'igbo', label: 'Igbo' },
+        { value: 'hausa', label: 'Hausa' }, { value: 'pidgin', label: 'Pidgin' }, { value: 'french', label: 'French' },
+      ] },
+      { key: 'coverage_area', label: 'Coverage Area', type: 'TEXT', required: true, isPublic: true, isFilter: false, order: 4, placeholder: 'e.g. Lagos Island, Victoria Island, Lekki', options: [] },
+      { key: 'vehicle_provided', label: 'Vehicle Provided', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 5, options: [] },
+    ],
+  },
+  {
+    id: 'arts_entertainment',
+    name: 'Arts & Entertainment',
+    description: 'Galleries, museums, festivals, and cultural events',
+    icon: Palette,
+    color: 'from-fuchsia-400 to-pink-600',
+    fields: [
+      { key: 'event_type', label: 'Event/Venue Type', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 0, options: [
+        { value: 'gallery', label: 'Art Gallery' }, { value: 'museum', label: 'Museum' },
+        { value: 'festival', label: 'Festival' }, { value: 'exhibition', label: 'Exhibition' },
+        { value: 'cultural_center', label: 'Cultural Center' }, { value: 'workshop', label: 'Art Workshop' },
+      ] },
+      { key: 'capacity', label: 'Venue Capacity', type: 'NUMBER', required: false, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 1, placeholder: 'e.g. 200', options: [] },
+      { key: 'age_restriction', label: 'Age Policy', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 2, options: [
+        { value: 'all_ages', label: 'All Ages' }, { value: 'family', label: 'Family-Friendly' },
+        { value: '16_plus', label: '16+' }, { value: '18_plus', label: '18+' },
+      ] },
+      { key: 'admission_type', label: 'Admission', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 3, options: [
+        { value: 'free', label: 'Free Entry' }, { value: 'ticketed', label: 'Ticketed' },
+        { value: 'reservation', label: 'Reservation Required' }, { value: 'membership', label: 'Members Only' },
+      ] },
+      { key: 'accessibility', label: 'Accessibility', type: 'MULTISELECT', required: false, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 4, options: [
+        { value: 'wheelchair', label: 'Wheelchair Accessible' }, { value: 'parking', label: 'Parking Available' },
+        { value: 'guided_tours', label: 'Guided Tours' }, { value: 'audio_guide', label: 'Audio Guide' },
+        { value: 'braille', label: 'Braille Signage' },
+      ] },
+      { key: 'photography_allowed', label: 'Photography Allowed', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 5, options: [] },
     ],
   },
 ];

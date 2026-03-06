@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { api, ApiClientError } from "@/lib/api";
 
@@ -47,10 +48,8 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-md">
       <div className="text-center mb-8">
-        <Link href="/" className="inline-flex items-center gap-2 mb-6">
-          <div className="w-10 h-10 bg-ruby-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-lg">R+</span>
-          </div>
+        <Link href="/" className="inline-block mb-6">
+          <Image src="/images/logo.png" alt="Ruby+" width={48} height={48} className="mx-auto" />
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Admin Login</h1>
         <p className="mt-2 text-sm text-gray-500">

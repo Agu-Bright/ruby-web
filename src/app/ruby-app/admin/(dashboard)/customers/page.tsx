@@ -434,6 +434,24 @@ function CustomerDetailView({
   const [txTotal, setTxTotal] = useState(0);
   const [showFundModal, setShowFundModal] = useState(false);
   const [selectedTx, setSelectedTx] = useState<LedgerEntry | null>(null);
+  const [otpData, setOtpData] = useState<{ code: string; purpose: string; createdAt: string; expiresAt: string } | null>(null);
+  const [otpLoading, setOtpLoading] = useState(true);
+
+  const fetchOtp = useCallback(async () => {
+    setOtpLoading(true);
+    try {
+      const res = await api.customers.getOtp(customer._id);
+      setOtpData(res.data);
+    } catch {
+      setOtpData(null);
+    } finally {
+      setOtpLoading(false);
+    }
+  }, [customer._id]);
+
+  useEffect(() => {
+    fetchOtp();
+  }, [fetchOtp]);
 
   const fetchWallet = useCallback(async () => {
     setWalletLoading(true);
@@ -599,6 +617,40 @@ function CustomerDetailView({
               </div>
             </div>
           </div>
+
+          {/* Active OTP Code (admin visibility) */}
+          {!otpLoading && otpData && (
+            <div>
+              <span className="text-xs text-gray-500 uppercase mb-2 block">Active OTP Code</span>
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+                    otpData.purpose === 'EMAIL_VERIFICATION'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {otpData.purpose === 'EMAIL_VERIFICATION' ? 'Email Verification' : 'Password Reset'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(otpData.code);
+                      toast.success('OTP copied to clipboard');
+                    }}
+                    className="text-xs text-amber-700 hover:text-amber-900 font-medium flex items-center gap-1"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-3xl font-mono font-bold text-amber-900 tracking-[0.3em] text-center mb-3">
+                  {otpData.code}
+                </p>
+                <div className="flex items-center justify-between text-[11px] text-amber-700">
+                  <span>Created: {formatDateTime(otpData.createdAt)}</span>
+                  <span>Expires: {formatDateTime(otpData.expiresAt)}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -1311,6 +1311,47 @@ export interface AdminNotificationListResponse {
 }
 
 // ============================================================
+// Broadcast Notifications
+// ============================================================
+export type BroadcastTargetAudience = 'ALL' | 'USERS' | 'BUSINESS_OWNERS';
+export type BroadcastStatus = 'PENDING' | 'SENDING' | 'COMPLETED' | 'FAILED';
+
+export interface BroadcastNotification {
+  _id: string;
+  title: string;
+  body: string;
+  targetAudience: BroadcastTargetAudience;
+  locationIds: string[];
+  sentBy: string | { _id: string; firstName?: string; lastName?: string };
+  totalRecipients: number;
+  totalPushSent: number;
+  totalFailed: number;
+  status: BroadcastStatus;
+  data?: Record<string, unknown>;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BroadcastNotificationRequest {
+  title: string;
+  body: string;
+  targetAudience: BroadcastTargetAudience;
+  locationIds?: string[];
+  data?: Record<string, unknown>;
+}
+
+export interface BroadcastHistoryResponse {
+  items: BroadcastNotification[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// ============================================================
 // Emergency Alerts
 // ============================================================
 export type EmergencyAlertStatus = 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED' | 'FALSE_ALARM';

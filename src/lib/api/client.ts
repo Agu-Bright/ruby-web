@@ -850,6 +850,8 @@ export const api = {
       }),
     stats: () =>
       request<import("@/lib/types").CustomerStats>("/users/stats"),
+    getOtp: (id: string) =>
+      request<{ code: string; purpose: string; createdAt: string; expiresAt: string } | null>(`/users/${id}/otp`),
   },
 
   // Audit Logs
@@ -974,6 +976,20 @@ export const api = {
       request<{ success: boolean }>("/admin/notifications/mark-all-read", {
         method: "POST",
       }),
+    broadcast: (data: import("@/lib/types").BroadcastNotificationRequest) =>
+      request<import("@/lib/types").BroadcastNotification>("/admin/notifications/broadcast", {
+        method: "POST",
+        body: data,
+      }),
+    broadcastHistory: (params?: { page?: number; limit?: number }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.set("page", String(params.page));
+      if (params?.limit) searchParams.set("limit", String(params.limit));
+      const qs = searchParams.toString();
+      return request<import("@/lib/types").BroadcastHistoryResponse>(
+        `/admin/notifications/broadcast/history${qs ? `?${qs}` : ""}`,
+      );
+    },
   },
 };
 

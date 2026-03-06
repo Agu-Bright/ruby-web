@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Upload, X, Loader2, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api';
+import { compressImage } from '@/lib/image-compress';
 
 interface ImageUploadProps {
   value?: string;
@@ -27,6 +28,7 @@ export function ImageUpload({
   disabled = false,
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,16 +55,22 @@ export function ImageUpload({
       }
 
       setError(null);
-      setIsUploading(true);
 
       try {
-        const res = await api.media.upload(file, folder);
+        // Compress image before uploading (skips SVGs and small files)
+        setIsCompressing(true);
+        const compressed = await compressImage(file);
+        setIsCompressing(false);
+
+        setIsUploading(true);
+        const res = await api.media.upload(compressed, folder);
         onChange(res.data.url);
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : 'Upload failed';
         setError(message);
       } finally {
+        setIsCompressing(false);
         setIsUploading(false);
       }
     },
@@ -79,14 +87,14 @@ export function ImageUpload({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    if (disabled || isUploading) return;
+    if (disabled || isUploading || isCompressing) return;
     const file = e.dataTransfer.files?.[0];
     if (file) handleUpload(file);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!disabled && !isUploading) setIsDragOver(true);
+    if (!disabled && !isUploading && !isCompressing) setIsDragOver(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -155,7 +163,7 @@ export function ImageUpload({
     <div>
       {label && <label className="label-text">{label}</label>}
       <div
-        onClick={() => !disabled && !isUploading && fileInputRef.current?.click()}
+        onClick={() => !disabled && !isUploading && !isCompressing && fileInputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -166,10 +174,12 @@ export function ImageUpload({
           ${error ? 'border-red-300 bg-red-50/30' : ''}
         `}
       >
-        {isUploading ? (
+        {isCompressing || isUploading ? (
           <>
             <Loader2 className="w-5 h-5 text-ruby-500 animate-spin mb-1" />
-            <p className="text-xs text-gray-500">Uploading...</p>
+            <p className="text-xs text-gray-500">
+              {isCompressing ? 'Compressing...' : 'Uploading...'}
+            </p>
           </>
         ) : (
           <>

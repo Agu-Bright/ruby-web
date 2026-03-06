@@ -279,6 +279,57 @@ async function uploadFile(
   return { success: true, data: json as UploadResult };
 }
 
+/**
+ * Upload a file directly to R2 via presigned URL (bypasses backend proxy).
+ * Falls back to multipart upload through backend on failure.
+ */
+async function uploadDirect(
+  file: File,
+  folder?: string,
+): Promise<ApiResponse<UploadResult>> {
+  try {
+    // 1. Get presigned URL from backend
+    const presigned = await request<{
+      uploadUrl: string;
+      key: string;
+      publicUrl: string;
+      expiresIn: number;
+    }>("/admin/media/presigned-url", {
+      method: "POST",
+      body: { fileName: file.name, mimeType: file.type, folder: folder || "uploads" },
+    });
+
+    // 2. PUT file directly to R2
+    const putRes = await fetch(presigned.data.uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type,
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
+      body: file,
+    });
+
+    if (!putRes.ok) {
+      throw new Error(`Direct upload failed: ${putRes.status}`);
+    }
+
+    // 3. Return result in same format as multipart upload
+    return {
+      success: true,
+      data: {
+        key: presigned.data.key,
+        url: presigned.data.publicUrl,
+        originalName: file.name,
+        mimeType: file.type,
+        size: file.size,
+      },
+    };
+  } catch {
+    // Fallback to multipart upload through backend
+    return uploadFile("/admin/media/upload", file, folder);
+  }
+}
+
 // ============================================================
 // API Client Methods
 // ============================================================
@@ -308,7 +359,7 @@ export const api = {
   // Media
   media: {
     upload: (file: File, folder?: string) =>
-      uploadFile("/admin/media/upload", file, folder),
+      uploadDirect(file, folder),
     delete: (key: string) =>
       request<void>(`/admin/media/${encodeURIComponent(key)}`, {
         method: "DELETE",

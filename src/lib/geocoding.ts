@@ -72,6 +72,61 @@ export async function geocodeSearch(
   }));
 }
 
+// ─── Reverse Geocoding ──────────────────────────────────────
+
+export interface ReverseGeocodeResult {
+  displayName: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+}
+
+export async function reverseGeocode(
+  lat: number,
+  lng: number
+): Promise<ReverseGeocodeResult | null> {
+  const params = new URLSearchParams({
+    lat: lat.toString(),
+    lon: lng.toString(),
+    format: 'json',
+    addressdetails: '1',
+  });
+
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?${params}`,
+      {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'RubyPlusAdmin/1.0',
+        },
+      }
+    );
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.error) return null;
+
+    return {
+      displayName: data.display_name,
+      street: [data.address?.road, data.address?.house_number]
+        .filter(Boolean)
+        .join(' ') || undefined,
+      city:
+        data.address?.city ||
+        data.address?.town ||
+        data.address?.village,
+      state: data.address?.state,
+      country: data.address?.country,
+      postalCode: data.address?.postcode,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─── React Hook ──────────────────────────────────────────────
 
 export function useGeocoding(debounceMs = 500) {

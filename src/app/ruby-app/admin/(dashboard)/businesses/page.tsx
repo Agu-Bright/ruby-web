@@ -8,11 +8,24 @@ import {
   Plus, Copy, Loader2, Package, Wrench, Edit2, Archive, Power, Image as ImageIcon,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { PageHeader, DataTable, StatusBadge, Modal, StatCard, ImageUpload, type Column } from '@/components/ui';
+
+const MapLocationPicker = dynamic(
+  () => import('@/components/ui/map-location-picker').then(mod => ({ default: mod.MapLocationPicker })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[280px] bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
+        <span className="text-sm text-gray-400">Loading map...</span>
+      </div>
+    ),
+  }
+);
 import type {
   Business, BusinessFilterParams, BusinessStatus, BusinessStats, VerifyCacRequest,
   BusinessMediaItem, BusinessHoursEntry, BusinessAddress,
@@ -2241,29 +2254,32 @@ function CreateBusinessModal({
                 {(subcategories || []).map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Latitude</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                  value={form.latitude || ''}
-                  onChange={(e) => update('latitude', parseFloat(e.target.value) || 0)}
-                  placeholder="6.5244"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Longitude</label>
-                <input
-                  type="number"
-                  step="any"
-                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                  value={form.longitude || ''}
-                  onChange={(e) => update('longitude', parseFloat(e.target.value) || 0)}
-                  placeholder="3.3792"
-                />
-              </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Pin Business Location</label>
+              <p className="text-xs text-gray-400 mt-0.5 mb-2">Search for an address or click on the map to set the exact location</p>
+              <MapLocationPicker
+                latitude={form.latitude || 6.5244}
+                longitude={form.longitude || 3.3792}
+                onLocationChange={(lat, lng) => {
+                  update('latitude', lat);
+                  update('longitude', lng);
+                }}
+                onAddressResolved={(addr) => {
+                  if (!form.address.street && addr.street) {
+                    setForm(f => ({
+                      ...f,
+                      address: {
+                        ...f.address,
+                        street: addr.street || f.address.street,
+                        city: addr.city || f.address.city,
+                        state: addr.state || f.address.state,
+                      },
+                    }));
+                  }
+                }}
+                height="280px"
+                countryCode="ng"
+              />
             </div>
             <div>
               <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Street Address</label>

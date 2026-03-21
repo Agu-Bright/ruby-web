@@ -1103,6 +1103,28 @@ export const api = {
       );
     },
   },
+
+  legalDocuments: {
+    list: (params?: { page?: number; limit?: number; type?: string; status?: string }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.set("page", String(params.page));
+      if (params?.limit) searchParams.set("limit", String(params.limit));
+      if (params?.type) searchParams.set("type", params.type);
+      if (params?.status) searchParams.set("status", params.status);
+      const qs = searchParams.toString();
+      return request<any>(`/admin/legal-documents${qs ? `?${qs}` : ""}`);
+    },
+    create: (data: any) =>
+      request<any>("/admin/legal-documents", { method: "POST", body: data }),
+    update: (id: string, data: any) =>
+      request<any>(`/admin/legal-documents/${id}`, { method: "PUT", body: data }),
+    activate: (id: string) =>
+      request<any>(`/admin/legal-documents/${id}/activate`, { method: "POST" }),
+    deactivate: (id: string) =>
+      request<any>(`/admin/legal-documents/${id}/deactivate`, { method: "POST" }),
+    delete: (id: string) =>
+      request<any>(`/admin/legal-documents/${id}`, { method: "DELETE" }),
+  },
 };
 
 export default api;

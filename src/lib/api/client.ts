@@ -784,33 +784,33 @@ export const api = {
 
   // Rides
   rides: {
-    list: (params?: import("@/lib/types").RideFilterParams) =>
-      request<import("@/lib/types").Ride[]>("/admin/rides", {
+    list: (params?: Record<string, any>) =>
+      request<any[]>("/admin/rides", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
     get: (id: string) =>
-      request<import("@/lib/types").Ride>(`/admin/rides/${id}`),
+      request<any>(`/admin/rides/${id}`),
     stats: (params?: { locationId?: string }) =>
-      request<import("@/lib/types").RideStats>("/admin/rides/stats", {
+      request<any>("/admin/rides/stats", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
   },
 
   // Dispatch
   dispatch: {
-    list: (params?: import("@/lib/types").DispatchFilterParams) =>
-      request<import("@/lib/types").Dispatch[]>("/admin/dispatch", {
+    list: (params?: Record<string, any>) =>
+      request<any[]>("/admin/dispatch", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
     get: (id: string) =>
-      request<import("@/lib/types").Dispatch>(`/admin/dispatch/${id}`),
+      request<any>(`/admin/dispatch/${id}`),
     cancel: (id: string, data?: { reason?: string }) =>
-      request<import("@/lib/types").Dispatch>(`/admin/dispatch/${id}/cancel`, {
+      request<any>(`/admin/dispatch/${id}/cancel`, {
         method: "POST",
         body: data,
       }),
     stats: (params?: { locationId?: string }) =>
-      request<import("@/lib/types").DispatchStats>("/admin/dispatch/stats", {
+      request<any>("/admin/dispatch/stats", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
   },

@@ -422,9 +422,6 @@ export default function LegalDocumentsPage() {
         data={docs}
         isLoading={isLoading}
         emptyMessage="No legal documents found"
-        emptyIcon={<Scale className="w-12 h-12 text-gray-300" />}
-        pagination={pagination}
-        onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
       />
 
       {/* Create/Edit Modal */}

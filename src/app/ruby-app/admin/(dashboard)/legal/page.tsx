@@ -110,7 +110,7 @@ export default function LegalDocumentsPage() {
   const deleteMutation = useMutation((id: string) => api.legalDocuments.delete(id));
 
   const docs = Array.isArray(docsData) ? docsData : [];
-  const pagination = docsMeta?.pagination;
+  const pagination = (docsMeta as any)?.pagination;
 
   // Search handler
   const handleSearch = useCallback(() => {

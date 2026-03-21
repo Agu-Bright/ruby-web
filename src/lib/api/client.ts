@@ -646,6 +646,18 @@ export const api = {
         `/admin/businesses/${id}/status`,
         { method: "PATCH", body: data },
       ),
+    // Business wallet management
+    getWallet: (businessId: string) =>
+      request<import("@/lib/types").Wallet[]>(`/admin/wallets/by-business/${businessId}`),
+    fundWallet: (walletId: string, data: { amount: number; currency?: string; description?: string }) =>
+      request<import("@/lib/types").LedgerEntry>(`/admin/wallets/${walletId}/fund`, {
+        method: "POST",
+        body: data,
+      }),
+    getWalletTransactions: (walletId: string, params?: { page?: number; limit?: number; type?: string }) =>
+      request<import("@/lib/types").LedgerEntry[]>(`/admin/wallets/${walletId}/transactions`, {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
   },
 
   // Admin Products
@@ -770,6 +782,39 @@ export const api = {
       request<import("@/lib/types").BookingStats>("/admin/bookings/stats"),
   },
 
+  // Rides
+  rides: {
+    list: (params?: import("@/lib/types").RideFilterParams) =>
+      request<import("@/lib/types").Ride[]>("/admin/rides", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").Ride>(`/admin/rides/${id}`),
+    stats: (params?: { locationId?: string }) =>
+      request<import("@/lib/types").RideStats>("/admin/rides/stats", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+  },
+
+  // Dispatch
+  dispatch: {
+    list: (params?: import("@/lib/types").DispatchFilterParams) =>
+      request<import("@/lib/types").Dispatch[]>("/admin/dispatch", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").Dispatch>(`/admin/dispatch/${id}`),
+    cancel: (id: string, data?: { reason?: string }) =>
+      request<import("@/lib/types").Dispatch>(`/admin/dispatch/${id}/cancel`, {
+        method: "POST",
+        body: data,
+      }),
+    stats: (params?: { locationId?: string }) =>
+      request<import("@/lib/types").DispatchStats>("/admin/dispatch/stats", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+  },
+
   // Disputes
   disputes: {
     list: (params?: import("@/lib/types").DisputeFilterParams) =>
@@ -867,6 +912,11 @@ export const api = {
       request<import("@/lib/types").FeeConfig>(
         `/admin/fees/${id}`,
         { method: "PATCH", body: data },
+      ),
+    delete: (id: string) =>
+      request<{ deleted: boolean }>(
+        `/admin/fees/${id}`,
+        { method: "DELETE" },
       ),
   },
 
@@ -971,6 +1021,17 @@ export const api = {
         method: "POST",
         body: data,
       }),
+    delete: (id: string) =>
+      request<null>(`/admin/ads/${id}`, { method: "DELETE" }),
+  },
+
+  reviews: {
+    list: (params?: { page?: number; limit?: number; businessId?: string; rating?: number; isFlagged?: string }) =>
+      request<any[]>("/admin/reviews", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    delete: (id: string) =>
+      request<null>(`/admin/reviews/${id}`, { method: "DELETE" }),
   },
 
   adProducts: {

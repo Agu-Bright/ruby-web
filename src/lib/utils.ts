@@ -219,6 +219,7 @@ const AD_TYPE_LABELS: Record<string, string> = {
   SLIDESHOW_AD: 'Slideshow Ad',
   EXPLORE_REELS_AD: 'Explore Reels Ad',
   PUSH_NOTIFICATION: 'Push Notification',
+  FEATURED_REVIEWS: 'Featured Reviews',
 };
 
 export function getAdTypeName(type: string): string {

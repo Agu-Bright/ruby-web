@@ -457,9 +457,9 @@ function CustomerDetailView({
     setWalletLoading(true);
     try {
       const res = await api.customers.getWallets(customer._id);
-      const wallets = res.data;
-      const userWallet = Array.isArray(wallets) && wallets.length > 0 ? wallets[0] : null;
-      setWallet(userWallet);
+      const rawData = res.data;
+      const wallets = Array.isArray(rawData) ? rawData : (Array.isArray((rawData as any)?.data) ? (rawData as any).data : []);
+      setWallet(wallets.length > 0 ? wallets[0] : null);
     } catch {
       setWallet(null);
     } finally {

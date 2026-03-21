@@ -6,6 +6,7 @@ import {
   Phone, Mail, Globe, Star, ShieldCheck, ShieldX, RotateCcw, RefreshCw,
   FileText, ExternalLink, AlertTriangle, MoreHorizontal, ChevronDown, Trash2,
   Plus, Copy, Loader2, Package, Wrench, Edit2, Archive, Power, Image as ImageIcon,
+  Wallet, DollarSign, ArrowUpRight, ArrowDownLeft, ChevronLeft, ChevronRight, AlertCircle, X,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -32,8 +33,9 @@ import type {
   AdminCreateBusinessRequest, Location, Category, Subcategory,
   Product, ProductStatus, UpdateProductRequest,
   ServiceListing, ServiceStatus, UpdateServiceRequest, PricingType, ServiceFulfillmentMode,
+  Wallet as WalletType, LedgerEntry,
 } from '@/lib/types';
-import { formatDate, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName } from '@/lib/utils';
+import { formatDate, formatDateTime, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName } from '@/lib/utils';
 
 const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'LIVE', 'REJECTED', 'SUSPENDED'];
 
@@ -151,7 +153,7 @@ export default function BusinessesPage() {
   });
   const [search, setSearch] = useState('');
   const [detailBusiness, setDetailBusiness] = useState<Business | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog' | 'wallet'>('info');
   const [actionModal, setActionModal] = useState<{ business: Business; action: ActionType } | null>(null);
 
   // Catalog tab state
@@ -164,6 +166,15 @@ export default function BusinessesPage() {
   const [reason, setReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<BusinessStatus>('PENDING_REVIEW');
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Wallet tab state
+  const [bizWallet, setBizWallet] = useState<WalletType | null>(null);
+  const [bizWalletLoading, setBizWalletLoading] = useState(true);
+  const [bizTransactions, setBizTransactions] = useState<LedgerEntry[]>([]);
+  const [bizTxLoading, setBizTxLoading] = useState(false);
+  const [bizTxPage, setBizTxPage] = useState(1);
+  const [bizTxTotal, setBizTxTotal] = useState(0);
+  const [showBizFundModal, setShowBizFundModal] = useState(false);
 
   // Fetch businesses list
   const { data: businesses, meta, isLoading, refetch } = useApi<Business[]>(
@@ -274,6 +285,49 @@ export default function BusinessesPage() {
   const { mutate: archiveService } = useMutation(({ id }: { id: string }) => api.services.archive(id), catalogMutOpts);
   const { mutate: updateService, isLoading: updatingService } = useMutation(({ id, data }: { id: string; data: UpdateServiceRequest }) => api.services.update(id, data), catalogMutOpts);
   const catalogProcessing = deletingProduct || suspendingProduct || activatingProduct || updatingProduct || deletingService || suspendingService || activatingService || updatingService;
+
+  // Wallet fetch functions
+  const fetchBizWallet = useCallback(async () => {
+    if (!detailBusiness) return;
+    setBizWalletLoading(true);
+    try {
+      const res = await api.businesses.getWallet(detailBusiness._id);
+      const wallets = res.data;
+      const w = Array.isArray(wallets) && wallets.length > 0 ? wallets[0] : null;
+      setBizWallet(w);
+    } catch {
+      setBizWallet(null);
+    } finally {
+      setBizWalletLoading(false);
+    }
+  }, [detailBusiness]);
+
+  const fetchBizTransactions = useCallback(async (walletId: string, page: number) => {
+    setBizTxLoading(true);
+    try {
+      const txRes = await api.businesses.getWalletTransactions(walletId, { limit: 10, page });
+      setBizTransactions(Array.isArray(txRes.data) ? txRes.data : []);
+      setBizTxTotal(txRes.meta?.total || 0);
+    } catch {
+      setBizTransactions([]);
+    } finally {
+      setBizTxLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (detailBusiness && detailTab === 'wallet') {
+      fetchBizWallet();
+    }
+  }, [detailBusiness, detailTab, fetchBizWallet]);
+
+  useEffect(() => {
+    if (bizWallet && detailTab === 'wallet') {
+      fetchBizTransactions(bizWallet._id, bizTxPage);
+    }
+  }, [bizWallet, bizTxPage, detailTab, fetchBizTransactions]);
+
+  const bizTxTotalPages = Math.ceil(bizTxTotal / 10) || 1;
 
   const handleCatalogConfirm = useCallback(async () => {
     if (!catalogConfirmModal) return;
@@ -689,17 +743,18 @@ export default function BusinessesPage() {
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-gray-100">
-              {(['info', 'media', 'cac', 'hours', 'catalog'] as const).map(tab => (
+              {(['info', 'media', 'cac', 'hours', 'catalog', 'wallet'] as const).map(tab => (
                 <button
                   key={tab}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
                     detailTab === tab
                       ? 'border-ruby-600 text-ruby-600'
                       : 'border-transparent text-gray-400 hover:text-gray-600'
                   }`}
-                  onClick={() => { setDetailTab(tab); if (tab === 'catalog') { setCatalogSearch(''); setCatalogStatusFilter(''); } }}
+                  onClick={() => { setDetailTab(tab); if (tab === 'catalog') { setCatalogSearch(''); setCatalogStatusFilter(''); } if (tab === 'wallet') { setBizTxPage(1); } }}
                 >
-                  {tab === 'info' ? 'Info' : tab === 'media' ? 'Media' : tab === 'cac' ? 'CAC' : tab === 'hours' ? 'Hours' : 'Catalog'}
+                  {tab === 'wallet' && <Wallet className="w-3.5 h-3.5" />}
+                  {tab === 'info' ? 'Info' : tab === 'media' ? 'Media' : tab === 'cac' ? 'CAC' : tab === 'hours' ? 'Hours' : tab === 'catalog' ? 'Catalog' : 'Wallet'}
                   {tab === 'cac' && displayBusiness.cacDocumentUrl && displayBusiness.cacDocumentStatus === 'PENDING' && (
                     <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse" />
                   )}
@@ -1260,6 +1315,130 @@ export default function BusinessesPage() {
               </div>
             )}
 
+            {/* Tab: Wallet */}
+            {detailTab === 'wallet' && (
+              <div className="space-y-5">
+                {bizWalletLoading ? (
+                  <div className="flex items-center gap-4 animate-pulse">
+                    <div className="h-20 flex-1 bg-gray-100 rounded-xl" />
+                  </div>
+                ) : bizWallet ? (
+                  <>
+                    {/* Frozen warning */}
+                    {bizWallet.status === 'FROZEN' && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-xs text-amber-700 flex items-start gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          This wallet is frozen. Funding is disabled until the wallet is unfrozen.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Balance card */}
+                    <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl border border-emerald-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-emerald-600 uppercase tracking-wider font-semibold">Balance</p>
+                          <p className="text-2xl font-bold text-emerald-800 mt-1">{formatCurrency(bizWallet.balance, bizWallet.currency)}</p>
+                          <p className="text-[11px] text-emerald-500 mt-1">{bizWallet.status || 'ACTIVE'} · {bizWallet.currency}</p>
+                        </div>
+                        <button
+                          onClick={() => setShowBizFundModal(true)}
+                          disabled={bizWallet.status === 'FROZEN'}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Plus className="w-4 h-4" /> Add Funds
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Transactions */}
+                    <div>
+                      <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center">
+                            <DollarSign className="w-3.5 h-3.5 text-gray-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-semibold text-gray-800">Transactions</h3>
+                            <p className="text-[11px] text-gray-400 mt-0.5">{bizTxTotal} total transactions</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        {bizTxLoading ? (
+                          <div className="space-y-3">
+                            {[...Array(3)].map((_, i) => (
+                              <div key={i} className="flex items-center gap-3 animate-pulse">
+                                <div className="w-8 h-8 bg-gray-100 rounded-lg" />
+                                <div className="flex-1 space-y-1"><div className="h-3 bg-gray-100 rounded w-2/3" /><div className="h-2 bg-gray-50 rounded w-1/3" /></div>
+                                <div className="h-4 bg-gray-100 rounded w-16" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : bizTransactions.length === 0 ? (
+                          <p className="text-sm text-gray-400 text-center py-4">No transactions yet</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {bizTransactions.map((tx) => {
+                              const isCredit = tx.direction === 'CREDIT' || tx.type === 'CREDIT';
+                              return (
+                                <div
+                                  key={tx._id}
+                                  className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-gray-300 hover:bg-gray-100/50 transition-colors text-left"
+                                >
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isCredit ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                                    {isCredit ? <ArrowDownLeft className="w-4 h-4 text-emerald-600" /> : <ArrowUpRight className="w-4 h-4 text-red-600" />}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-gray-800 font-medium truncate">{tx.description || tx.referenceType}</p>
+                                    <p className="text-[11px] text-gray-400">{formatDateTime(tx.createdAt)}</p>
+                                  </div>
+                                  <div className={`text-sm font-semibold ${isCredit ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {isCredit ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Transaction pagination */}
+                        {bizTxTotalPages > 1 && (
+                          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                            <span className="text-xs text-gray-500">Page {bizTxPage} of {bizTxTotalPages}</span>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => setBizTxPage(p => Math.max(1, p - 1))}
+                                disabled={bizTxPage <= 1}
+                                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setBizTxPage(p => Math.min(bizTxTotalPages, p + 1))}
+                                disabled={bizTxPage >= bizTxTotalPages}
+                                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                    <Wallet className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No wallet found</p>
+                    <p className="text-xs text-gray-400 mt-1">A wallet will be created when the business makes their first transaction</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Action bar */}
             <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-100">
               <button
@@ -1456,6 +1635,30 @@ export default function BusinessesPage() {
         }}
         isSubmitting={creating}
       />
+
+      {/* ─── Fund Wallet Modal ─── */}
+      {showBizFundModal && bizWallet && displayBusiness && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={() => setShowBizFundModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Fund Wallet</h2>
+              <button onClick={() => setShowBizFundModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <FundBusinessWalletForm
+              wallet={bizWallet}
+              businessName={displayBusiness.name}
+              onClose={() => setShowBizFundModal(false)}
+              onSuccess={() => {
+                setShowBizFundModal(false);
+                fetchBizWallet();
+                if (bizWallet) fetchBizTransactions(bizWallet._id, bizTxPage);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ─── Catalog Detail Modal ─── */}
       <Modal
@@ -2394,5 +2597,70 @@ function CreateBusinessModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+// ─── Fund Business Wallet Form ──────────────────────────────
+
+function FundBusinessWalletForm({
+  wallet, businessName, onClose, onSuccess,
+}: {
+  wallet: WalletType; businessName: string; onClose: () => void; onSuccess: () => void;
+}) {
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount < 100) {
+      toast.error('Minimum amount is NGN 100');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await api.businesses.fundWallet(wallet._id, {
+        amount: numAmount,
+        currency: wallet.currency,
+        description: description || `Admin funding for ${businessName}`,
+      });
+      toast.success(`Successfully funded ${formatCurrency(numAmount, wallet.currency)}`);
+      onSuccess();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fund wallet';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (NGN)</label>
+        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount (min 100)" min="100" step="1" required className="input-field" autoFocus />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (optional)</label>
+        <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={`Admin funding for ${businessName}`} className="input-field" />
+      </div>
+      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <p className="text-xs text-amber-700 flex items-start gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          This action will immediately credit the wallet. This action is audited.
+        </p>
+      </div>
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+        <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center gap-2">
+          {isSubmitting ? (
+            <><RefreshCw className="w-4 h-4 animate-spin" /> Funding...</>
+          ) : (
+            <><Plus className="w-4 h-4" /> Fund Wallet</>
+          )}
+        </button>
+      </div>
+    </form>
   );
 }

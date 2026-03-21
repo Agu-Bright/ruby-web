@@ -293,6 +293,30 @@ export default function TaxonomySetupPage() {
       const itemId = `sub-${sub.slug}`;
 
       if (skipExisting && existingSubcategorySlugs.has(sub.slug)) {
+        const existing = existingSubcategories.find(s => s.slug === sub.slug);
+
+        // Link template if seed data has one and existing subcategory doesn't
+        if (existing && sub._templatePresetId) {
+          const templateId = templateIdMap.get(sub._templatePresetId);
+          const existingTid = typeof existing.templateId === 'object'
+            ? (existing.templateId as any)?._id
+            : existing.templateId;
+
+          if (templateId && existingTid !== templateId) {
+            setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: 'creating' } : i));
+            try {
+              await api.subcategories.update(existing._id, { templateId });
+              setItems(prev => prev.map(i => i.id === itemId
+                ? { ...i, status: 'success', createdId: existing._id }
+                : i));
+              await delay(100);
+              continue;
+            } catch {
+              // Fall through to regular skip if update fails
+            }
+          }
+        }
+
         setItems(prev => prev.map(i => i.id === itemId ? { ...i, status: 'skipped' } : i));
         continue;
       }

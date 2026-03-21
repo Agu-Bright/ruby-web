@@ -39,7 +39,7 @@ const services = [
   },
 ];
 
-const TARGET_DATE = new Date('2026-03-06T00:00:00').getTime();
+const TARGET_DATE = new Date('2026-05-20T00:00:00').getTime();
 
 function useCountdown() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });

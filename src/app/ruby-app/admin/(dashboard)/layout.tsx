@@ -27,6 +27,7 @@ import {
   Tag,
   ShieldAlert,
   Radio,
+  Scale,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -60,6 +61,7 @@ const navGroups: NavGroup[] = [
       { label: "Admin Users", href: "/ruby-app/admin/users", icon: Users, superOnly: true },
       { label: "Taxonomy", href: "/ruby-app/admin/taxonomy", icon: FolderTree, hiddenForRoles: ["location_admin"] },
       { label: "Templates", href: "/ruby-app/admin/templates", icon: FileText, hiddenForRoles: ["location_admin"] },
+      { label: "Legal", href: "/ruby-app/admin/legal", icon: Scale, hiddenForRoles: ["location_admin"] },
     ],
   },
   {

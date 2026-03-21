@@ -13,6 +13,9 @@ import {
   Clock,
   MapPin,
   X,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -111,15 +114,15 @@ export default function BroadcastsPage() {
     setLoadingHistory(true);
     try {
       const res = await api.notifications.broadcastHistory({ page, limit: 10 });
-      const data = res.data || res;
-      setHistory((data as BroadcastHistoryResponse).items || []);
+      // Backend Transform interceptor unwraps { items, pagination } into
+      // { success: true, data: [items], meta: { pagination } }
+      const items = Array.isArray(res.data)
+        ? res.data
+        : (res.data as any)?.items || [];
+      setHistory(items);
+      const pg = (res as any).meta?.pagination;
       setHistoryPagination(
-        (data as BroadcastHistoryResponse).pagination || {
-          page: 1,
-          limit: 10,
-          total: 0,
-          totalPages: 0,
-        }
+        pg || { page: 1, limit: 10, total: 0, totalPages: 0 }
       );
     } catch {
       // silent
@@ -168,6 +171,24 @@ export default function BroadcastsPage() {
   const getAudienceLabel = (audience: string) => {
     const opt = audienceOptions.find((o) => o.value === audience);
     return opt?.label || audience;
+  };
+
+  // Expanded row for full message preview
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const handleResend = (broadcast: BroadcastNotification) => {
+    setTitle(broadcast.title);
+    setBody(broadcast.body);
+    setTargetAudience(broadcast.targetAudience);
+    if (isGlobalScope && broadcast.locationIds?.length) {
+      setSelectedLocationIds(
+        broadcast.locationIds.map((id: any) =>
+          typeof id === "object" ? id._id : id
+        )
+      );
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.info("Broadcast loaded — review and send");
   };
 
   const canSend = title.trim().length > 0 && body.trim().length > 0;
@@ -466,95 +487,157 @@ export default function BroadcastsPage() {
                       Date
                     </th>
                     <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Title
+                      Broadcast
                     </th>
                     <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
                       Audience
                     </th>
                     <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Recipients
-                    </th>
-                    <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Delivered
+                      Delivery
                     </th>
                     <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
                       Status
                     </th>
+                    <th className="text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((b) => (
-                    <tr
-                      key={b._id}
-                      className="border-b border-gray-50 hover:bg-gray-50/50"
-                    >
-                      <td className="px-5 py-3.5 text-sm text-gray-600 whitespace-nowrap">
-                        {formatDate(b.createdAt)}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <p className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
-                          {b.title}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate max-w-[200px]">
-                          {b.body}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                          {b.targetAudience === "ALL" && (
-                            <Globe className="w-3 h-3" />
+                  {history.map((b) => {
+                    const deliveryRate =
+                      b.totalRecipients > 0
+                        ? Math.round(
+                            (b.totalPushSent / b.totalRecipients) * 100
+                          )
+                        : 0;
+                    const isExpanded = expandedId === b._id;
+                    return (
+                      <tr
+                        key={b._id}
+                        className="border-b border-gray-50 hover:bg-gray-50/50"
+                      >
+                        <td className="px-5 py-3.5 text-sm text-gray-600 whitespace-nowrap align-top">
+                          {formatDate(b.createdAt)}
+                        </td>
+                        <td className="px-5 py-3.5 align-top">
+                          <p className="text-sm font-medium text-gray-900 truncate max-w-[240px]">
+                            {b.title}
+                          </p>
+                          <p
+                            className={`text-xs text-gray-500 max-w-[240px] ${isExpanded ? "" : "truncate"}`}
+                          >
+                            {b.body}
+                          </p>
+                          {b.body.length > 60 && (
+                            <button
+                              onClick={() =>
+                                setExpandedId(isExpanded ? null : b._id)
+                              }
+                              className="text-[10px] text-ruby-500 hover:text-ruby-700 mt-0.5 flex items-center gap-0.5"
+                            >
+                              {isExpanded ? (
+                                <>
+                                  Show less{" "}
+                                  <ChevronUp className="w-3 h-3" />
+                                </>
+                              ) : (
+                                <>
+                                  Show more{" "}
+                                  <ChevronDown className="w-3 h-3" />
+                                </>
+                              )}
+                            </button>
                           )}
-                          {b.targetAudience === "USERS" && (
-                            <Users className="w-3 h-3" />
-                          )}
-                          {b.targetAudience === "BUSINESS_OWNERS" && (
-                            <Store className="w-3 h-3" />
-                          )}
-                          {getAudienceLabel(b.targetAudience)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-sm text-gray-700">
-                        {b.totalRecipients}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-green-600 flex items-center gap-0.5">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            {b.totalPushSent}
+                        </td>
+                        <td className="px-5 py-3.5 align-top">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                            {b.targetAudience === "ALL" && (
+                              <Globe className="w-3 h-3" />
+                            )}
+                            {b.targetAudience === "USERS" && (
+                              <Users className="w-3 h-3" />
+                            )}
+                            {b.targetAudience === "BUSINESS_OWNERS" && (
+                              <Store className="w-3 h-3" />
+                            )}
+                            {getAudienceLabel(b.targetAudience)}
                           </span>
-                          {b.totalFailed > 0 && (
-                            <span className="text-red-500 flex items-center gap-0.5">
-                              <XCircle className="w-3.5 h-3.5" />
-                              {b.totalFailed}
+                        </td>
+                        <td className="px-5 py-3.5 align-top">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1 text-sm text-gray-700">
+                              <Users className="w-3.5 h-3.5 text-gray-400" />
+                              <span className="font-medium">
+                                {b.totalRecipients}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                recipients
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-green-600 flex items-center gap-0.5">
+                                <CheckCircle className="w-3 h-3" />
+                                {b.totalPushSent}
+                              </span>
+                              {b.totalFailed > 0 && (
+                                <span className="text-red-500 flex items-center gap-0.5">
+                                  <XCircle className="w-3 h-3" />
+                                  {b.totalFailed}
+                                </span>
+                              )}
+                              {b.totalRecipients > 0 && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                    deliveryRate >= 90
+                                      ? "bg-green-50 text-green-700"
+                                      : deliveryRate >= 50
+                                        ? "bg-amber-50 text-amber-700"
+                                        : "bg-red-50 text-red-700"
+                                  }`}
+                                >
+                                  {deliveryRate}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5 align-top">
+                          {b.status === "COMPLETED" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                              <CheckCircle className="w-3 h-3" />
+                              Completed
+                            </span>
+                          ) : b.status === "SENDING" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Sending
+                            </span>
+                          ) : b.status === "FAILED" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
+                              <XCircle className="w-3 h-3" />
+                              Failed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-600">
+                              <Clock className="w-3 h-3" />
+                              Pending
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        {b.status === "COMPLETED" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
-                            <CheckCircle className="w-3 h-3" />
-                            Completed
-                          </span>
-                        ) : b.status === "SENDING" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Sending
-                          </span>
-                        ) : b.status === "FAILED" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
-                            <XCircle className="w-3 h-3" />
-                            Failed
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-600">
-                            <Clock className="w-3 h-3" />
-                            Pending
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-5 py-3.5 text-right align-top">
+                          <button
+                            onClick={() => handleResend(b)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-ruby-600 border border-gray-200 hover:border-ruby-200 rounded-lg hover:bg-ruby-50 transition-colors"
+                            title="Use as template"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            Resend
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

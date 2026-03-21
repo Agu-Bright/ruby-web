@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Megaphone, Search, CheckCircle, XCircle, Eye,
   MoreHorizontal, ChevronDown, TrendingUp, Clock, Zap,
-  Star, Image, PlayCircle, Bell, AlertTriangle, Loader2,
+  Star, Image, PlayCircle, Bell, AlertTriangle, Loader2, Pin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApi, useMutation } from '@/lib/hooks';
@@ -17,13 +17,14 @@ import type {
 import { formatDate, formatCurrency, getAdTypeName, getAdStatusLabel, getBusinessName, getLocationName } from '@/lib/utils';
 
 const STATUS_OPTIONS: AdCampaignStatus[] = ['PENDING_REVIEW', 'ACTIVE', 'PAUSED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
-const TYPE_OPTIONS: AdType[] = ['FEATURED_LISTING', 'SLIDESHOW_AD', 'EXPLORE_REELS_AD', 'PUSH_NOTIFICATION'];
+const TYPE_OPTIONS: AdType[] = ['FEATURED_LISTING', 'SLIDESHOW_AD', 'EXPLORE_REELS_AD', 'PUSH_NOTIFICATION', 'FEATURED_REVIEWS'];
 
 const AD_TYPE_ICONS: Record<string, typeof Star> = {
   FEATURED_LISTING: Star,
   SLIDESHOW_AD: Image,
   EXPLORE_REELS_AD: PlayCircle,
   PUSH_NOTIFICATION: Bell,
+  FEATURED_REVIEWS: Pin,
 };
 
 type ActionType = 'approve' | 'reject';
@@ -401,8 +402,26 @@ export default function CampaignsPage() {
               <div>
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Media</p>
                 <div className="flex gap-2 overflow-x-auto">
-                  {selectedCampaign.media.map((m, i) => (
-                    <img key={i} src={m.url} alt={`Media ${i + 1}`} className="h-24 rounded-lg object-cover" />
+                  {selectedCampaign.media.map((m, i) =>
+                    m.type === 'VIDEO' || m.url?.match(/\.(mp4|mov|webm)$/i) ? (
+                      <video key={i} src={m.url} controls className="h-24 rounded-lg object-cover" />
+                    ) : (
+                      <img key={i} src={m.url} alt={`Media ${i + 1}`} className="h-24 rounded-lg object-cover" />
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            {selectedCampaign.reviewIds && selectedCampaign.reviewIds.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Featured Reviews</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedCampaign.reviewIds.map((id: string, i: number) => (
+                    <span key={i} className="inline-flex items-center px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-md font-mono">
+                      <Pin className="h-3 w-3 mr-1" />
+                      {typeof id === 'object' ? (id as any)._id || id : id}
+                    </span>
                   ))}
                 </div>
               </div>

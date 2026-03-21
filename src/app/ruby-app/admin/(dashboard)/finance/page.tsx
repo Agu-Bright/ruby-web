@@ -19,6 +19,10 @@ import {
   TrendingUp,
   AlertTriangle,
   X,
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApi } from '@/lib/hooks';
@@ -32,8 +36,18 @@ import type {
   LedgerEntry,
   Wallet as WalletType,
   FeeConfig,
+  FeeType,
 } from '@/lib/types';
 import { formatCurrency, formatDateTime, formatRelativeTime } from '@/lib/utils';
+
+const FEE_TYPES: { value: FeeType; label: string }[] = [
+  { value: 'ORDER_PLATFORM_FEE', label: 'Order Platform Fee' },
+  { value: 'BOOKING_PLATFORM_FEE', label: 'Booking Platform Fee' },
+  { value: 'PAYMENT_PROCESSING_FEE', label: 'Payment Processing Fee' },
+  { value: 'DELIVERY_PLATFORM_FEE', label: 'Delivery Platform Fee' },
+];
+
+const getFeeTypeLabel = (type: string) => FEE_TYPES.find(f => f.value === type)?.label || type.replace(/_/g, ' ');
 
 type Tab = 'payouts' | 'ledger' | 'wallets' | 'fees';
 
@@ -49,6 +63,12 @@ export default function FinancePage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<LedgerEntry | null>(null);
+
+  // Fee config state
+  const [selectedFee, setSelectedFee] = useState<FeeConfig | null>(null);
+  const [showFeeModal, setShowFeeModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [feeLoading, setFeeLoading] = useState(false);
 
   const {
     data: payouts,
@@ -82,6 +102,7 @@ export default function FinancePage() {
     data: fees,
     meta: feesMeta,
     isLoading: feesLoading,
+    refetch: refetchFees,
   } = useApi<FeeConfig[]>(
     () => api.feeConfigs.list({ page, limit: 20 }),
     [page],
@@ -231,21 +252,82 @@ export default function FinancePage() {
     { key: 'updatedAt', header: 'Last Updated', render: (w) => <span className="text-sm text-gray-500">{formatRelativeTime(w.updatedAt)}</span> },
   ];
 
+  // ─── Fee CRUD Handlers ─────────────────────────────────
+  const handleSaveFee = async (data: Partial<FeeConfig>) => {
+    const isEdit = !!selectedFee;
+    setFeeLoading(true);
+    try {
+      if (isEdit) {
+        // Backend UpdateFeeConfigDto only accepts mutable fields — feeType/scope are immutable
+        await api.feeConfigs.update(selectedFee._id, {
+          flatFee: data.flatFee,
+          isActive: data.isActive,
+        });
+        toast.success('Fee configuration updated');
+      } else {
+        await api.feeConfigs.create(data);
+        toast.success('Fee configuration created');
+      }
+      setShowFeeModal(false);
+      setSelectedFee(null);
+      refetchFees();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      toast.error(isEdit ? `Update failed: ${message}` : `Create failed: ${message}`);
+    } finally {
+      setFeeLoading(false);
+    }
+  };
+
+  const handleDeleteFee = async () => {
+    if (!selectedFee) return;
+    setFeeLoading(true);
+    try {
+      await api.feeConfigs.delete(selectedFee._id);
+      toast.success('Fee configuration deleted');
+      setShowDeleteConfirm(false);
+      setSelectedFee(null);
+      refetchFees();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong';
+      toast.error(`Delete failed: ${message}`);
+    } finally {
+      setFeeLoading(false);
+    }
+  };
+
   const feeColumns: Column<FeeConfig>[] = [
     {
-      key: 'name',
-      header: 'Fee Config',
+      key: 'feeType',
+      header: 'Fee Type',
       render: (f) => (
-        <div>
-          <p className="text-sm font-medium text-gray-900">{f.name}</p>
-          <p className="text-xs text-gray-500">{f.locationId ? `Location: ${f.locationId.slice(-8)}` : 'Global default'}</p>
+        <p className="text-sm font-medium text-gray-900">{getFeeTypeLabel(f.feeType)}</p>
+      ),
+    },
+    {
+      key: 'flatFee',
+      header: 'Flat Fee (NGN)',
+      render: (f) => (
+        <span className="text-sm font-semibold text-gray-900">{formatCurrency(f.flatFee)}</span>
+      ),
+    },
+    { key: 'isActive', header: 'Status', render: (f) => <StatusBadge status={f.isActive ? 'ACTIVE' : 'INACTIVE'} /> },
+    {
+      key: 'actions',
+      header: '',
+      render: (f) => (
+        <div className="flex items-center gap-1">
+          <button onClick={(e) => { e.stopPropagation(); setSelectedFee(f); setShowFeeModal(true); }}
+            className="p-1.5 hover:bg-blue-50 rounded-md transition-colors" title="Edit">
+            <Pencil size={14} className="text-blue-600" />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); setSelectedFee(f); setShowDeleteConfirm(true); }}
+            className="p-1.5 hover:bg-red-50 rounded-md transition-colors" title="Delete">
+            <Trash2 size={14} className="text-red-600" />
+          </button>
         </div>
       ),
     },
-    { key: 'scope', header: 'Scope', render: (f) => <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 rounded-full text-gray-700">{f.scope}</span> },
-    { key: 'platformFeePercent', header: 'Platform Fee', render: (f) => <span className="text-sm text-gray-700">{f.platformFeePercent}%</span> },
-    { key: 'deliveryFeeConfig', header: 'Delivery', render: (f) => <span className="text-sm text-gray-700">{f.deliveryFeeConfig ? f.deliveryFeeConfig.mode : '—'}</span> },
-    { key: 'isActive', header: 'Status', render: (f) => <StatusBadge status={f.isActive ? 'ACTIVE' : 'INACTIVE'} /> },
   ];
 
   const tabs_list: { key: Tab; label: string; icon: typeof Wallet }[] = [
@@ -314,12 +396,21 @@ export default function FinancePage() {
               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg" />
           </div>
         )}
+        {tab === 'fees' && (
+          <>
+            <div className="flex-1" />
+            <button onClick={() => { setSelectedFee(null); setShowFeeModal(true); }}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
+              <Plus size={15} /> Add Fee Config
+            </button>
+          </>
+        )}
       </div>
 
       {tab === 'payouts' && <DataTable columns={payoutColumns} data={payouts || []} meta={payoutsMeta} isLoading={payoutsLoading} currentPage={page} onPageChange={setPage} emptyMessage="No payout requests found" onRowClick={(p) => { setSelectedPayout(p); setShowDetailModal(true); }} />}
       {tab === 'ledger' && <DataTable columns={ledgerColumns} data={ledger || []} meta={ledgerMeta} isLoading={ledgerLoading} currentPage={page} onPageChange={setPage} emptyMessage="No ledger entries found" onRowClick={(entry) => setSelectedLedgerEntry(entry)} />}
       {tab === 'wallets' && <DataTable columns={walletColumns} data={wallets || []} meta={walletsMeta} isLoading={walletsLoading} currentPage={page} onPageChange={setPage} emptyMessage="No wallets found" />}
-      {tab === 'fees' && <DataTable columns={feeColumns} data={fees || []} meta={feesMeta} isLoading={feesLoading} currentPage={page} onPageChange={setPage} emptyMessage="No fee configurations found" />}
+      {tab === 'fees' && <DataTable columns={feeColumns} data={fees || []} meta={feesMeta} isLoading={feesLoading} currentPage={page} onPageChange={setPage} emptyMessage="No fee configurations found" onRowClick={(f) => { setSelectedFee(f); setShowFeeModal(true); }} />}
 
       <Modal isOpen={showDetailModal} onClose={() => { setShowDetailModal(false); setSelectedPayout(null); }} title="Payout Details" size="lg">
         {selectedPayout && (
@@ -388,6 +479,44 @@ export default function FinancePage() {
           onClose={() => setSelectedLedgerEntry(null)}
         />
       )}
+
+      {/* Fee Config Create/Edit Modal */}
+      {showFeeModal && (
+        <FeeConfigModal
+          fee={selectedFee}
+          isLoading={feeLoading}
+          onSave={handleSaveFee}
+          onClose={() => { setShowFeeModal(false); setSelectedFee(null); }}
+        />
+      )}
+
+      {/* Fee Delete Confirmation */}
+      <Modal isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setSelectedFee(null); }} title="Delete Fee Config" size="sm">
+        <div className="space-y-4">
+          <div className="bg-red-50 rounded-lg p-4">
+            <p className="text-sm text-red-800">
+              Are you sure you want to delete this fee configuration? This action cannot be undone.
+            </p>
+          </div>
+          {selectedFee && (
+            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <p className="font-medium text-gray-900">{getFeeTypeLabel(selectedFee.feeType)}</p>
+              <p className="text-gray-500">Flat fee: {formatCurrency(selectedFee.flatFee)}</p>
+            </div>
+          )}
+          <div className="flex items-center gap-3 pt-2">
+            <button onClick={() => { setShowDeleteConfirm(false); setSelectedFee(null); }}
+              className="flex-1 py-2.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleDeleteFee} disabled={feeLoading}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50">
+              {feeLoading && <Loader2 size={14} className="animate-spin" />}
+              Delete
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -500,6 +629,106 @@ function LedgerDetailModal({
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Fee Config Create/Edit Modal ───────────────────────
+
+function FeeConfigModal({
+  fee,
+  isLoading,
+  onSave,
+  onClose,
+}: {
+  fee: FeeConfig | null;
+  isLoading: boolean;
+  onSave: (data: Partial<FeeConfig>) => void;
+  onClose: () => void;
+}) {
+  const isEdit = !!fee;
+
+  const [feeType, setFeeType] = useState<FeeType>(fee?.feeType || 'ORDER_PLATFORM_FEE');
+  const [flatFee, setFlatFee] = useState(fee?.flatFee?.toString() || '');
+  const [isActive, setIsActive] = useState(fee?.isActive ?? true);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(flatFee);
+    if (isNaN(amount) || amount < 0) {
+      toast.error('Please enter a valid fee amount');
+      return;
+    }
+    onSave({
+      feeType,
+      scope: 'GLOBAL',
+      flatFee: amount,
+      percentage: 0,
+      isActive,
+    });
+  };
+
+  const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-colors';
+  const labelCls = 'block text-xs font-medium text-gray-600 mb-1.5';
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-slide-up flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">{isEdit ? 'Edit' : 'Add'} Fee</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Set a flat service fee charged on transactions</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {/* Fee Type */}
+          <div>
+            <label className={labelCls}>Fee Type</label>
+            <select value={feeType} onChange={(e) => setFeeType(e.target.value as FeeType)} className={inputCls} disabled={isEdit}>
+              {FEE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+
+          {/* Flat Fee */}
+          <div>
+            <label className={labelCls}>Flat Fee Amount (NGN)</label>
+            <input type="number" value={flatFee} onChange={(e) => setFlatFee(e.target.value)}
+              min="0" step="1" placeholder="e.g. 500" className={inputCls} autoFocus />
+            <p className="text-[10px] text-gray-400 mt-1">This amount will be charged on every transaction of this type</p>
+          </div>
+
+          {/* Active Toggle */}
+          <div className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Active</p>
+              <p className="text-xs text-gray-500">Enable or disable this fee</p>
+            </div>
+            <button type="button" onClick={() => setIsActive(!isActive)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isActive ? 'bg-red-600' : 'bg-gray-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={isLoading}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50">
+              {isLoading && <Loader2 size={14} className="animate-spin" />}
+              {isEdit ? 'Save Changes' : 'Add Fee'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

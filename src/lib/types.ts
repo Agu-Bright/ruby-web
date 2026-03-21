@@ -593,6 +593,12 @@ export interface Business {
   claimedBy?: string;
   // Merchant code
   merchantCode?: string;
+  // Multi-branch
+  parentBusinessId?: string | { _id: string; name: string; slug: string };
+  isParent?: boolean;
+  branchLabel?: string;
+  catalogMode?: 'INHERIT' | 'INDEPENDENT' | 'MIXED';
+  branchCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -760,7 +766,7 @@ export interface OrderStats {
 // Delivery Jobs (Admin)
 // ============================================================
 export type DeliveryJobStatus = 'CREATED' | 'ASSIGNED' | 'RIDER_ACCEPTED' | 'RIDER_AT_PICKUP' | 'PICKED_UP' | 'IN_TRANSIT' | 'RIDER_AT_DROPOFF' | 'DELIVERED' | 'FAILED' | 'CANCELLED';
-export type DeliveryProvider = 'MANUAL' | 'INTERNAL' | 'TOPSHIP' | 'UBER_DIRECT';
+export type DeliveryProvider = 'MANUAL' | 'INTERNAL' | 'TOPSHIP' | 'GLOVO';
 
 export interface DeliveryJob {
   _id: string;
@@ -969,22 +975,26 @@ export interface PayoutActionRequest {
 // ============================================================
 // Fee Configuration
 // ============================================================
+export type FeeType = 'ORDER_PLATFORM_FEE' | 'BOOKING_PLATFORM_FEE' | 'PAYMENT_PROCESSING_FEE' | 'DELIVERY_PLATFORM_FEE';
+export type FeeScope = 'GLOBAL' | 'LOCATION' | 'CATEGORY';
+
 export interface FeeConfig {
   _id: string;
-  name: string;
-  scope: 'GLOBAL' | 'LOCATION' | 'CATEGORY';
-  locationId?: string;
-  categoryId?: string;
-  platformFeePercent: number;
-  deliveryFeeConfig?: {
-    mode: 'FLAT' | 'DISTANCE_BASED' | 'PROVIDER_QUOTE';
-    flatFee?: number;
-    baseFee?: number;
-    perKmFee?: number;
-  };
-  servicePlatformFeePercent?: number;
-  currency?: string;
+  feeType: FeeType;
+  scope: FeeScope;
+  locationId?: string | { _id: string; name: string };
+  categoryId?: string | { _id: string; name: string };
+  percentage: number;
+  flatFee: number;
+  minAmount: number;
+  maxAmount: number;
+  currency: string;
   isActive: boolean;
+  effectiveFrom?: string;
+  effectiveUntil?: string;
+  description?: string;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -1166,7 +1176,7 @@ export interface CustomerFilterParams extends PaginationParams {
 // ============================================================
 // Ad Campaigns
 // ============================================================
-export type AdType = 'FEATURED_LISTING' | 'SLIDESHOW_AD' | 'EXPLORE_REELS_AD' | 'PUSH_NOTIFICATION';
+export type AdType = 'FEATURED_LISTING' | 'SLIDESHOW_AD' | 'EXPLORE_REELS_AD' | 'PUSH_NOTIFICATION' | 'FEATURED_REVIEWS';
 export type AdCampaignStatus = 'PENDING_REVIEW' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'REJECTED' | 'CANCELLED';
 export type AdPaymentStatus = 'PENDING' | 'PAID' | 'REFUNDED';
 export type AdRateUnit = 'DAY' | 'NOTIFICATION';
@@ -1201,6 +1211,7 @@ export interface AdCampaign {
   reviewedAt?: string;
   rejectionReason?: string;
   locationId?: string | { _id: string; name: string; slug: string };
+  reviewIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -1249,6 +1260,37 @@ export interface Promo {
 export interface PromoFilterParams extends PaginationParams {
   isActive?: boolean;
   locationId?: string;
+  search?: string;
+}
+
+// ============================================================
+// Legal Documents
+// ============================================================
+export type LegalDocumentType = 'MERCHANT_AGREEMENT' | 'TERMS_OF_SERVICE' | 'PRIVACY_POLICY';
+
+export interface LegalSection {
+  number: string;
+  title: string;
+  items: string[];
+}
+
+export interface LegalDocument {
+  _id: string;
+  type: LegalDocumentType;
+  title: string;
+  sections: LegalSection[];
+  version: string;
+  isActive: boolean;
+  publishedAt?: string;
+  changelog?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LegalDocumentFilterParams extends PaginationParams {
+  type?: LegalDocumentType;
+  isActive?: string;
   search?: string;
 }
 

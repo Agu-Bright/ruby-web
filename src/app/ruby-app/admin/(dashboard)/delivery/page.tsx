@@ -160,7 +160,7 @@ export default function DeliveryPage() {
     {
       key: 'provider', header: 'Provider',
       render: (j) => {
-        const colors: Record<string, string> = { MANUAL: 'bg-gray-100 text-gray-700', INTERNAL: 'bg-blue-50 text-blue-700', TOPSHIP: 'bg-purple-50 text-purple-700', UBER_DIRECT: 'bg-black text-white' };
+        const colors: Record<string, string> = { MANUAL: 'bg-gray-100 text-gray-700', INTERNAL: 'bg-blue-50 text-blue-700', TOPSHIP: 'bg-purple-50 text-purple-700', GLOVO: 'bg-orange-50 text-orange-700' };
         return <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${colors[j.provider] || 'bg-gray-100 text-gray-700'}`}>{j.provider}</span>;
       },
     },

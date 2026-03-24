@@ -2721,9 +2721,9 @@ function EditBusinessModal({
     claimContactPhone: (business as any).claimContactPhone || '',
     claimContactEmail: (business as any).claimContactEmail || '',
     address: {
-      street: business.address?.street || '',
-      city: business.address?.city || '',
-      state: business.address?.state || '',
+      street: (business.address as any)?.street || '',
+      city: (business.address as any)?.city || '',
+      state: (business.address as any)?.state || '',
     },
     contact: {
       phone: business.contact?.phone || '',

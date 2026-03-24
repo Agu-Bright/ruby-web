@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   FolderTree, Tag, Layers, Eye, Pencil, Power, PowerOff, Plus, Search,
-  RefreshCw, ChevronDown, Activity, Check, Briefcase, Settings, List,
+  RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Activity, Check, Briefcase, Settings, List,
   Package, MapPin, ShoppingBag, Calendar, X, AlertCircle, Hash, FileText,
   Rocket,
 } from 'lucide-react';
@@ -1161,6 +1161,7 @@ function SubcategoriesTab() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [subcategoryPage, setSubcategoryPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [viewSubcategory, setViewSubcategory] = useState<Subcategory | null>(null);
   const [editSubcategory, setEditSubcategory] = useState<Subcategory | null>(null);
@@ -1176,6 +1177,7 @@ function SubcategoriesTab() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filtered = useMemo(() => {
+    setSubcategoryPage(1);
     if (!subcategories) return [];
     return subcategories.filter(s => {
       if (searchQuery) {
@@ -1192,6 +1194,10 @@ function SubcategoriesTab() {
       return true;
     });
   }, [subcategories, searchQuery, categoryFilter, modelFilter, statusFilter]);
+
+  const SUBCATEGORY_PAGE_SIZE = 20;
+  const subcategoryTotalPages = Math.ceil(filtered.length / SUBCATEGORY_PAGE_SIZE);
+  const paginatedSubcategories = filtered.slice((subcategoryPage - 1) * SUBCATEGORY_PAGE_SIZE, subcategoryPage * SUBCATEGORY_PAGE_SIZE);
 
   const getCategoryName = (s: Subcategory) => {
     if (typeof s.categoryId === 'object' && s.categoryId?.name) return s.categoryId.name;
@@ -1418,7 +1424,7 @@ function SubcategoriesTab() {
                       <p className="text-sm font-medium text-gray-500">No subcategories match your filters</p>
                     </td>
                   </tr>
-                ) : filtered.map(sub => (
+                ) : paginatedSubcategories.map(sub => (
                   <tr key={sub._id} className="group hover:bg-gray-50/80 transition-colors cursor-pointer" onClick={() => setViewSubcategory(sub)}>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
@@ -1465,6 +1471,33 @@ function SubcategoriesTab() {
               </tbody>
             </table>
           </div>
+          {/* Pagination */}
+          {subcategoryTotalPages > 1 && (
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                Showing {(subcategoryPage - 1) * SUBCATEGORY_PAGE_SIZE + 1} to {Math.min(subcategoryPage * SUBCATEGORY_PAGE_SIZE, filtered.length)} of {filtered.length} subcategories
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSubcategoryPage(p => Math.max(1, p - 1))}
+                  disabled={subcategoryPage === 1}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Previous
+                </button>
+                <span className="text-sm text-gray-600 font-medium px-2">
+                  Page {subcategoryPage} of {subcategoryTotalPages}
+                </span>
+                <button
+                  onClick={() => setSubcategoryPage(p => Math.min(subcategoryTotalPages, p + 1))}
+                  disabled={subcategoryPage === subcategoryTotalPages}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

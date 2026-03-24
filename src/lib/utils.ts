@@ -359,3 +359,9 @@ export function getEntityId(field: any): string {
   return field._id || '';
 }
 
+/** Normalize media URLs — pass through as-is, handles both old R2 and custom domain */
+export function normalizeMediaUrl(url?: string | null): string {
+  if (!url) return '';
+  return url;
+}
+

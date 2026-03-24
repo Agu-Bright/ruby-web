@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Tag, Search, Plus, Pencil, Trash2, Eye,
   MoreHorizontal, ChevronDown, TrendingUp, MousePointerClick,
-  Loader2, ExternalLink, Store,
+  Loader2, ExternalLink, Store, Smartphone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApi, useMutation } from '@/lib/hooks';
@@ -17,9 +17,10 @@ const EMPTY_PROMO = {
   title: '',
   description: '',
   imageUrl: '',
-  linkType: 'BUSINESS' as 'BUSINESS' | 'EXTERNAL',
+  linkType: 'BUSINESS' as 'BUSINESS' | 'EXTERNAL' | 'IN_APP',
   businessId: '',
   externalUrl: '',
+  screenRoute: '',
   locationId: '',
   isActive: true,
   displayOrder: 0,
@@ -42,7 +43,7 @@ export default function PromosPage() {
     [JSON.stringify(filters)],
   );
   const { data: statsData } = useApi(() => api.promos.stats(), []);
-  const { data: locationsData } = useApi(() => api.locations.list({ limit: 100 }), []);
+  const { data: locationsData } = useApi(() => api.locations.list({ limit: 100, type: 'CITY' as any }), []);
   const { data: businessesData } = useApi(() => api.businesses.list({ limit: 200, status: 'LIVE' as any }), []);
 
   const createMutation = useMutation(api.promos.create);
@@ -84,6 +85,7 @@ export default function PromosPage() {
       linkType: promo.linkType,
       businessId: typeof promo.businessId === 'object' ? promo.businessId?._id || '' : promo.businessId || '',
       externalUrl: promo.externalUrl || '',
+      screenRoute: (promo as any).screenRoute || '',
       locationId: typeof promo.locationId === 'object' ? promo.locationId?._id || '' : promo.locationId || '',
       isActive: promo.isActive,
       displayOrder: promo.displayOrder,
@@ -110,6 +112,10 @@ export default function PromosPage() {
       toast.error('External URL is required');
       return;
     }
+    if (formData.linkType === 'IN_APP' && !formData.screenRoute) {
+      toast.error('Please select a screen');
+      return;
+    }
 
     const payload: any = {
       title: formData.title.trim(),
@@ -123,9 +129,15 @@ export default function PromosPage() {
     if (formData.linkType === 'BUSINESS') {
       payload.businessId = formData.businessId;
       payload.externalUrl = undefined;
-    } else {
+      payload.screenRoute = undefined;
+    } else if (formData.linkType === 'EXTERNAL') {
       payload.externalUrl = formData.externalUrl;
       payload.businessId = undefined;
+      payload.screenRoute = undefined;
+    } else if (formData.linkType === 'IN_APP') {
+      payload.screenRoute = formData.screenRoute;
+      payload.businessId = undefined;
+      payload.externalUrl = undefined;
     }
 
     if (formData.locationId) payload.locationId = formData.locationId;
@@ -159,9 +171,23 @@ export default function PromosPage() {
     }
   };
 
+  const SCREEN_ROUTE_LABELS: Record<string, string> = {
+    '/(tabs)': 'Home',
+    '/(tabs)/explore': 'Explore / Reels',
+    '/(main)/wallet': 'Wallet',
+    '/(main)/ride': 'Request Ride',
+    '/(main)/dispatch': 'Send Package',
+    '/(tabs)/orders': 'Orders',
+    '/(main)/profile/bookings': 'Bookings',
+    '/(tabs)/profile': 'Profile',
+  };
+
   const getPromoLink = (promo: Promo): string => {
     if (promo.linkType === 'BUSINESS') {
       return getBusinessName(promo.businessId) || 'Unknown Business';
+    }
+    if (promo.linkType === 'IN_APP') {
+      return SCREEN_ROUTE_LABELS[promo.screenRoute || ''] || promo.screenRoute || '-';
     }
     return promo.externalUrl || '-';
   };
@@ -201,6 +227,8 @@ export default function PromosPage() {
         <div className="flex items-center gap-1.5">
           {p.linkType === 'BUSINESS' ? (
             <Store className="h-3.5 w-3.5 text-gray-400" />
+          ) : p.linkType === 'IN_APP' ? (
+            <Smartphone className="h-3.5 w-3.5 text-gray-400" />
           ) : (
             <ExternalLink className="h-3.5 w-3.5 text-gray-400" />
           )}
@@ -394,11 +422,42 @@ export default function PromosPage() {
                 <ExternalLink className="h-4 w-4" />
                 External URL
               </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, linkType: 'IN_APP' })}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors flex items-center justify-center gap-2 ${
+                  formData.linkType === 'IN_APP'
+                    ? 'bg-ruby-50 border-ruby-300 text-ruby-700'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Smartphone className="h-4 w-4" />
+                In-App Screen
+              </button>
             </div>
           </div>
 
-          {/* Business Select or External URL */}
-          {formData.linkType === 'BUSINESS' ? (
+          {/* Business Select, External URL, or Screen Route */}
+          {formData.linkType === 'IN_APP' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Screen *</label>
+              <select
+                value={formData.screenRoute}
+                onChange={(e) => setFormData({ ...formData, screenRoute: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-ruby-500 focus:border-ruby-500"
+              >
+                <option value="">Select a screen...</option>
+                <option value="/(tabs)">Home</option>
+                <option value="/(tabs)/explore">Explore / Reels</option>
+                <option value="/(main)/wallet">Wallet</option>
+                <option value="/(main)/ride">Request Ride</option>
+                <option value="/(main)/dispatch">Send Package</option>
+                <option value="/(tabs)/orders">Orders</option>
+                <option value="/(main)/profile/bookings">Bookings</option>
+                <option value="/(tabs)/profile">Profile</option>
+              </select>
+            </div>
+          ) : formData.linkType === 'BUSINESS' ? (
             <div>
               <SearchableSelect
                 options={businessOptions}

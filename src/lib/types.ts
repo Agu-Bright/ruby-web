@@ -1243,9 +1243,10 @@ export interface Promo {
   title: string;
   description?: string;
   imageUrl: string;
-  linkType: 'BUSINESS' | 'EXTERNAL';
+  linkType: 'BUSINESS' | 'EXTERNAL' | 'IN_APP';
   businessId?: string | { _id: string; name: string; slug: string; logoUrl?: string };
   externalUrl?: string;
+  screenRoute?: string;
   locationId?: string | { _id: string; name: string };
   isActive: boolean;
   displayOrder: number;

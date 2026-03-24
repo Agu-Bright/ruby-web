@@ -20,7 +20,7 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { PageHeader, Modal, StatusBadge } from "@/components/ui";
+import { PageHeader, Modal, StatusBadge, DataTable, type Column } from "@/components/ui";
 import type {
   BroadcastTargetAudience,
   BroadcastNotification,
@@ -192,6 +192,166 @@ export default function BroadcastsPage() {
   };
 
   const canSend = title.trim().length > 0 && body.trim().length > 0;
+
+  const broadcastColumns: Column<BroadcastNotification>[] = [
+    {
+      key: "date",
+      header: "Date",
+      render: (b) => (
+        <span className="whitespace-nowrap">{formatDate(b.createdAt)}</span>
+      ),
+    },
+    {
+      key: "broadcast",
+      header: "Broadcast",
+      render: (b) => {
+        const isExpanded = expandedId === b._id;
+        return (
+          <div>
+            <p className="text-sm font-medium text-gray-900 truncate max-w-[240px]">
+              {b.title}
+            </p>
+            <p
+              className={`text-xs text-gray-500 max-w-[240px] ${isExpanded ? "" : "truncate"}`}
+            >
+              {b.body}
+            </p>
+            {b.body.length > 60 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedId(isExpanded ? null : b._id);
+                }}
+                className="text-[10px] text-ruby-500 hover:text-ruby-700 mt-0.5 flex items-center gap-0.5"
+              >
+                {isExpanded ? (
+                  <>
+                    Show less <ChevronUp className="w-3 h-3" />
+                  </>
+                ) : (
+                  <>
+                    Show more <ChevronDown className="w-3 h-3" />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "audience",
+      header: "Audience",
+      render: (b) => (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          {b.targetAudience === "ALL" && <Globe className="w-3 h-3" />}
+          {b.targetAudience === "USERS" && <Users className="w-3 h-3" />}
+          {b.targetAudience === "BUSINESS_OWNERS" && (
+            <Store className="w-3 h-3" />
+          )}
+          {getAudienceLabel(b.targetAudience)}
+        </span>
+      ),
+    },
+    {
+      key: "delivery",
+      header: "Delivery",
+      render: (b) => {
+        const deliveryRate =
+          b.totalRecipients > 0
+            ? Math.round((b.totalPushSent / b.totalRecipients) * 100)
+            : 0;
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-sm text-gray-700">
+              <Users className="w-3.5 h-3.5 text-gray-400" />
+              <span className="font-medium">{b.totalRecipients}</span>
+              <span className="text-xs text-gray-500">recipients</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-green-600 flex items-center gap-0.5">
+                <CheckCircle className="w-3 h-3" />
+                {b.totalPushSent}
+              </span>
+              {b.totalFailed > 0 && (
+                <span className="text-red-500 flex items-center gap-0.5">
+                  <XCircle className="w-3 h-3" />
+                  {b.totalFailed}
+                </span>
+              )}
+              {b.totalRecipients > 0 && (
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                    deliveryRate >= 90
+                      ? "bg-green-50 text-green-700"
+                      : deliveryRate >= 50
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-red-50 text-red-700"
+                  }`}
+                >
+                  {deliveryRate}%
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (b) => {
+        if (b.status === "COMPLETED") {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+              <CheckCircle className="w-3 h-3" />
+              Completed
+            </span>
+          );
+        }
+        if (b.status === "SENDING") {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Sending
+            </span>
+          );
+        }
+        if (b.status === "FAILED") {
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
+              <XCircle className="w-3 h-3" />
+              Failed
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-600">
+            <Clock className="w-3 h-3" />
+            Pending
+          </span>
+        );
+      },
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      className: "text-right",
+      render: (b) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleResend(b);
+          }}
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-ruby-600 border border-gray-200 hover:border-ruby-200 rounded-lg hover:bg-ruby-50 transition-colors"
+          title="Use as template"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Resend
+        </button>
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -461,221 +621,27 @@ export default function BroadcastsPage() {
       </Modal>
 
       {/* Broadcast History */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="p-5 border-b border-gray-100">
+      <div>
+        <div className="mb-4">
           <h2 className="text-lg font-semibold text-gray-900">
             Broadcast History
           </h2>
         </div>
 
-        {loadingHistory ? (
-          <div className="p-12 text-center">
-            <Loader2 className="w-6 h-6 animate-spin text-gray-400 mx-auto" />
-          </div>
-        ) : history.length === 0 ? (
-          <div className="p-12 text-center">
-            <Radio className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No broadcasts sent yet</p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Date
-                    </th>
-                    <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Broadcast
-                    </th>
-                    <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Audience
-                    </th>
-                    <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Delivery
-                    </th>
-                    <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Status
-                    </th>
-                    <th className="text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((b) => {
-                    const deliveryRate =
-                      b.totalRecipients > 0
-                        ? Math.round(
-                            (b.totalPushSent / b.totalRecipients) * 100
-                          )
-                        : 0;
-                    const isExpanded = expandedId === b._id;
-                    return (
-                      <tr
-                        key={b._id}
-                        className="border-b border-gray-50 hover:bg-gray-50/50"
-                      >
-                        <td className="px-5 py-3.5 text-sm text-gray-600 whitespace-nowrap align-top">
-                          {formatDate(b.createdAt)}
-                        </td>
-                        <td className="px-5 py-3.5 align-top">
-                          <p className="text-sm font-medium text-gray-900 truncate max-w-[240px]">
-                            {b.title}
-                          </p>
-                          <p
-                            className={`text-xs text-gray-500 max-w-[240px] ${isExpanded ? "" : "truncate"}`}
-                          >
-                            {b.body}
-                          </p>
-                          {b.body.length > 60 && (
-                            <button
-                              onClick={() =>
-                                setExpandedId(isExpanded ? null : b._id)
-                              }
-                              className="text-[10px] text-ruby-500 hover:text-ruby-700 mt-0.5 flex items-center gap-0.5"
-                            >
-                              {isExpanded ? (
-                                <>
-                                  Show less{" "}
-                                  <ChevronUp className="w-3 h-3" />
-                                </>
-                              ) : (
-                                <>
-                                  Show more{" "}
-                                  <ChevronDown className="w-3 h-3" />
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5 align-top">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                            {b.targetAudience === "ALL" && (
-                              <Globe className="w-3 h-3" />
-                            )}
-                            {b.targetAudience === "USERS" && (
-                              <Users className="w-3 h-3" />
-                            )}
-                            {b.targetAudience === "BUSINESS_OWNERS" && (
-                              <Store className="w-3 h-3" />
-                            )}
-                            {getAudienceLabel(b.targetAudience)}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 align-top">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1 text-sm text-gray-700">
-                              <Users className="w-3.5 h-3.5 text-gray-400" />
-                              <span className="font-medium">
-                                {b.totalRecipients}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                recipients
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-green-600 flex items-center gap-0.5">
-                                <CheckCircle className="w-3 h-3" />
-                                {b.totalPushSent}
-                              </span>
-                              {b.totalFailed > 0 && (
-                                <span className="text-red-500 flex items-center gap-0.5">
-                                  <XCircle className="w-3 h-3" />
-                                  {b.totalFailed}
-                                </span>
-                              )}
-                              {b.totalRecipients > 0 && (
-                                <span
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                                    deliveryRate >= 90
-                                      ? "bg-green-50 text-green-700"
-                                      : deliveryRate >= 50
-                                        ? "bg-amber-50 text-amber-700"
-                                        : "bg-red-50 text-red-700"
-                                  }`}
-                                >
-                                  {deliveryRate}%
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 align-top">
-                          {b.status === "COMPLETED" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
-                              <CheckCircle className="w-3 h-3" />
-                              Completed
-                            </span>
-                          ) : b.status === "SENDING" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Sending
-                            </span>
-                          ) : b.status === "FAILED" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
-                              <XCircle className="w-3 h-3" />
-                              Failed
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-600">
-                              <Clock className="w-3 h-3" />
-                              Pending
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5 text-right align-top">
-                          <button
-                            onClick={() => handleResend(b)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-ruby-600 border border-gray-200 hover:border-ruby-200 rounded-lg hover:bg-ruby-50 transition-colors"
-                            title="Use as template"
-                          >
-                            <RefreshCw className="w-3 h-3" />
-                            Resend
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {historyPagination.totalPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-                <p className="text-xs text-gray-500">
-                  Page {historyPagination.page} of{" "}
-                  {historyPagination.totalPages} ({historyPagination.total}{" "}
-                  total)
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() =>
-                      fetchHistory(historyPagination.page - 1)
-                    }
-                    disabled={historyPagination.page <= 1}
-                    className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() =>
-                      fetchHistory(historyPagination.page + 1)
-                    }
-                    disabled={
-                      historyPagination.page >= historyPagination.totalPages
-                    }
-                    className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+        <DataTable<BroadcastNotification>
+          columns={broadcastColumns}
+          data={history}
+          meta={{
+            page: historyPagination.page,
+            limit: historyPagination.limit,
+            total: historyPagination.total,
+            totalPages: historyPagination.totalPages,
+          }}
+          isLoading={loadingHistory}
+          onPageChange={(p) => fetchHistory(p)}
+          currentPage={historyPagination.page}
+          emptyMessage="No broadcasts sent yet"
+        />
       </div>
     </div>
   );

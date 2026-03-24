@@ -629,6 +629,11 @@ export const api = {
         method: "POST",
         body: data,
       }),
+    adminUpdate: (id: string, data: Partial<import("@/lib/types").AdminCreateBusinessRequest>) =>
+      request<import("@/lib/types").Business>(`/admin/businesses/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
     unclaimed: (params?: import("@/lib/types").PaginationParams & { search?: string; locationId?: string }) =>
       request<import("@/lib/types").Business[]>("/admin/businesses/unclaimed", {
         params: params as Record<string, string | number | boolean | undefined>,

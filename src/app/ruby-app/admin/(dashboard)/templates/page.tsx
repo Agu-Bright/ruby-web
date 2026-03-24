@@ -220,6 +220,7 @@ export default function TemplatesPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -244,6 +245,7 @@ export default function TemplatesPage() {
   }, [templates]);
 
   const filtered = useMemo(() => {
+    setPage(1);
     if (!templates) return [];
     return templates.filter(t => {
       if (searchQuery) {
@@ -255,6 +257,10 @@ export default function TemplatesPage() {
       return true;
     });
   }, [templates, searchQuery, statusFilter]);
+
+  const TEMPLATE_PAGE_SIZE = 12;
+  const totalPages = Math.ceil(filtered.length / TEMPLATE_PAGE_SIZE);
+  const paginatedTemplates = filtered.slice((page - 1) * TEMPLATE_PAGE_SIZE, page * TEMPLATE_PAGE_SIZE);
 
   const resetForm = useCallback(() => {
     setForm({ name: '', description: '', fields: [emptyField(0)] });
@@ -571,7 +577,7 @@ export default function TemplatesPage() {
                       <p className="text-sm font-medium text-gray-500">No templates match your filters</p>
                     </td>
                   </tr>
-                ) : filtered.map(tmpl => {
+                ) : paginatedTemplates.map(tmpl => {
                   const pubFields = tmpl.fields.filter(f => f.isPublic).length;
                   const filterFields = tmpl.fields.filter(f => f.isFilter).length;
                   return (
@@ -628,6 +634,33 @@ export default function TemplatesPage() {
               </tbody>
             </table>
           </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                Showing {(page - 1) * TEMPLATE_PAGE_SIZE + 1} to {Math.min(page * TEMPLATE_PAGE_SIZE, filtered.length)} of {filtered.length} templates
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Previous
+                </button>
+                <span className="text-sm text-gray-600 font-medium px-2">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

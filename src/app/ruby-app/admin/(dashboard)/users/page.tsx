@@ -10,8 +10,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
-import { Modal, StatusBadge, StatCard, SearchableSelect } from '@/components/ui';
-import type { SelectOption } from '@/components/ui';
+import { Modal, StatusBadge, StatCard, SearchableSelect, DataTable } from '@/components/ui';
+import type { SelectOption, Column } from '@/components/ui';
 import { formatDate, formatDateTime, getInitials } from '@/lib/utils';
 import type {
   AdminUser, AdminRole, AdminScope, CreateAdminRequest, UpdateAdminRequest,
@@ -211,7 +211,7 @@ export default function AdminUsersPage() {
   const [editAdmin, setEditAdmin] = useState<AdminUser | null>(null);
   const [adminCreds, setAdminCreds] = useState<{ firstName: string; lastName: string; email: string; password: string; roles: AdminRole[] } | null>(null);
 
-  const { data: users, isLoading, error, refetch } = useApi<AdminUser[]>(
+  const { data: users, meta, isLoading, error, refetch } = useApi<AdminUser[]>(
     () => api.adminUsers.list(filters),
     [filters],
   );
@@ -259,6 +259,130 @@ export default function AdminUsersPage() {
       toast.error('Failed to update admin status');
     }
   }, [refetch]);
+
+  const adminColumns: Column<AdminUser>[] = useMemo(() => [
+    {
+      key: 'admin',
+      header: 'Admin',
+      render: (user) => (
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-gradient-to-br from-ruby-400 to-ruby-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm">
+            {getInitials(user.firstName, user.lastName)}
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900 text-sm">{user.firstName} {user.lastName}</div>
+            <div className="text-xs text-gray-400">{user.email}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'role',
+      header: 'Role',
+      render: (user) => <RoleBadge role={user.roles?.[0] || 'admin'} />,
+    },
+    {
+      key: 'scope',
+      header: 'Scope',
+      render: (user) => {
+        const locationCount = user.locationIds?.length || 0;
+        return (
+          <div>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
+              user.scope === 'GLOBAL'
+                ? 'text-purple-700 bg-purple-50 border border-purple-200'
+                : 'text-blue-700 bg-blue-50 border border-blue-200'
+            }`}>
+              {user.scope === 'GLOBAL' ? <Globe className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+              {user.scope}
+            </span>
+            {user.scope === 'LOCATION' && locationCount > 0 && (
+              <div className="text-[10px] text-gray-400 mt-1">{locationCount} location{locationCount !== 1 ? 's' : ''}</div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (user) => {
+        const isActive = user.isActive !== false;
+        return (
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold w-fit ${
+            isActive
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+            {isActive ? 'Active' : 'Suspended'}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'lastLogin',
+      header: 'Last Login',
+      render: (user) => (
+        <span className="text-sm text-gray-500">
+          {user.lastLoginAt ? formatDate(user.lastLoginAt) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'created',
+      header: 'Created',
+      render: (user) => (
+        <span className="text-sm text-gray-500">
+          {user.createdAt ? formatDate(user.createdAt) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      className: 'text-right',
+      render: (user) => {
+        const isActive = user.isActive !== false;
+        return (
+          <div className="flex items-center justify-end gap-0.5">
+            <ActionButton
+              icon={Eye}
+              tooltip="View details"
+              onClick={(e) => { e.stopPropagation(); setViewAdmin(user); }}
+              variant="default"
+            />
+            {isSuperAdmin && (
+              <>
+                <ActionButton
+                  icon={Pencil}
+                  tooltip="Edit"
+                  onClick={(e) => { e.stopPropagation(); setEditAdmin(user); }}
+                  variant="blue"
+                />
+                {isActive ? (
+                  <ActionButton
+                    icon={PowerOff}
+                    tooltip="Suspend"
+                    onClick={(e) => { e.stopPropagation(); handleStatusToggle(user); }}
+                    variant="red"
+                  />
+                ) : (
+                  <ActionButton
+                    icon={Power}
+                    tooltip="Activate"
+                    onClick={(e) => { e.stopPropagation(); handleStatusToggle(user); }}
+                    variant="green"
+                  />
+                )}
+              </>
+            )}
+          </div>
+        );
+      },
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [isSuperAdmin, handleStatusToggle]);
 
   const handleCreated = useCallback((creds: typeof adminCreds) => {
     setShowCreateModal(false);
@@ -370,198 +494,18 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Loading */}
-      {isLoading && (
-        <div className="card overflow-hidden">
-          <div className="p-6 space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 animate-pulse">
-                <div className="w-10 h-10 bg-gray-200 rounded-xl" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-1/3" />
-                  <div className="h-3 bg-gray-100 rounded w-1/5" />
-                </div>
-                <div className="h-6 w-16 bg-gray-100 rounded-md" />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Empty */}
-      {!isLoading && !error && (!users || users.length === 0) && (
-        <div className="card p-16 text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-6 ring-1 ring-gray-200">
-            <Shield className="w-10 h-10 text-gray-300" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">No admin users yet</h3>
-          <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
-            Create your first admin user to start managing the platform.
-          </p>
-          {isSuperAdmin && (
-            <button onClick={() => setShowCreateModal(true)} className="btn-primary inline-flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Create First Admin
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Table */}
-      {!isLoading && !error && users && users.length > 0 && (
-        <div className="card overflow-hidden">
-          {/* Table Header */}
-          <div className="px-5 py-3.5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <Shield className="w-4 h-4 text-gray-500" />
-                <h3 className="text-sm font-semibold text-gray-700">Admin Users</h3>
-                <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
-                  {filtered.length} of {users.length}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Admin</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Scope</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Last Login</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Created</th>
-                  <th className="text-right px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center">
-                      <Search className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-gray-500">No admins match your filters</p>
-                      <p className="text-xs text-gray-400 mt-1">Try a different search or filter</p>
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map(user => {
-                    const isActive = user.isActive !== false;
-                    const role = user.roles?.[0] || 'admin';
-                    const locationCount = user.locationIds?.length || 0;
-
-                    return (
-                      <tr
-                        key={user._id || user.id}
-                        className="group hover:bg-gray-50/80 transition-colors cursor-pointer"
-                        onClick={() => setViewAdmin(user)}
-                      >
-                        {/* Admin */}
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-gradient-to-br from-ruby-400 to-ruby-600 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                              {getInitials(user.firstName, user.lastName)}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-gray-900 text-sm">{user.firstName} {user.lastName}</div>
-                              <div className="text-xs text-gray-400">{user.email}</div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Role */}
-                        <td className="px-5 py-3.5">
-                          <RoleBadge role={role} />
-                        </td>
-
-                        {/* Scope */}
-                        <td className="px-5 py-3.5">
-                          <div>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold ${
-                              user.scope === 'GLOBAL'
-                                ? 'text-purple-700 bg-purple-50 border border-purple-200'
-                                : 'text-blue-700 bg-blue-50 border border-blue-200'
-                            }`}>
-                              {user.scope === 'GLOBAL' ? <Globe className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
-                              {user.scope}
-                            </span>
-                            {user.scope === 'LOCATION' && locationCount > 0 && (
-                              <div className="text-[10px] text-gray-400 mt-1">{locationCount} location{locationCount !== 1 ? 's' : ''}</div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-5 py-3.5">
-                          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold w-fit ${
-                            isActive
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-red-50 text-red-700 border border-red-200'
-                          }`}>
-                            <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                            {isActive ? 'Active' : 'Suspended'}
-                          </div>
-                        </td>
-
-                        {/* Last Login */}
-                        <td className="px-5 py-3.5">
-                          <span className="text-sm text-gray-500">
-                            {user.lastLoginAt ? formatDate(user.lastLoginAt) : '—'}
-                          </span>
-                        </td>
-
-                        {/* Created */}
-                        <td className="px-5 py-3.5">
-                          <span className="text-sm text-gray-500">
-                            {user.createdAt ? formatDate(user.createdAt) : '—'}
-                          </span>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                            <ActionButton
-                              icon={Eye}
-                              tooltip="View details"
-                              onClick={(e) => { e.stopPropagation(); setViewAdmin(user); }}
-                              variant="default"
-                            />
-                            {isSuperAdmin && (
-                              <>
-                                <ActionButton
-                                  icon={Pencil}
-                                  tooltip="Edit"
-                                  onClick={(e) => { e.stopPropagation(); setEditAdmin(user); }}
-                                  variant="blue"
-                                />
-                                {isActive ? (
-                                  <ActionButton
-                                    icon={PowerOff}
-                                    tooltip="Suspend"
-                                    onClick={(e) => { e.stopPropagation(); handleStatusToggle(user); }}
-                                    variant="red"
-                                  />
-                                ) : (
-                                  <ActionButton
-                                    icon={Power}
-                                    tooltip="Activate"
-                                    onClick={(e) => { e.stopPropagation(); handleStatusToggle(user); }}
-                                    variant="green"
-                                  />
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {!error && (
+        <DataTable<AdminUser>
+          columns={adminColumns}
+          data={filtered}
+          meta={meta}
+          isLoading={isLoading}
+          onPageChange={(p) => setFilters(prev => ({ ...prev, page: p }))}
+          currentPage={filters.page}
+          onRowClick={(user) => setViewAdmin(user)}
+          emptyMessage="No admin users found"
+        />
       )}
 
       {/* Modals */}

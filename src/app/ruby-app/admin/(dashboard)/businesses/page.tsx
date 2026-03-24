@@ -35,13 +35,13 @@ import type {
   ServiceListing, ServiceStatus, UpdateServiceRequest, PricingType, ServiceFulfillmentMode,
   Wallet as WalletType, LedgerEntry,
 } from '@/lib/types';
-import { formatDate, formatDateTime, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName } from '@/lib/utils';
+import { formatDate, formatDateTime, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName, normalizeMediaUrl } from '@/lib/utils';
 
 const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'LIVE', 'REJECTED', 'SUSPENDED'];
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status';
+type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status' | 'edit';
 
 // ─── Action Dropdown Component ───
 function ActionDropdown({ business, onAction, onView }: {
@@ -65,6 +65,7 @@ function ActionDropdown({ business, onAction, onView }: {
 
   const items: { label: string; icon: typeof Eye; action: () => void; variant?: 'default' | 'success' | 'danger' | 'warning' }[] = [
     { label: 'View Details', icon: Eye, action: () => { onView(business); setOpen(false); } },
+    { label: 'Edit Business', icon: Edit2, action: () => { onAction(business, 'edit'); setOpen(false); } },
   ];
 
   if (business.status === 'PENDING_REVIEW') {
@@ -429,7 +430,13 @@ export default function BusinessesPage() {
     // Error toasts are handled automatically by the onError callback in each mutation
   }, [actionModal, reason, selectedStatus, approveBusiness, rejectBusiness, suspendBusiness, reinstateBusiness, verifyCac, featureBusiness, deleteBusiness, refetch, detailBusiness]);
 
+  const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
+
   const openAction = (business: Business, action: ActionType) => {
+    if (action === 'edit') {
+      setEditingBusiness(business);
+      return;
+    }
     setActionModal({ business, action });
     setReason('');
     if (action === 'update-status') {
@@ -516,7 +523,7 @@ export default function BusinessesPage() {
       render: (b) => (
         <div className="flex items-center gap-3">
           {b.logoUrl ? (
-            <img src={b.logoUrl} alt="" className="w-9 h-9 rounded-lg object-cover ring-1 ring-gray-200" />
+            <img src={normalizeMediaUrl(b.logoUrl)} alt="" className="w-9 h-9 rounded-lg object-cover ring-1 ring-gray-200" />
           ) : (
             <div className="w-9 h-9 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg flex items-center justify-center ring-1 ring-emerald-200/50">
               <Store className="w-4 h-4 text-emerald-600" />
@@ -700,7 +707,7 @@ export default function BusinessesPage() {
             {/* Header */}
             <div className="flex items-start gap-4">
               {displayBusiness.logoUrl ? (
-                <img src={displayBusiness.logoUrl} alt="" className="w-14 h-14 rounded-xl object-cover ring-1 ring-gray-200" />
+                <img src={normalizeMediaUrl(displayBusiness.logoUrl)} alt="" className="w-14 h-14 rounded-xl object-cover ring-1 ring-gray-200" />
               ) : (
                 <div className="w-14 h-14 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl flex items-center justify-center ring-1 ring-emerald-200/50">
                   <Store className="w-7 h-7 text-emerald-600" />
@@ -738,7 +745,7 @@ export default function BusinessesPage() {
 
             {/* Cover image */}
             {displayBusiness.coverImageUrl && (
-              <img src={displayBusiness.coverImageUrl} alt="Cover" className="w-full h-36 object-cover rounded-lg ring-1 ring-gray-200" />
+              <img src={normalizeMediaUrl(displayBusiness.coverImageUrl)} alt="Cover" className="w-full h-36 object-cover rounded-lg ring-1 ring-gray-200" />
             )}
 
             {/* Tabs */}
@@ -959,7 +966,7 @@ export default function BusinessesPage() {
                     <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Logo</span>
                     {displayBusiness.logoUrl ? (
                       <a href={displayBusiness.logoUrl} target="_blank" rel="noopener noreferrer">
-                        <img src={displayBusiness.logoUrl} alt="Logo" className="w-24 h-24 rounded-xl object-cover ring-1 ring-gray-200 hover:opacity-80 transition-opacity" />
+                        <img src={normalizeMediaUrl(displayBusiness.logoUrl)} alt="Logo" className="w-24 h-24 rounded-xl object-cover ring-1 ring-gray-200 hover:opacity-80 transition-opacity" />
                       </a>
                     ) : (
                       <div className="w-24 h-24 bg-gray-50 rounded-xl flex items-center justify-center text-gray-300 ring-1 ring-gray-200">
@@ -971,7 +978,7 @@ export default function BusinessesPage() {
                     <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Cover Image</span>
                     {displayBusiness.coverImageUrl ? (
                       <a href={displayBusiness.coverImageUrl} target="_blank" rel="noopener noreferrer">
-                        <img src={displayBusiness.coverImageUrl} alt="Cover" className="w-full h-24 rounded-xl object-cover ring-1 ring-gray-200 hover:opacity-80 transition-opacity" />
+                        <img src={normalizeMediaUrl(displayBusiness.coverImageUrl)} alt="Cover" className="w-full h-24 rounded-xl object-cover ring-1 ring-gray-200 hover:opacity-80 transition-opacity" />
                       </a>
                     ) : (
                       <div className="w-full h-24 bg-gray-50 rounded-xl flex items-center justify-center text-gray-300 ring-1 ring-gray-200 text-xs">
@@ -996,7 +1003,7 @@ export default function BusinessesPage() {
                                 <span className="text-2xl">&#9658;</span>
                               </div>
                             ) : (
-                              <img src={url} alt={caption || `Media ${idx + 1}`} className="w-full h-24 object-cover rounded-lg ring-1 ring-gray-200 group-hover:opacity-80 transition-opacity" />
+                              <img src={normalizeMediaUrl(url)} alt={caption || `Media ${idx + 1}`} className="w-full h-24 object-cover rounded-lg ring-1 ring-gray-200 group-hover:opacity-80 transition-opacity" />
                             )}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition-colors flex items-center justify-center">
                               <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
@@ -1048,7 +1055,7 @@ export default function BusinessesPage() {
                       <ExternalLink className="w-3 h-3 text-gray-400" />
                     </a>
                     {displayBusiness.cacDocumentUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
-                      <img src={displayBusiness.cacDocumentUrl} alt="CAC Document" className="mt-3 max-w-full max-h-60 rounded-lg ring-1 ring-gray-200" />
+                      <img src={normalizeMediaUrl(displayBusiness.cacDocumentUrl)} alt="CAC Document" className="mt-3 max-w-full max-h-60 rounded-lg ring-1 ring-gray-200" />
                     )}
                   </div>
                 ) : (
@@ -1218,7 +1225,7 @@ export default function BusinessesPage() {
                             <div key={product._id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50/50 transition-colors">
                               <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
                                 {img ? (
-                                  <img src={img.url} alt={product.name} className="w-full h-full object-cover" />
+                                  <img src={normalizeMediaUrl(img.url)} alt={product.name} className="w-full h-full object-cover" />
                                 ) : (
                                   <ImageIcon className="w-4 h-4 text-gray-300" />
                                 )}
@@ -1279,7 +1286,7 @@ export default function BusinessesPage() {
                             <div key={svc._id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50/50 transition-colors">
                               <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
                                 {img ? (
-                                  <img src={img.url} alt={svc.name} className="w-full h-full object-cover" />
+                                  <img src={normalizeMediaUrl(img.url)} alt={svc.name} className="w-full h-full object-cover" />
                                 ) : (
                                   <Wrench className="w-4 h-4 text-gray-300" />
                                 )}
@@ -1636,6 +1643,22 @@ export default function BusinessesPage() {
         isSubmitting={creating}
       />
 
+      {/* ─── Edit Business Modal ─── */}
+      {editingBusiness && (
+        <EditBusinessModal
+          business={editingBusiness}
+          onClose={() => setEditingBusiness(null)}
+          onSubmit={async (data) => {
+            const result = await api.businesses.adminUpdate(editingBusiness._id, data);
+            if (result?.success) {
+              toast.success('Business updated successfully');
+              setEditingBusiness(null);
+              refetch();
+            }
+          }}
+        />
+      )}
+
       {/* ─── Fund Wallet Modal ─── */}
       {showBizFundModal && bizWallet && displayBusiness && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={() => setShowBizFundModal(false)}>
@@ -1884,7 +1907,7 @@ function CatalogDetailContent({ type, item }: { type: 'product' | 'service'; ite
           <div className="grid grid-cols-4 gap-2">
             {p.images.sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0)).map((img, i) => (
               <div key={i} className={`relative rounded-lg overflow-hidden border ${img.isPrimary ? 'border-ruby-300 ring-2 ring-ruby-100' : 'border-gray-200'}`}>
-                <img src={img.url} alt={img.alt || p.name} className="w-full h-20 object-cover" />
+                <img src={normalizeMediaUrl(img.url)} alt={img.alt || p.name} className="w-full h-20 object-cover" />
                 {img.isPrimary && <span className="absolute top-1 left-1 text-[8px] bg-ruby-600 text-white px-1 py-0.5 rounded font-medium">PRIMARY</span>}
               </div>
             ))}
@@ -1987,10 +2010,10 @@ function CatalogDetailContent({ type, item }: { type: 'product' | 'service'; ite
       {/* Media */}
       {((s.media && s.media.length > 0) || s.coverImageUrl) && (
         <div className="grid grid-cols-4 gap-2">
-          {s.coverImageUrl && <img src={s.coverImageUrl} alt={s.name} className="w-full h-20 object-cover rounded-lg border border-gray-200" />}
+          {s.coverImageUrl && <img src={normalizeMediaUrl(s.coverImageUrl)} alt={s.name} className="w-full h-20 object-cover rounded-lg border border-gray-200" />}
           {s.media?.map((m, i) => (
             <div key={i} className="relative rounded-lg overflow-hidden border border-gray-200">
-              <img src={m.url} alt={m.caption || s.name} className="w-full h-20 object-cover" />
+              <img src={normalizeMediaUrl(m.url)} alt={m.caption || s.name} className="w-full h-20 object-cover" />
               {m.type === 'VIDEO' && <span className="absolute top-1 left-1 text-[8px] bg-black/60 text-white px-1 py-0.5 rounded">VIDEO</span>}
             </div>
           ))}
@@ -2662,5 +2685,301 @@ function FundBusinessWalletForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// ─── Edit Business Modal ──────────────────────────────────────────
+function EditBusinessModal({
+  business,
+  onClose,
+  onSubmit,
+}: {
+  business: Business;
+  onClose: () => void;
+  onSubmit: (data: Partial<AdminCreateBusinessRequest>) => Promise<void>;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState({
+    name: business.name || '',
+    description: business.description || '',
+    tagline: business.tagline || '',
+    locationId: toLocationId(business.locationId as any) || '',
+    categoryId: typeof (business as any).categoryId === 'object' ? (business as any).categoryId?._id || '' : (business as any).categoryId || '',
+    subcategoryId: typeof (business as any).subcategoryId === 'object' ? (business as any).subcategoryId?._id || '' : (business as any).subcategoryId || '',
+    longitude: (business as any).longitude || 3.3792,
+    latitude: (business as any).latitude || 6.5244,
+    logoUrl: business.logoUrl || '',
+    coverImageUrl: business.coverImageUrl || '',
+    claimContactPhone: (business as any).claimContactPhone || '',
+    claimContactEmail: (business as any).claimContactEmail || '',
+    address: {
+      street: business.address?.street || '',
+      city: business.address?.city || '',
+      state: business.address?.state || '',
+    },
+    contact: {
+      phone: business.contact?.phone || '',
+      email: business.contact?.email || '',
+      whatsapp: business.contact?.whatsapp || '',
+    },
+  });
+
+  const { data: locations } = useApi<Location[]>(() => api.locations.list({ limit: 100 }), []);
+  const { data: categories } = useApi<Category[]>(() => api.categories.list(), []);
+  const { data: subcategories } = useApi<Subcategory[]>(
+    () => form.categoryId ? api.subcategories.list({ categoryId: form.categoryId }) : Promise.resolve({ success: true, data: [] }),
+    [form.categoryId]
+  );
+
+  const update = (key: string, value: unknown) => setForm(f => ({ ...f, [key]: value }));
+
+  const handleSave = async () => {
+    if (!form.name) { toast.error('Business name is required'); return; }
+    setSubmitting(true);
+    try {
+      const data: any = { ...form };
+      if (data.address && !data.address.street) delete data.address;
+      if (data.contact && !data.contact.phone && !data.contact.email) delete data.contact;
+      await onSubmit(data);
+    } catch {
+      toast.error('Failed to update business');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const steps = ['Basic Info', 'Location & Category', 'Contact & Claim'];
+
+  return (
+    <Modal isOpen onClose={onClose} title={`Edit: ${business.name}`} subtitle="Update business details" size="lg">
+      <div className="space-y-5">
+        {/* Step indicator */}
+        <div className="flex items-center gap-2">
+          {steps.map((s, i) => (
+            <div key={s} className="flex items-center gap-2">
+              <button
+                onClick={() => setStep(i)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  i === step ? 'bg-ruby-600 text-white' : 'bg-gray-100 text-gray-500 cursor-pointer hover:bg-gray-200'
+                }`}
+              >
+                {s}
+              </button>
+              {i < steps.length - 1 && <ChevronDown className="w-3 h-3 text-gray-300 -rotate-90" />}
+            </div>
+          ))}
+        </div>
+
+        {/* Step 0: Basic Info */}
+        {step === 0 && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Name *</label>
+              <input
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.name}
+                onChange={(e) => update('name', e.target.value)}
+                placeholder="e.g. Mama's Kitchen"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Description</label>
+              <textarea
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 resize-none"
+                rows={3}
+                value={form.description}
+                onChange={(e) => update('description', e.target.value)}
+                placeholder="Brief description of the business"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tagline</label>
+              <input
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.tagline}
+                onChange={(e) => update('tagline', e.target.value)}
+                placeholder="Short tagline"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <ImageUpload
+                value={form.logoUrl}
+                onChange={(url) => update('logoUrl', url || '')}
+                folder="businesses/logos"
+                label="Logo"
+                helpText="Square image recommended"
+                maxSizeMB={2}
+              />
+              <ImageUpload
+                value={form.coverImageUrl}
+                onChange={(url) => update('coverImageUrl', url || '')}
+                folder="businesses/covers"
+                label="Cover Image"
+                helpText="Landscape image recommended"
+                maxSizeMB={5}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Location & Category */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Location</label>
+              <select
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.locationId}
+                onChange={(e) => update('locationId', e.target.value)}
+              >
+                <option value="">Select location</option>
+                {(locations || []).map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Category</label>
+              <select
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.categoryId}
+                onChange={(e) => { update('categoryId', e.target.value); update('subcategoryId', ''); }}
+              >
+                <option value="">Select category</option>
+                {(categories || []).map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Subcategory</label>
+              <select
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.subcategoryId}
+                onChange={(e) => update('subcategoryId', e.target.value)}
+                disabled={!form.categoryId}
+              >
+                <option value="">Select subcategory</option>
+                {(subcategories || []).map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Pin Business Location</label>
+              <p className="text-xs text-gray-400 mt-0.5 mb-2">Search for an address or click on the map to set the exact location</p>
+              <MapLocationPicker
+                latitude={form.latitude}
+                longitude={form.longitude}
+                onLocationChange={(lat, lng) => {
+                  update('latitude', lat);
+                  update('longitude', lng);
+                }}
+                onAddressResolved={(addr) => {
+                  setForm(f => ({
+                    ...f,
+                    address: {
+                      ...f.address,
+                      street: addr.street || f.address.street,
+                      city: addr.city || f.address.city,
+                      state: addr.state || f.address.state,
+                    },
+                  }));
+                }}
+                height="280px"
+                countryCode="ng"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Street Address</label>
+              <input
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.address.street}
+                onChange={(e) => setForm(f => ({ ...f, address: { ...f.address, street: e.target.value } }))}
+                placeholder="123 Main Street"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Contact & Claim */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Merchant Phone</label>
+                <input
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.claimContactPhone}
+                  onChange={(e) => update('claimContactPhone', e.target.value)}
+                  placeholder="+234..."
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Merchant Email</label>
+                <input
+                  type="email"
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.claimContactEmail}
+                  onChange={(e) => update('claimContactEmail', e.target.value)}
+                  placeholder="merchant@email.com"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Phone</label>
+                <input
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.contact.phone}
+                  onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, phone: e.target.value } }))}
+                  placeholder="+234..."
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Email</label>
+                <input
+                  type="email"
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.contact.email}
+                  onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, email: e.target.value } }))}
+                  placeholder="business@email.com"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">WhatsApp</label>
+              <input
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.contact.whatsapp}
+                onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, whatsapp: e.target.value } }))}
+                placeholder="+234..."
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <div className="flex justify-between pt-2 border-t border-gray-100">
+          <button
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            onClick={step === 0 ? onClose : () => setStep(s => s - 1)}
+          >
+            {step === 0 ? 'Cancel' : '← Back'}
+          </button>
+          {step < steps.length - 1 ? (
+            <button
+              className="px-5 py-2 text-sm font-medium text-white bg-ruby-600 rounded-lg hover:bg-ruby-700 transition-colors"
+              onClick={() => setStep(s => s + 1)}
+            >
+              Next →
+            </button>
+          ) : (
+            <button
+              className="px-5 py-2 text-sm font-medium text-white bg-ruby-600 rounded-lg hover:bg-ruby-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              onClick={handleSave}
+              disabled={submitting}
+            >
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }

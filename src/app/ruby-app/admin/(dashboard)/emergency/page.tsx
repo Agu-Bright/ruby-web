@@ -2,24 +2,20 @@
 
 import { useState, useCallback } from 'react';
 import {
-  ShieldAlert,
   Eye,
-  CheckCircle,
-  XCircle,
   MapPin,
   Phone,
   Mail,
   Clock,
   User,
   ExternalLink,
-  AlertTriangle,
   ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { useApi, useMutation } from '@/lib/hooks';
 import api from '@/lib/api/client';
-import { PageHeader, StatusBadge, Modal, type Column } from '@/components/ui';
+import { PageHeader, StatusBadge, Modal, DataTable, type Column } from '@/components/ui';
 import type {
   EmergencyAlert,
   EmergencyAlertStats,
@@ -126,13 +122,106 @@ export default function EmergencyPage() {
     }
   }, [actionModal, actionNotes, updateAlert, refetch]);
 
-  const pagination = meta;
-
   const statCards = [
     { label: 'Active', value: stats?.active ?? 0, color: 'bg-red-50 text-red-700', pulse: true },
     { label: 'Acknowledged', value: stats?.acknowledged ?? 0, color: 'bg-amber-50 text-amber-700', pulse: false },
     { label: 'Resolved', value: stats?.resolved ?? 0, color: 'bg-green-50 text-green-700', pulse: false },
     { label: 'False Alarm', value: stats?.falseAlarm ?? 0, color: 'bg-gray-50 text-gray-600', pulse: false },
+  ];
+
+  const alertColumns: Column<EmergencyAlert>[] = [
+    {
+      key: 'alert',
+      header: 'Alert',
+      render: (alert) => (
+        <div className="flex items-center gap-3">
+          {alert.status === 'ACTIVE' && (
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
+            </span>
+          )}
+          <div>
+            <div className="font-medium text-gray-900">{getAlertUserName(alert)}</div>
+            <div className="text-xs text-gray-500">{getAlertUserPhone(alert)}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (alert) =>
+        alert.location?.coordinates ? (
+          <a
+            href={getMapsUrl(alert)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs"
+          >
+            <MapPin className="w-3 h-3" />
+            {getCoordDisplay(alert)}
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        ) : (
+          <span className="text-gray-400 text-xs">Unknown</span>
+        ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (alert) => <StatusBadge status={alert.status} />,
+    },
+    {
+      key: 'time',
+      header: 'Time',
+      render: (alert) => (
+        <div>
+          <div className="text-gray-700 text-xs">{formatRelativeTime(alert.createdAt)}</div>
+          <div className="text-gray-400 text-[10px]">{formatDateTime(alert.createdAt)}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      className: 'text-right',
+      render: (alert) => (
+        <div className="flex items-center justify-end gap-1">
+          <button
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+            title="View details"
+            onClick={() => setDetailAlert(alert)}
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          {alert.status === 'ACTIVE' && (
+            <button
+              className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 text-xs font-medium hover:bg-amber-200"
+              onClick={() => setActionModal({ alert, action: 'ACKNOWLEDGED' })}
+            >
+              Acknowledge
+            </button>
+          )}
+          {alert.status === 'ACKNOWLEDGED' && (
+            <button
+              className="px-2.5 py-1 rounded-lg bg-green-100 text-green-700 text-xs font-medium hover:bg-green-200"
+              onClick={() => setActionModal({ alert, action: 'RESOLVED' })}
+            >
+              Resolve
+            </button>
+          )}
+          {(alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED') && (
+            <button
+              className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-medium hover:bg-gray-200"
+              onClick={() => setActionModal({ alert, action: 'FALSE_ALARM' })}
+            >
+              False Alarm
+            </button>
+          )}
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -180,141 +269,15 @@ export default function EmergencyPage() {
       </div>
 
       {/* ─── Alert Table ─── */}
-      <div className="card overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ruby-600" />
-          </div>
-        ) : !alerts?.length ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-            <CheckCircle className="w-12 h-12 text-gray-300 mb-3" />
-            <p className="font-medium">No emergency alerts</p>
-            <p className="text-sm text-gray-400">All clear</p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="text-left px-4 py-3 font-medium text-gray-500">Alert</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500">Location</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500">Time</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {alerts.map((alert) => (
-                    <tr key={alert._id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${alert.status === 'ACTIVE' ? 'bg-red-50/30' : ''}`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          {alert.status === 'ACTIVE' && (
-                            <span className="relative flex h-2.5 w-2.5 shrink-0">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
-                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
-                            </span>
-                          )}
-                          <div>
-                            <div className="font-medium text-gray-900">{getAlertUserName(alert)}</div>
-                            <div className="text-xs text-gray-500">{getAlertUserPhone(alert)}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {alert.location?.coordinates ? (
-                          <a
-                            href={getMapsUrl(alert)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs"
-                          >
-                            <MapPin className="w-3 h-3" />
-                            {getCoordDisplay(alert)}
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : (
-                          <span className="text-gray-400 text-xs">Unknown</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={alert.status} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-gray-700 text-xs">{formatRelativeTime(alert.createdAt)}</div>
-                        <div className="text-gray-400 text-[10px]">{formatDateTime(alert.createdAt)}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
-                            title="View details"
-                            onClick={() => setDetailAlert(alert)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {alert.status === 'ACTIVE' && (
-                            <button
-                              className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 text-xs font-medium hover:bg-amber-200"
-                              onClick={() => setActionModal({ alert, action: 'ACKNOWLEDGED' })}
-                            >
-                              Acknowledge
-                            </button>
-                          )}
-                          {alert.status === 'ACKNOWLEDGED' && (
-                            <button
-                              className="px-2.5 py-1 rounded-lg bg-green-100 text-green-700 text-xs font-medium hover:bg-green-200"
-                              onClick={() => setActionModal({ alert, action: 'RESOLVED' })}
-                            >
-                              Resolve
-                            </button>
-                          )}
-                          {(alert.status === 'ACTIVE' || alert.status === 'ACKNOWLEDGED') && (
-                            <button
-                              className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-xs font-medium hover:bg-gray-200"
-                              onClick={() => setActionModal({ alert, action: 'FALSE_ALARM' })}
-                            >
-                              False Alarm
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {pagination && (pagination.totalPages ?? 0) > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                <span className="text-sm text-gray-500">
-                  {pagination.total} alert{pagination.total !== 1 ? 's' : ''}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                    disabled={(pagination.page ?? 1) <= 1}
-                    onClick={() => setFilters((f) => ({ ...f, page: (f.page || 1) - 1 }))}
-                  >
-                    Previous
-                  </button>
-                  <span className="px-3 py-1.5 text-sm text-gray-600">
-                    {pagination.page ?? 1} / {pagination.totalPages ?? 1}
-                  </span>
-                  <button
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                    disabled={(pagination.page ?? 1) >= (pagination.totalPages ?? 1)}
-                    onClick={() => setFilters((f) => ({ ...f, page: (f.page || 1) + 1 }))}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <DataTable<EmergencyAlert>
+        columns={alertColumns}
+        data={alerts || []}
+        meta={meta}
+        isLoading={isLoading}
+        onPageChange={(p) => setFilters((f) => ({ ...f, page: p }))}
+        currentPage={filters.page || 1}
+        emptyMessage="No emergency alerts found"
+      />
 
       {/* ─── Detail Modal ─── */}
       <Modal

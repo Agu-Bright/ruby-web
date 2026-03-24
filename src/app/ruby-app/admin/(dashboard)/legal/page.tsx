@@ -110,7 +110,6 @@ export default function LegalDocumentsPage() {
   const deleteMutation = useMutation((id: string) => api.legalDocuments.delete(id));
 
   const docs = Array.isArray(docsData) ? docsData : [];
-  const pagination = (docsMeta as any)?.pagination;
 
   // Search handler
   const handleSearch = useCallback(() => {
@@ -422,6 +421,9 @@ export default function LegalDocumentsPage() {
         data={docs}
         isLoading={isLoading}
         emptyMessage="No legal documents found"
+        meta={docsMeta}
+        currentPage={filters.page}
+        onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
       />
 
       {/* Create/Edit Modal */}

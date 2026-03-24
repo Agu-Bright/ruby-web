@@ -74,8 +74,8 @@ export function DataTable<T>({
 
   return (
     <div className="card min-h-[400px]">
-      <div>
-        <table className="w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50/50">
               {columns.map((col) => (

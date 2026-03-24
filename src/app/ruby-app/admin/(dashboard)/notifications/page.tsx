@@ -171,13 +171,13 @@ export default function NotificationsPage() {
 
       {/* Filter Tabs + Actions */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <div className="flex items-center gap-1">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b border-gray-100">
+          <div className="flex flex-wrap items-center gap-1">
             {FILTER_TABS.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => handleTabChange(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                   activeTab === tab.key
                     ? "bg-ruby-50 text-ruby-700"
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
@@ -191,7 +191,7 @@ export default function NotificationsPage() {
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
-              className="text-xs font-medium text-ruby-600 hover:text-ruby-700 px-3 py-1.5 rounded-lg hover:bg-ruby-50 transition-colors"
+              className="text-xs font-medium text-ruby-600 hover:text-ruby-700 px-3 py-1.5 rounded-lg hover:bg-ruby-50 transition-colors self-end sm:self-auto"
             >
               Mark all as read
             </button>
@@ -225,14 +225,14 @@ export default function NotificationsPage() {
                 <button
                   key={notification._id}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`w-full flex items-start gap-4 px-5 py-4 hover:bg-gray-50 transition-colors text-left ${
+                  className={`w-full flex items-start gap-3 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50 transition-colors text-left ${
                     !notification.isRead ? "bg-ruby-50/20" : ""
                   }`}
                 >
                   <div
-                    className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${config.bg}`}
+                    className={`flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${config.bg}`}
                   >
-                    <Icon className={`w-5 h-5 ${config.color}`} />
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${config.color}`} />
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -246,13 +246,13 @@ export default function NotificationsPage() {
                         <span className="w-2 h-2 bg-ruby-600 rounded-full flex-shrink-0" />
                       )}
                     </div>
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-xs sm:text-sm font-medium text-gray-900">
                       {notification.title}
                     </p>
-                    <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5 line-clamp-2">
                       {notification.body}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1.5">
+                    <p className="text-xs text-gray-400 mt-1 sm:mt-1.5">
                       {formatTimeAgo(notification.createdAt)}
                     </p>
                   </div>
@@ -264,8 +264,8 @@ export default function NotificationsPage() {
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-            <p className="text-sm text-gray-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-3 sm:px-5 py-3 border-t border-gray-100">
+            <p className="text-xs sm:text-sm text-gray-500">
               Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
             </p>
             <div className="flex items-center gap-2">

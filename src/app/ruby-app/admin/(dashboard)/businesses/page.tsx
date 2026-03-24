@@ -509,6 +509,13 @@ export default function BusinessesPage() {
         variant: 'primary',
         icon: RefreshCw,
       },
+      edit: {
+        title: 'Edit Business',
+        description: (name) => `Edit details for "${name}".`,
+        label: 'Save',
+        variant: 'primary',
+        icon: Edit2,
+      },
     };
     return configs[action];
   };

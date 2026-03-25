@@ -28,6 +28,7 @@ import {
   ShieldAlert,
   Radio,
   Scale,
+  Star,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -70,6 +71,7 @@ const navGroups: NavGroup[] = [
       { label: "Emergency", href: "/ruby-app/admin/emergency", icon: ShieldAlert },
       { label: "Customers", href: "/ruby-app/admin/customers", icon: UserCircle },
       { label: "Businesses", href: "/ruby-app/admin/businesses", icon: Store },
+      { label: "Reviews", href: "/ruby-app/admin/reviews", icon: Star },
       { label: "Orders", href: "/ruby-app/admin/orders", icon: ShoppingCart },
       { label: "Delivery", href: "/ruby-app/admin/delivery", icon: Truck },
       { label: "Bookings", href: "/ruby-app/admin/bookings", icon: CalendarCheck },

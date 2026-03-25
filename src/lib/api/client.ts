@@ -190,6 +190,10 @@ async function request<T>(
         res.status,
       );
     }
+    // Flatten nested pagination into meta so meta.totalPages is accessible
+    if (json.meta?.pagination) {
+      json.meta = { ...json.meta, ...json.meta.pagination };
+    }
     return json;
   }
 
@@ -1031,10 +1035,12 @@ export const api = {
   },
 
   reviews: {
-    list: (params?: { page?: number; limit?: number; businessId?: string; rating?: number; isFlagged?: string }) =>
+    list: (params?: { page?: number; limit?: number; businessId?: string; rating?: number; isFlagged?: string; isVerified?: string }) =>
       request<any[]>("/admin/reviews", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
+    verify: (id: string) =>
+      request<any>(`/admin/reviews/${id}/verify`, { method: "PATCH" }),
     delete: (id: string) =>
       request<null>(`/admin/reviews/${id}`, { method: "DELETE" }),
   },

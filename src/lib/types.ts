@@ -1186,9 +1186,11 @@ export interface AdMedia {
   type?: 'IMAGE' | 'VIDEO';
 }
 
+export type AuthorType = 'BUSINESS' | 'CUSTOMER' | 'ADMIN';
+
 export interface AdCampaign {
   _id: string;
-  businessId: string | { _id: string; name: string; slug: string; logoUrl?: string };
+  businessId?: string | { _id: string; name: string; slug: string; logoUrl?: string };
   type: AdType;
   name: string;
   status: AdCampaignStatus;
@@ -1212,6 +1214,16 @@ export interface AdCampaign {
   rejectionReason?: string;
   locationId?: string | { _id: string; name: string; slug: string };
   reviewIds?: string[];
+  // Organic reel fields
+  isOrganic?: boolean;
+  authorType?: AuthorType;
+  userId?: string | { _id: string; firstName: string; lastName: string; avatarUrl?: string };
+  adminId?: string | { _id: string; firstName: string; lastName: string };
+  // Engagement
+  likesCount?: number;
+  commentsCount?: number;
+  bookmarksCount?: number;
+  sharesCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -1233,6 +1245,8 @@ export interface AdCampaignFilterParams extends PaginationParams {
   businessId?: string;
   locationId?: string;
   search?: string;
+  isOrganic?: boolean;
+  authorType?: AuthorType;
 }
 
 // ============================================================

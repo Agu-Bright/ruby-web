@@ -1032,6 +1032,11 @@ export const api = {
       }),
     delete: (id: string) =>
       request<null>(`/admin/ads/${id}`, { method: "DELETE" }),
+    createAdminReel: (data: { media: { url: string; type?: string }[]; caption?: string; hashtags?: string[]; locationId?: string }, businessId?: string) =>
+      request<import("@/lib/types").AdCampaign>(`/admin/ads/reels${businessId ? `?businessId=${businessId}` : ''}`, {
+        method: "POST",
+        body: data,
+      }),
   },
 
   reviews: {

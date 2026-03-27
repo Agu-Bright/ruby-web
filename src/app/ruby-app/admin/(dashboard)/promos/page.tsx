@@ -177,6 +177,7 @@ export default function PromosPage() {
     '/(main)/wallet': 'Wallet',
     '/(main)/ride': 'Request Ride',
     '/(main)/dispatch': 'Send Package',
+    '/(main)/chowdeck': 'Chowdeck',
     '/(tabs)/orders': 'Orders',
     '/(main)/profile/bookings': 'Bookings',
     '/(tabs)/profile': 'Profile',
@@ -452,6 +453,7 @@ export default function PromosPage() {
                 <option value="/(main)/wallet">Wallet</option>
                 <option value="/(main)/ride">Request Ride</option>
                 <option value="/(main)/dispatch">Send Package</option>
+                <option value="/(main)/chowdeck">Chowdeck</option>
                 <option value="/(tabs)/orders">Orders</option>
                 <option value="/(main)/profile/bookings">Bookings</option>
                 <option value="/(tabs)/profile">Profile</option>

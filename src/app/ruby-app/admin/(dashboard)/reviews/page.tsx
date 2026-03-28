@@ -110,7 +110,7 @@ export default function ReviewsPage() {
   };
 
   // Stats from current data
-  const totalReviews = meta?.pagination?.total || 0;
+  const totalReviews = (meta as any)?.pagination?.total || meta?.total || 0;
   const verifiedCount = reviews?.filter(r => r.isVerified).length || 0;
   const flaggedCount = reviews?.filter(r => r.isFlagged).length || 0;
 

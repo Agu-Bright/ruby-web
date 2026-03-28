@@ -229,7 +229,7 @@ export default function ReviewsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Reviews"
-        subtitle="Manage customer reviews. Verified reviews appear on the home screen."
+        description="Manage customer reviews. Verified reviews appear on the home screen."
       />
 
       {/* Filter bar */}
@@ -283,7 +283,7 @@ export default function ReviewsPage() {
         columns={columns}
         data={reviews || []}
         isLoading={isLoading}
-        pagination={meta?.pagination}
+        meta={meta}
         onPageChange={(page) => setFilters(prev => ({ ...prev, page }))}
         emptyMessage="No reviews found"
       />

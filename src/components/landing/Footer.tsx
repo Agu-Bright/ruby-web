@@ -2,11 +2,11 @@ import Image from "next/image";
 
 const quickLinks = ["Home", "About Us", "Partner", "Blogs", "Contact Us"];
 const utilityPages = [
-  "FAQs",
-  "Get Support",
-  "Terms Of Service",
-  "Privacy Policy",
-  "Cookie Policy",
+  { label: "FAQs", href: "/contact" },
+  { label: "Get Support", href: "/contact" },
+  { label: "Terms Of Service", href: "/terms" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Cookie Policy", href: "/privacy#cookies" },
 ];
 
 function SocialIcon({ d }: { d: string }) {
@@ -132,12 +132,12 @@ export default function Footer() {
               </h4>
               <ul className="space-y-2.5">
                 {utilityPages.map((link) => (
-                  <li key={link}>
+                  <li key={link.label}>
                     <a
-                      href="#"
+                      href={link.href}
                       className="text-xs text-white/50 hover:text-ruby-red transition-colors"
                     >
-                      {link}
+                      {link.label}
                     </a>
                   </li>
                 ))}

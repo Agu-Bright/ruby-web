@@ -211,7 +211,7 @@ export default function ReviewsPage() {
           >
             <ShieldCheck className="w-4 h-4" />
           </button>
-          {admin?.roles?.includes('SUPER_ADMIN') && (
+          {admin?.roles?.includes('super_admin') && (
             <button
               onClick={() => setDeleteConfirm(r)}
               className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600"
@@ -381,7 +381,7 @@ export default function ReviewsPage() {
                 <ShieldCheck className="w-4 h-4" />
                 {selectedReview.isVerified ? 'Unverify' : 'Verify for Home Screen'}
               </button>
-              {admin?.roles?.includes('SUPER_ADMIN') && (
+              {admin?.roles?.includes('super_admin') && (
                 <button
                   onClick={() => { setDeleteConfirm(selectedReview); setSelectedReview(null); }}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-700 hover:bg-red-100 transition-colors"

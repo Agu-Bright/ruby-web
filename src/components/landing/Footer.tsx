@@ -1,6 +1,12 @@
 import Image from "next/image";
 
-const quickLinks = ["Home", "About Us", "Partner", "Blogs", "Contact Us"];
+const quickLinks = [
+  { label: "Home", href: "/" },
+  { label: "About Us", href: "/about" },
+  { label: "Partner", href: "/partner" },
+  { label: "Blogs", href: "#" },
+  { label: "Contact Us", href: "/contact" },
+];
 const utilityPages = [
   { label: "FAQs", href: "/contact" },
   { label: "Get Support", href: "/contact" },
@@ -113,12 +119,12 @@ export default function Footer() {
               </h4>
               <ul className="space-y-2.5">
                 {quickLinks.map((link) => (
-                  <li key={link}>
+                  <li key={link.label}>
                     <a
-                      href="#"
+                      href={link.href}
                       className="text-xs text-white/50 hover:text-ruby-red transition-colors"
                     >
-                      {link}
+                      {link.label}
                     </a>
                   </li>
                 ))}

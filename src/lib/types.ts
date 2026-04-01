@@ -975,26 +975,22 @@ export interface PayoutActionRequest {
 // ============================================================
 // Fee Configuration
 // ============================================================
-export type FeeType = 'ORDER_PLATFORM_FEE' | 'BOOKING_PLATFORM_FEE' | 'PAYMENT_PROCESSING_FEE' | 'DELIVERY_PLATFORM_FEE';
-export type FeeScope = 'GLOBAL' | 'LOCATION' | 'CATEGORY';
-
 export interface FeeConfig {
   _id: string;
-  feeType: FeeType;
-  scope: FeeScope;
-  locationId?: string | { _id: string; name: string };
-  categoryId?: string | { _id: string; name: string };
-  percentage: number;
-  flatFee: number;
-  minAmount: number;
-  maxAmount: number;
-  currency: string;
+  name: string;
+  scope: 'GLOBAL' | 'LOCATION' | 'CATEGORY';
+  locationId?: string;
+  categoryId?: string;
+  platformFeePercent: number;
+  deliveryFeeConfig?: {
+    mode: 'FLAT' | 'DISTANCE_BASED' | 'PROVIDER_QUOTE';
+    flatFee?: number;
+    baseFee?: number;
+    perKmFee?: number;
+  };
+  servicePlatformFeePercent?: number;
+  currency?: string;
   isActive: boolean;
-  effectiveFrom?: string;
-  effectiveUntil?: string;
-  description?: string;
-  createdBy?: string;
-  updatedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -1186,11 +1182,9 @@ export interface AdMedia {
   type?: 'IMAGE' | 'VIDEO';
 }
 
-export type AuthorType = 'BUSINESS' | 'CUSTOMER' | 'ADMIN';
-
 export interface AdCampaign {
   _id: string;
-  businessId?: string | { _id: string; name: string; slug: string; logoUrl?: string };
+  businessId: string | { _id: string; name: string; slug: string; logoUrl?: string };
   type: AdType;
   name: string;
   status: AdCampaignStatus;
@@ -1214,16 +1208,6 @@ export interface AdCampaign {
   rejectionReason?: string;
   locationId?: string | { _id: string; name: string; slug: string };
   reviewIds?: string[];
-  // Organic reel fields
-  isOrganic?: boolean;
-  authorType?: AuthorType;
-  userId?: string | { _id: string; firstName: string; lastName: string; avatarUrl?: string };
-  adminId?: string | { _id: string; firstName: string; lastName: string };
-  // Engagement
-  likesCount?: number;
-  commentsCount?: number;
-  bookmarksCount?: number;
-  sharesCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -1245,8 +1229,6 @@ export interface AdCampaignFilterParams extends PaginationParams {
   businessId?: string;
   locationId?: string;
   search?: string;
-  isOrganic?: boolean;
-  authorType?: AuthorType;
 }
 
 // ============================================================
@@ -1257,10 +1239,9 @@ export interface Promo {
   title: string;
   description?: string;
   imageUrl: string;
-  linkType: 'BUSINESS' | 'EXTERNAL' | 'IN_APP';
+  linkType: 'BUSINESS' | 'EXTERNAL';
   businessId?: string | { _id: string; name: string; slug: string; logoUrl?: string };
   externalUrl?: string;
-  screenRoute?: string;
   locationId?: string | { _id: string; name: string };
   isActive: boolean;
   displayOrder: number;

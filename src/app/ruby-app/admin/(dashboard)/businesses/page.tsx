@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, Fragment } from 'react';
 import {
   Store, Search, CheckCircle, XCircle, Ban, Eye, MapPin, Clock,
   Phone, Mail, Globe, Star, ShieldCheck, ShieldX, RotateCcw, RefreshCw,
-  FileText, ExternalLink, AlertTriangle, MoreHorizontal, ChevronDown, Trash2,
-  Plus, Copy, Loader2, Package, Wrench, Edit2, Archive, Power, Image as ImageIcon,
-  Wallet, DollarSign, ArrowUpRight, ArrowDownLeft, ChevronLeft, ChevronRight, AlertCircle, X,
+  FileText, ExternalLink, AlertTriangle, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Trash2,
+  Plus, Copy, Loader2, Package, Wrench, Edit2, Archive, Power, Image as ImageIcon, GitBranch,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -14,7 +13,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
-import { PageHeader, DataTable, StatusBadge, Modal, StatCard, ImageUpload, type Column } from '@/components/ui';
+import { PageHeader, StatusBadge, Modal, StatCard, ImageUpload } from '@/components/ui';
 
 const MapLocationPicker = dynamic(
   () => import('@/components/ui/map-location-picker').then(mod => ({ default: mod.MapLocationPicker })),
@@ -33,15 +32,14 @@ import type {
   AdminCreateBusinessRequest, Location, Category, Subcategory,
   Product, ProductStatus, UpdateProductRequest,
   ServiceListing, ServiceStatus, UpdateServiceRequest, PricingType, ServiceFulfillmentMode,
-  Wallet as WalletType, LedgerEntry,
 } from '@/lib/types';
-import { formatDate, formatDateTime, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName, normalizeMediaUrl } from '@/lib/utils';
+import { formatDate, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName } from '@/lib/utils';
 
 const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'LIVE', 'REJECTED', 'SUSPENDED'];
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status' | 'edit';
+type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status';
 
 // ─── Action Dropdown Component ───
 function ActionDropdown({ business, onAction, onView }: {
@@ -65,7 +63,6 @@ function ActionDropdown({ business, onAction, onView }: {
 
   const items: { label: string; icon: typeof Eye; action: () => void; variant?: 'default' | 'success' | 'danger' | 'warning' }[] = [
     { label: 'View Details', icon: Eye, action: () => { onView(business); setOpen(false); } },
-    { label: 'Edit Business', icon: Edit2, action: () => { onAction(business, 'edit'); setOpen(false); } },
   ];
 
   if (business.status === 'PENDING_REVIEW') {
@@ -153,8 +150,9 @@ export default function BusinessesPage() {
     ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: toLocationId(admin.locationIds[0]) } : {}),
   });
   const [search, setSearch] = useState('');
+  const [branchTypeFilter, setBranchTypeFilter] = useState<'all' | 'brands' | 'branches' | 'standalone'>('all');
   const [detailBusiness, setDetailBusiness] = useState<Business | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog' | 'wallet'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog' | 'branches'>('info');
   const [actionModal, setActionModal] = useState<{ business: Business; action: ActionType } | null>(null);
 
   // Catalog tab state
@@ -168,14 +166,9 @@ export default function BusinessesPage() {
   const [selectedStatus, setSelectedStatus] = useState<BusinessStatus>('PENDING_REVIEW');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Wallet tab state
-  const [bizWallet, setBizWallet] = useState<WalletType | null>(null);
-  const [bizWalletLoading, setBizWalletLoading] = useState(true);
-  const [bizTransactions, setBizTransactions] = useState<LedgerEntry[]>([]);
-  const [bizTxLoading, setBizTxLoading] = useState(false);
-  const [bizTxPage, setBizTxPage] = useState(1);
-  const [bizTxTotal, setBizTxTotal] = useState(0);
-  const [showBizFundModal, setShowBizFundModal] = useState(false);
+  // Hierarchical branch tree state
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [branchCache, setBranchCache] = useState<Record<string, { data: Business[]; loading: boolean }>>({});
 
   // Fetch businesses list
   const { data: businesses, meta, isLoading, refetch } = useApi<Business[]>(
@@ -226,6 +219,34 @@ export default function BusinessesPage() {
   );
 
   const isProcessing = approving || rejecting || suspending || reinstating || verifyingCac || featuring || deleting;
+
+  // Hierarchical: toggle parent expand and fetch branches
+  const toggleParent = useCallback(async (parentId: string) => {
+    setExpandedParents(prev => {
+      const next = new Set(prev);
+      next.has(parentId) ? next.delete(parentId) : next.add(parentId);
+      return next;
+    });
+    if (!branchCache[parentId]) {
+      setBranchCache(prev => ({ ...prev, [parentId]: { data: [], loading: true } }));
+      try {
+        const res = await api.businesses.getBranches(parentId);
+        setBranchCache(prev => ({ ...prev, [parentId]: { data: res.data, loading: false } }));
+      } catch {
+        setBranchCache(prev => ({ ...prev, [parentId]: { data: [], loading: false } }));
+      }
+    }
+  }, [branchCache]);
+
+  // Filter data for hierarchical display
+  const displayData = useMemo(() => {
+    if (!businesses) return [];
+    if (branchTypeFilter === 'brands') return businesses.filter(b => b.isParent);
+    if (branchTypeFilter === 'branches') return businesses.filter(b => !!b.parentBusinessId);
+    if (branchTypeFilter === 'standalone') return businesses.filter(b => !b.isParent && !b.parentBusinessId);
+    // "all" mode: hide branches from top-level (they appear under their parent when expanded)
+    return businesses.filter(b => !b.parentBusinessId);
+  }, [businesses, branchTypeFilter]);
 
   // Fetch full detail
   const { data: fullDetail, isLoading: loadingDetail, error: detailError } = useApi<Business>(
@@ -286,49 +307,6 @@ export default function BusinessesPage() {
   const { mutate: archiveService } = useMutation(({ id }: { id: string }) => api.services.archive(id), catalogMutOpts);
   const { mutate: updateService, isLoading: updatingService } = useMutation(({ id, data }: { id: string; data: UpdateServiceRequest }) => api.services.update(id, data), catalogMutOpts);
   const catalogProcessing = deletingProduct || suspendingProduct || activatingProduct || updatingProduct || deletingService || suspendingService || activatingService || updatingService;
-
-  // Wallet fetch functions
-  const fetchBizWallet = useCallback(async () => {
-    if (!detailBusiness) return;
-    setBizWalletLoading(true);
-    try {
-      const res = await api.businesses.getWallet(detailBusiness._id);
-      const wallets = res.data;
-      const w = Array.isArray(wallets) && wallets.length > 0 ? wallets[0] : null;
-      setBizWallet(w);
-    } catch {
-      setBizWallet(null);
-    } finally {
-      setBizWalletLoading(false);
-    }
-  }, [detailBusiness]);
-
-  const fetchBizTransactions = useCallback(async (walletId: string, page: number) => {
-    setBizTxLoading(true);
-    try {
-      const txRes = await api.businesses.getWalletTransactions(walletId, { limit: 10, page });
-      setBizTransactions(Array.isArray(txRes.data) ? txRes.data : []);
-      setBizTxTotal(txRes.meta?.total || 0);
-    } catch {
-      setBizTransactions([]);
-    } finally {
-      setBizTxLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (detailBusiness && detailTab === 'wallet') {
-      fetchBizWallet();
-    }
-  }, [detailBusiness, detailTab, fetchBizWallet]);
-
-  useEffect(() => {
-    if (bizWallet && detailTab === 'wallet') {
-      fetchBizTransactions(bizWallet._id, bizTxPage);
-    }
-  }, [bizWallet, bizTxPage, detailTab, fetchBizTransactions]);
-
-  const bizTxTotalPages = Math.ceil(bizTxTotal / 10) || 1;
 
   const handleCatalogConfirm = useCallback(async () => {
     if (!catalogConfirmModal) return;
@@ -423,6 +401,7 @@ export default function BusinessesPage() {
       setReason('');
       setSelectedStatus('PENDING_REVIEW');
       refetch();
+      setBranchCache({});
       if (detailBusiness?._id === business._id) {
         setDetailBusiness(null);
       }
@@ -430,13 +409,7 @@ export default function BusinessesPage() {
     // Error toasts are handled automatically by the onError callback in each mutation
   }, [actionModal, reason, selectedStatus, approveBusiness, rejectBusiness, suspendBusiness, reinstateBusiness, verifyCac, featureBusiness, deleteBusiness, refetch, detailBusiness]);
 
-  const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
-
   const openAction = (business: Business, action: ActionType) => {
-    if (action === 'edit') {
-      setEditingBusiness(business);
-      return;
-    }
     setActionModal({ business, action });
     setReason('');
     if (action === 'update-status') {
@@ -509,116 +482,14 @@ export default function BusinessesPage() {
         variant: 'primary',
         icon: RefreshCw,
       },
-      edit: {
-        title: 'Edit Business',
-        description: (name) => `Edit details for "${name}".`,
-        label: 'Save',
-        variant: 'primary',
-        icon: Edit2,
-      },
     };
     return configs[action];
   };
 
   const needsReason = (action: ActionType) => ['reject', 'suspend', 'reject-cac'].includes(action);
 
-  // ─── Table columns ───
-  const columns: Column<Business>[] = [
-    {
-      key: 'name',
-      header: 'Business',
-      render: (b) => (
-        <div className="flex items-center gap-3">
-          {b.logoUrl ? (
-            <img src={normalizeMediaUrl(b.logoUrl)} alt="" className="w-9 h-9 rounded-lg object-cover ring-1 ring-gray-200" />
-          ) : (
-            <div className="w-9 h-9 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg flex items-center justify-center ring-1 ring-emerald-200/50">
-              <Store className="w-4 h-4 text-emerald-600" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <div className="font-medium text-gray-900 flex items-center gap-1.5 truncate">
-              {b.name}
-              {b.isFeatured && <Star className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />}
-            </div>
-            <div className="text-xs text-gray-500 truncate">{getCategoryName(b.categoryId) || 'Uncategorized'}</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (b) => (
-        <div className="flex flex-col gap-1.5">
-          <StatusBadge status={b.status} />
-          {b.cacDocumentUrl && (
-            <CacBadge status={b.cacDocumentStatus} />
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'owner',
-      header: 'Owner',
-      render: (b) => {
-        if (b.isClaimed === false) {
-          return (
-            <div className="min-w-0">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-orange-50 text-orange-700 border border-orange-200">
-                Unclaimed
-              </span>
-              {b.claimCode && <div className="text-xs text-gray-400 mt-0.5 font-mono">{b.claimCode}</div>}
-            </div>
-          );
-        }
-        const name = getOwnerName(b.ownerId);
-        const email = getOwnerEmail(b.ownerId);
-        return (
-          <div className="min-w-0">
-            <div className="text-sm text-gray-700 font-medium truncate">{name || 'Unknown'}</div>
-            {email && <div className="text-xs text-gray-400 truncate">{email}</div>}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'location',
-      header: 'Location',
-      render: (b) => (
-        <div className="flex items-center gap-1.5 text-sm text-gray-600">
-          <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-          <span className="truncate">{getLocationName(b.locationId) || '—'}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'created',
-      header: 'Created',
-      render: (b) => <span className="text-sm text-gray-500">{formatDate(b.createdAt)}</span>,
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-20',
-      render: (b) => (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            onClick={(e) => { e.stopPropagation(); setDetailBusiness(b); setDetailTab('info'); }}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-            title="View details"
-          >
-            <Eye className="w-4 h-4 text-gray-400" />
-          </button>
-          <ActionDropdown
-            business={b}
-            onAction={openAction}
-            onView={(biz) => { setDetailBusiness(biz); setDetailTab('info'); }}
-          />
-        </div>
-      ),
-    },
-  ];
+  // ─── Table column headers ───
+  const tableHeaders = ['Business', 'Status', 'Owner', 'Location', 'Created', ''];
 
   return (
     <div className="space-y-6">
@@ -672,6 +543,19 @@ export default function BusinessesPage() {
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
+          <div className="relative">
+            <select
+              className="appearance-none bg-gray-50 border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors cursor-pointer"
+              value={branchTypeFilter}
+              onChange={(e) => setBranchTypeFilter(e.target.value as typeof branchTypeFilter)}
+            >
+              <option value="all">All types</option>
+              <option value="brands">Brands (Parents)</option>
+              <option value="branches">Branches</option>
+              <option value="standalone">Standalone</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
           {stats && stats.pendingReview > 0 && filters.status !== 'PENDING_REVIEW' && (
             <button
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
@@ -681,26 +565,255 @@ export default function BusinessesPage() {
               {stats.pendingReview} pending review
             </button>
           )}
-          {filters.status && (
+          {(filters.status || branchTypeFilter !== 'all') && (
             <button
               className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
-              onClick={() => setFilters(f => ({ ...f, status: undefined, page: 1 }))}
+              onClick={() => { setFilters(f => ({ ...f, status: undefined, page: 1 })); setBranchTypeFilter('all'); }}
             >
-              Clear filter
+              Clear filters
             </button>
           )}
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={businesses || []}
-        meta={meta}
-        isLoading={isLoading}
-        emptyMessage="No businesses found"
-        currentPage={filters.page}
-        onPageChange={(page) => setFilters(f => ({ ...f, page }))}
-      />
+      {/* ─── Hierarchical Business Table ─── */}
+      <div className="card min-h-[400px]">
+        <div>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50/50">
+                {tableHeaders.map((h, i) => (
+                  <th key={i} className={`px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider ${i === tableHeaders.length - 1 ? 'w-20' : ''}`}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    {tableHeaders.map((_, j) => (
+                      <td key={j} className="px-4 py-3"><div className="skeleton h-4 w-24" /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : !displayData.length ? (
+                <tr>
+                  <td colSpan={tableHeaders.length} className="px-4 py-12 text-center text-sm text-gray-400">
+                    No businesses found
+                  </td>
+                </tr>
+              ) : (
+                displayData.map((b) => {
+                  const isExpanded = expandedParents.has(b._id);
+                  const branches = branchCache[b._id];
+                  const isBranchRow = !!b.parentBusinessId;
+
+                  return (
+                    <Fragment key={b._id}>
+                      {/* ── Main row ── */}
+                      <tr className={`border-b border-gray-100 transition-colors hover:bg-gray-50 ${b.isParent && isExpanded ? 'bg-blue-50/30' : ''}`}>
+                        {/* Business cell */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <div className="flex items-center gap-2">
+                            {b.isParent && branchTypeFilter === 'all' ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleParent(b._id); }}
+                                className="p-0.5 rounded hover:bg-gray-200/60 transition-colors shrink-0"
+                              >
+                                <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                              </button>
+                            ) : isBranchRow ? (
+                              <GitBranch className="w-3.5 h-3.5 text-blue-400 shrink-0 ml-0.5" />
+                            ) : (
+                              <div className="w-5" />
+                            )}
+                            {b.logoUrl ? (
+                              <img src={b.logoUrl} alt="" className="w-9 h-9 rounded-lg object-cover ring-1 ring-gray-200" />
+                            ) : (
+                              <div className="w-9 h-9 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg flex items-center justify-center ring-1 ring-emerald-200/50">
+                                <Store className="w-4 h-4 text-emerald-600" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900 flex items-center gap-1.5 truncate">
+                                {b.name}
+                                {b.isFeatured && <Star className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />}
+                                {b.isParent && b.branchCount ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-blue-50 text-blue-600 border border-blue-100 shrink-0">
+                                    {b.branchCount} {b.branchCount === 1 ? 'branch' : 'branches'}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {isBranchRow && b.branchLabel ? (
+                                  <span className="text-blue-500">{b.branchLabel}</span>
+                                ) : (
+                                  getCategoryName(b.categoryId) || 'Uncategorized'
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        {/* Status */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <div className="flex flex-col gap-1.5">
+                            <StatusBadge status={b.status} />
+                            {b.cacDocumentUrl && <CacBadge status={b.cacDocumentStatus} />}
+                          </div>
+                        </td>
+                        {/* Owner */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {b.isClaimed === false ? (
+                            <div className="min-w-0">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-orange-50 text-orange-700 border border-orange-200">Unclaimed</span>
+                              {b.claimCode && <div className="text-xs text-gray-400 mt-0.5 font-mono">{b.claimCode}</div>}
+                            </div>
+                          ) : (
+                            <div className="min-w-0">
+                              <div className="text-sm text-gray-700 font-medium truncate">{getOwnerName(b.ownerId) || 'Unknown'}</div>
+                              {getOwnerEmail(b.ownerId) && <div className="text-xs text-gray-400 truncate">{getOwnerEmail(b.ownerId)}</div>}
+                            </div>
+                          )}
+                        </td>
+                        {/* Location */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                            <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span className="truncate">{getLocationName(b.locationId) || '—'}</span>
+                          </div>
+                        </td>
+                        {/* Created */}
+                        <td className="px-4 py-3 text-sm text-gray-500">{formatDate(b.createdAt)}</td>
+                        {/* Actions */}
+                        <td className="px-4 py-3 text-sm text-gray-700 w-20">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDetailBusiness(b); setDetailTab('info'); }}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                              title="View details"
+                            >
+                              <Eye className="w-4 h-4 text-gray-400" />
+                            </button>
+                            <ActionDropdown business={b} onAction={openAction} onView={(biz) => { setDetailBusiness(biz); setDetailTab('info'); }} />
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* ── Expanded branch rows ── */}
+                      {b.isParent && isExpanded && branchTypeFilter === 'all' && (
+                        <>
+                          {branches?.loading && (
+                            Array.from({ length: 2 }).map((_, i) => (
+                              <tr key={`skel-${b._id}-${i}`} className="border-b border-gray-100 bg-gray-50/60">
+                                <td className="py-3 text-sm" style={{ paddingLeft: 52 }}>
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse" />
+                                    <div className="space-y-1.5">
+                                      <div className="h-3.5 bg-gray-200 rounded w-28 animate-pulse" />
+                                      <div className="h-3 bg-gray-100 rounded w-16 animate-pulse" />
+                                    </div>
+                                  </div>
+                                </td>
+                                {Array.from({ length: 4 }).map((_, j) => (
+                                  <td key={j} className="px-4 py-3"><div className="skeleton h-3.5 w-16" /></td>
+                                ))}
+                                <td className="px-4 py-3 w-20" />
+                              </tr>
+                            ))
+                          )}
+                          {branches?.data?.map((branch) => (
+                            <tr key={branch._id} className="border-b border-gray-100 bg-gray-50/60 hover:bg-gray-100/60 transition-colors animate-fade-in" style={{ borderLeft: '2px solid rgb(147, 197, 253)' }}>
+                              {/* Branch business cell */}
+                              <td className="py-3 text-sm text-gray-700" style={{ paddingLeft: 52, paddingRight: 16 }}>
+                                <div className="flex items-center gap-2">
+                                  <GitBranch className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                  {branch.logoUrl ? (
+                                    <img src={branch.logoUrl} alt="" className="w-8 h-8 rounded-lg object-cover ring-1 ring-gray-200" />
+                                  ) : (
+                                    <div className="w-8 h-8 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg flex items-center justify-center ring-1 ring-emerald-200/50">
+                                      <Store className="w-3.5 h-3.5 text-emerald-600" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="font-medium text-gray-800 text-sm truncate">{branch.name}</div>
+                                    {branch.branchLabel && <div className="text-xs text-blue-500 truncate">{branch.branchLabel}</div>}
+                                  </div>
+                                </div>
+                              </td>
+                              {/* Status */}
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                <StatusBadge status={branch.status} />
+                              </td>
+                              {/* Owner */}
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                <div className="text-sm text-gray-700 font-medium truncate">{getOwnerName(branch.ownerId) || 'Unknown'}</div>
+                              </td>
+                              {/* Location */}
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                                  <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                  <span className="truncate">{getLocationName(branch.locationId) || '—'}</span>
+                                </div>
+                              </td>
+                              {/* Created */}
+                              <td className="px-4 py-3 text-sm text-gray-500">{formatDate(branch.createdAt)}</td>
+                              {/* Actions */}
+                              <td className="px-4 py-3 text-sm text-gray-700 w-20">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setDetailBusiness(branch); setDetailTab('info'); }}
+                                    className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                                    title="View details"
+                                  >
+                                    <Eye className="w-4 h-4 text-gray-400" />
+                                  </button>
+                                  <ActionDropdown business={branch} onAction={openAction} onView={(biz) => { setDetailBusiness(biz); setDetailTab('info'); }} />
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          {branches && !branches.loading && branches.data.length === 0 && (
+                            <tr className="border-b border-gray-100 bg-gray-50/60">
+                              <td colSpan={tableHeaders.length} className="py-3 text-xs text-gray-400 text-center" style={{ paddingLeft: 52 }}>
+                                No branches found
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      )}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {meta && (meta.totalPages || 1) > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/30">
+            <div className="text-xs text-gray-500">
+              Page {filters.page || 1} of {meta.totalPages || 1} · {meta.total} total
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => { setFilters(f => ({ ...f, page: 1 })); setExpandedParents(new Set()); }} disabled={(filters.page || 1) <= 1} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronsLeft className="w-4 h-4" />
+              </button>
+              <button onClick={() => { setFilters(f => ({ ...f, page: (f.page || 1) - 1 })); setExpandedParents(new Set()); }} disabled={(filters.page || 1) <= 1} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button onClick={() => { setFilters(f => ({ ...f, page: (f.page || 1) + 1 })); setExpandedParents(new Set()); }} disabled={(filters.page || 1) >= (meta.totalPages || 1)} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <button onClick={() => { setFilters(f => ({ ...f, page: meta.totalPages || 1 })); setExpandedParents(new Set()); }} disabled={(filters.page || 1) >= (meta.totalPages || 1)} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronsRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ─── Detail Modal ─── */}
       <Modal
@@ -714,7 +827,7 @@ export default function BusinessesPage() {
             {/* Header */}
             <div className="flex items-start gap-4">
               {displayBusiness.logoUrl ? (
-                <img src={normalizeMediaUrl(displayBusiness.logoUrl)} alt="" className="w-14 h-14 rounded-xl object-cover ring-1 ring-gray-200" />
+                <img src={displayBusiness.logoUrl} alt="" className="w-14 h-14 rounded-xl object-cover ring-1 ring-gray-200" />
               ) : (
                 <div className="w-14 h-14 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl flex items-center justify-center ring-1 ring-emerald-200/50">
                   <Store className="w-7 h-7 text-emerald-600" />
@@ -752,23 +865,22 @@ export default function BusinessesPage() {
 
             {/* Cover image */}
             {displayBusiness.coverImageUrl && (
-              <img src={normalizeMediaUrl(displayBusiness.coverImageUrl)} alt="Cover" className="w-full h-36 object-cover rounded-lg ring-1 ring-gray-200" />
+              <img src={displayBusiness.coverImageUrl} alt="Cover" className="w-full h-36 object-cover rounded-lg ring-1 ring-gray-200" />
             )}
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-gray-100">
-              {(['info', 'media', 'cac', 'hours', 'catalog', 'wallet'] as const).map(tab => (
+              {(['info', 'media', 'cac', 'hours', 'catalog', ...(displayBusiness.isParent || displayBusiness.parentBusinessId ? ['branches'] as const : [])] as const).map(tab => (
                 <button
                   key={tab}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
                     detailTab === tab
                       ? 'border-ruby-600 text-ruby-600'
                       : 'border-transparent text-gray-400 hover:text-gray-600'
                   }`}
-                  onClick={() => { setDetailTab(tab); if (tab === 'catalog') { setCatalogSearch(''); setCatalogStatusFilter(''); } if (tab === 'wallet') { setBizTxPage(1); } }}
+                  onClick={() => { setDetailTab(tab as any); if (tab === 'catalog') { setCatalogSearch(''); setCatalogStatusFilter(''); } }}
                 >
-                  {tab === 'wallet' && <Wallet className="w-3.5 h-3.5" />}
-                  {tab === 'info' ? 'Info' : tab === 'media' ? 'Media' : tab === 'cac' ? 'CAC' : tab === 'hours' ? 'Hours' : tab === 'catalog' ? 'Catalog' : 'Wallet'}
+                  {tab === 'info' ? 'Info' : tab === 'media' ? 'Media' : tab === 'cac' ? 'CAC' : tab === 'hours' ? 'Hours' : tab === 'branches' ? 'Branches' : 'Catalog'}
                   {tab === 'cac' && displayBusiness.cacDocumentUrl && displayBusiness.cacDocumentStatus === 'PENDING' && (
                     <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse" />
                   )}
@@ -795,6 +907,18 @@ export default function BusinessesPage() {
                   )}
                   {displayBusiness.viewCount !== undefined && (
                     <DetailField label="Stats" value={`${displayBusiness.viewCount} views, ${displayBusiness.orderCount || 0} orders, ${displayBusiness.bookingCount || 0} bookings`} />
+                  )}
+                  {displayBusiness.isParent && (
+                    <DetailField label="Multi-Branch" value={`Parent business${displayBusiness.branchCount ? ` (${displayBusiness.branchCount} branches)` : ''}`} />
+                  )}
+                  {displayBusiness.branchLabel && (
+                    <DetailField label="Branch Label" value={displayBusiness.branchLabel} />
+                  )}
+                  {displayBusiness.parentBusinessId && (
+                    <DetailField label="Parent Business" value={typeof displayBusiness.parentBusinessId === 'object' ? displayBusiness.parentBusinessId.name : displayBusiness.parentBusinessId} />
+                  )}
+                  {displayBusiness.catalogMode && displayBusiness.catalogMode !== 'INDEPENDENT' && (
+                    <DetailField label="Catalog Mode" value={displayBusiness.catalogMode} />
                   )}
                 </div>
 
@@ -973,7 +1097,7 @@ export default function BusinessesPage() {
                     <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Logo</span>
                     {displayBusiness.logoUrl ? (
                       <a href={displayBusiness.logoUrl} target="_blank" rel="noopener noreferrer">
-                        <img src={normalizeMediaUrl(displayBusiness.logoUrl)} alt="Logo" className="w-24 h-24 rounded-xl object-cover ring-1 ring-gray-200 hover:opacity-80 transition-opacity" />
+                        <img src={displayBusiness.logoUrl} alt="Logo" className="w-24 h-24 rounded-xl object-cover ring-1 ring-gray-200 hover:opacity-80 transition-opacity" />
                       </a>
                     ) : (
                       <div className="w-24 h-24 bg-gray-50 rounded-xl flex items-center justify-center text-gray-300 ring-1 ring-gray-200">
@@ -985,7 +1109,7 @@ export default function BusinessesPage() {
                     <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 block">Cover Image</span>
                     {displayBusiness.coverImageUrl ? (
                       <a href={displayBusiness.coverImageUrl} target="_blank" rel="noopener noreferrer">
-                        <img src={normalizeMediaUrl(displayBusiness.coverImageUrl)} alt="Cover" className="w-full h-24 rounded-xl object-cover ring-1 ring-gray-200 hover:opacity-80 transition-opacity" />
+                        <img src={displayBusiness.coverImageUrl} alt="Cover" className="w-full h-24 rounded-xl object-cover ring-1 ring-gray-200 hover:opacity-80 transition-opacity" />
                       </a>
                     ) : (
                       <div className="w-full h-24 bg-gray-50 rounded-xl flex items-center justify-center text-gray-300 ring-1 ring-gray-200 text-xs">
@@ -1010,7 +1134,7 @@ export default function BusinessesPage() {
                                 <span className="text-2xl">&#9658;</span>
                               </div>
                             ) : (
-                              <img src={normalizeMediaUrl(url)} alt={caption || `Media ${idx + 1}`} className="w-full h-24 object-cover rounded-lg ring-1 ring-gray-200 group-hover:opacity-80 transition-opacity" />
+                              <img src={url} alt={caption || `Media ${idx + 1}`} className="w-full h-24 object-cover rounded-lg ring-1 ring-gray-200 group-hover:opacity-80 transition-opacity" />
                             )}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition-colors flex items-center justify-center">
                               <ExternalLink className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
@@ -1062,7 +1186,7 @@ export default function BusinessesPage() {
                       <ExternalLink className="w-3 h-3 text-gray-400" />
                     </a>
                     {displayBusiness.cacDocumentUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
-                      <img src={normalizeMediaUrl(displayBusiness.cacDocumentUrl)} alt="CAC Document" className="mt-3 max-w-full max-h-60 rounded-lg ring-1 ring-gray-200" />
+                      <img src={displayBusiness.cacDocumentUrl} alt="CAC Document" className="mt-3 max-w-full max-h-60 rounded-lg ring-1 ring-gray-200" />
                     )}
                   </div>
                 ) : (
@@ -1232,7 +1356,7 @@ export default function BusinessesPage() {
                             <div key={product._id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50/50 transition-colors">
                               <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
                                 {img ? (
-                                  <img src={normalizeMediaUrl(img.url)} alt={product.name} className="w-full h-full object-cover" />
+                                  <img src={img.url} alt={product.name} className="w-full h-full object-cover" />
                                 ) : (
                                   <ImageIcon className="w-4 h-4 text-gray-300" />
                                 )}
@@ -1293,7 +1417,7 @@ export default function BusinessesPage() {
                             <div key={svc._id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50/50 transition-colors">
                               <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
                                 {img ? (
-                                  <img src={normalizeMediaUrl(img.url)} alt={svc.name} className="w-full h-full object-cover" />
+                                  <img src={img.url} alt={svc.name} className="w-full h-full object-cover" />
                                 ) : (
                                   <Wrench className="w-4 h-4 text-gray-300" />
                                 )}
@@ -1329,128 +1453,9 @@ export default function BusinessesPage() {
               </div>
             )}
 
-            {/* Tab: Wallet */}
-            {detailTab === 'wallet' && (
-              <div className="space-y-5">
-                {bizWalletLoading ? (
-                  <div className="flex items-center gap-4 animate-pulse">
-                    <div className="h-20 flex-1 bg-gray-100 rounded-xl" />
-                  </div>
-                ) : bizWallet ? (
-                  <>
-                    {/* Frozen warning */}
-                    {bizWallet.status === 'FROZEN' && (
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                        <p className="text-xs text-amber-700 flex items-start gap-1.5">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                          This wallet is frozen. Funding is disabled until the wallet is unfrozen.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Balance card */}
-                    <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl border border-emerald-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-[10px] text-emerald-600 uppercase tracking-wider font-semibold">Balance</p>
-                          <p className="text-2xl font-bold text-emerald-800 mt-1">{formatCurrency(bizWallet.balance, bizWallet.currency)}</p>
-                          <p className="text-[11px] text-emerald-500 mt-1">{bizWallet.status || 'ACTIVE'} · {bizWallet.currency}</p>
-                        </div>
-                        <button
-                          onClick={() => setShowBizFundModal(true)}
-                          disabled={bizWallet.status === 'FROZEN'}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Plus className="w-4 h-4" /> Add Funds
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Transactions */}
-                    <div>
-                      <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center">
-                            <DollarSign className="w-3.5 h-3.5 text-gray-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-semibold text-gray-800">Transactions</h3>
-                            <p className="text-[11px] text-gray-400 mt-0.5">{bizTxTotal} total transactions</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        {bizTxLoading ? (
-                          <div className="space-y-3">
-                            {[...Array(3)].map((_, i) => (
-                              <div key={i} className="flex items-center gap-3 animate-pulse">
-                                <div className="w-8 h-8 bg-gray-100 rounded-lg" />
-                                <div className="flex-1 space-y-1"><div className="h-3 bg-gray-100 rounded w-2/3" /><div className="h-2 bg-gray-50 rounded w-1/3" /></div>
-                                <div className="h-4 bg-gray-100 rounded w-16" />
-                              </div>
-                            ))}
-                          </div>
-                        ) : bizTransactions.length === 0 ? (
-                          <p className="text-sm text-gray-400 text-center py-4">No transactions yet</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {bizTransactions.map((tx) => {
-                              const isCredit = tx.direction === 'CREDIT' || tx.type === 'CREDIT';
-                              return (
-                                <div
-                                  key={tx._id}
-                                  className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-gray-300 hover:bg-gray-100/50 transition-colors text-left"
-                                >
-                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isCredit ? 'bg-emerald-100' : 'bg-red-100'}`}>
-                                    {isCredit ? <ArrowDownLeft className="w-4 h-4 text-emerald-600" /> : <ArrowUpRight className="w-4 h-4 text-red-600" />}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-gray-800 font-medium truncate">{tx.description || tx.referenceType}</p>
-                                    <p className="text-[11px] text-gray-400">{formatDateTime(tx.createdAt)}</p>
-                                  </div>
-                                  <div className={`text-sm font-semibold ${isCredit ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {isCredit ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Transaction pagination */}
-                        {bizTxTotalPages > 1 && (
-                          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                            <span className="text-xs text-gray-500">Page {bizTxPage} of {bizTxTotalPages}</span>
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => setBizTxPage(p => Math.max(1, p - 1))}
-                                disabled={bizTxPage <= 1}
-                                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                              >
-                                <ChevronLeft className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setBizTxPage(p => Math.min(bizTxTotalPages, p + 1))}
-                                disabled={bizTxPage >= bizTxTotalPages}
-                                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                              >
-                                <ChevronRight className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-center">
-                    <Wallet className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No wallet found</p>
-                    <p className="text-xs text-gray-400 mt-1">A wallet will be created when the business makes their first transaction</p>
-                  </div>
-                )}
-              </div>
+            {/* Tab: Branches */}
+            {detailTab === 'branches' && (
+              <BranchesTab businessId={displayBusiness._id} isParent={!!displayBusiness.isParent} />
             )}
 
             {/* Action bar */}
@@ -1650,46 +1655,6 @@ export default function BusinessesPage() {
         isSubmitting={creating}
       />
 
-      {/* ─── Edit Business Modal ─── */}
-      {editingBusiness && (
-        <EditBusinessModal
-          business={editingBusiness}
-          onClose={() => setEditingBusiness(null)}
-          onSubmit={async (data) => {
-            const result = await api.businesses.adminUpdate(editingBusiness._id, data);
-            if (result?.success) {
-              toast.success('Business updated successfully');
-              setEditingBusiness(null);
-              refetch();
-            }
-          }}
-        />
-      )}
-
-      {/* ─── Fund Wallet Modal ─── */}
-      {showBizFundModal && bizWallet && displayBusiness && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 animate-fade-in" onClick={() => setShowBizFundModal(false)}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Fund Wallet</h2>
-              <button onClick={() => setShowBizFundModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            <FundBusinessWalletForm
-              wallet={bizWallet}
-              businessName={displayBusiness.name}
-              onClose={() => setShowBizFundModal(false)}
-              onSuccess={() => {
-                setShowBizFundModal(false);
-                fetchBizWallet();
-                if (bizWallet) fetchBizTransactions(bizWallet._id, bizTxPage);
-              }}
-            />
-          </div>
-        </div>
-      )}
-
       {/* ─── Catalog Detail Modal ─── */}
       <Modal
         isOpen={!!catalogItemModal}
@@ -1789,6 +1754,75 @@ export default function BusinessesPage() {
 }
 
 // ─── Helper Components ───
+
+// ─── Branches Tab ───
+function BranchesTab({ businessId, isParent }: { businessId: string; isParent: boolean }) {
+  const { data: branches, isLoading: loading, error } = useApi<Business[]>(
+    () => api.businesses.getBranches(businessId),
+    [businessId],
+    { enabled: !!businessId }
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin w-5 h-5 border-2 border-ruby-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-sm text-red-500 py-4">Failed to load branches: {error}</div>;
+  }
+
+  if (!branches?.length) {
+    return (
+      <div className="text-center py-8 text-gray-400">
+        <Store className="w-8 h-8 mx-auto mb-2 opacity-50" />
+        <p className="text-sm">No branches found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          {isParent ? 'Branch Locations' : 'Sibling Branches'}
+        </span>
+        <span className="text-xs text-gray-400">{branches.length} branch(es)</span>
+      </div>
+      <div className="space-y-2">
+        {branches.map((branch: Business) => (
+          <div key={branch._id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-800 truncate">
+                  {branch.branchLabel || branch.name}
+                </span>
+                <StatusBadge status={branch.status} />
+              </div>
+              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                {branch.address && (
+                  <span className="flex items-center gap-1 truncate">
+                    <MapPin className="w-3 h-3" />
+                    {typeof branch.address === 'object' ? [branch.address.street, branch.address.city].filter(Boolean).join(', ') || '—' : branch.address || '—'}
+                  </span>
+                )}
+                {branch.catalogMode && (
+                  <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium">
+                    {branch.catalogMode}
+                  </span>
+                )}
+              </div>
+            </div>
+            <span className="text-xs text-gray-400">{formatDate(branch.createdAt)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function DetailField({ label, value }: { label: string; value: string }) {
   return (
@@ -1914,7 +1948,7 @@ function CatalogDetailContent({ type, item }: { type: 'product' | 'service'; ite
           <div className="grid grid-cols-4 gap-2">
             {p.images.sort((a, b) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0)).map((img, i) => (
               <div key={i} className={`relative rounded-lg overflow-hidden border ${img.isPrimary ? 'border-ruby-300 ring-2 ring-ruby-100' : 'border-gray-200'}`}>
-                <img src={normalizeMediaUrl(img.url)} alt={img.alt || p.name} className="w-full h-20 object-cover" />
+                <img src={img.url} alt={img.alt || p.name} className="w-full h-20 object-cover" />
                 {img.isPrimary && <span className="absolute top-1 left-1 text-[8px] bg-ruby-600 text-white px-1 py-0.5 rounded font-medium">PRIMARY</span>}
               </div>
             ))}
@@ -2017,10 +2051,10 @@ function CatalogDetailContent({ type, item }: { type: 'product' | 'service'; ite
       {/* Media */}
       {((s.media && s.media.length > 0) || s.coverImageUrl) && (
         <div className="grid grid-cols-4 gap-2">
-          {s.coverImageUrl && <img src={normalizeMediaUrl(s.coverImageUrl)} alt={s.name} className="w-full h-20 object-cover rounded-lg border border-gray-200" />}
+          {s.coverImageUrl && <img src={s.coverImageUrl} alt={s.name} className="w-full h-20 object-cover rounded-lg border border-gray-200" />}
           {s.media?.map((m, i) => (
             <div key={i} className="relative rounded-lg overflow-hidden border border-gray-200">
-              <img src={normalizeMediaUrl(m.url)} alt={m.caption || s.name} className="w-full h-20 object-cover" />
+              <img src={m.url} alt={m.caption || s.name} className="w-full h-20 object-cover" />
               {m.type === 'VIDEO' && <span className="absolute top-1 left-1 text-[8px] bg-black/60 text-white px-1 py-0.5 rounded">VIDEO</span>}
             </div>
           ))}
@@ -2622,367 +2656,6 @@ function CreateBusinessModal({
                   Create Business
                 </>
               )}
-            </button>
-          )}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-// ─── Fund Business Wallet Form ──────────────────────────────
-
-function FundBusinessWalletForm({
-  wallet, businessName, onClose, onSuccess,
-}: {
-  wallet: WalletType; businessName: string; onClose: () => void; onSuccess: () => void;
-}) {
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount < 100) {
-      toast.error('Minimum amount is NGN 100');
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await api.businesses.fundWallet(wallet._id, {
-        amount: numAmount,
-        currency: wallet.currency,
-        description: description || `Admin funding for ${businessName}`,
-      });
-      toast.success(`Successfully funded ${formatCurrency(numAmount, wallet.currency)}`);
-      onSuccess();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to fund wallet';
-      toast.error(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (NGN)</label>
-        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount (min 100)" min="100" step="1" required className="input-field" autoFocus />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (optional)</label>
-        <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder={`Admin funding for ${businessName}`} className="input-field" />
-      </div>
-      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-        <p className="text-xs text-amber-700 flex items-start gap-1.5">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          This action will immediately credit the wallet. This action is audited.
-        </p>
-      </div>
-      <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-        <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center gap-2">
-          {isSubmitting ? (
-            <><RefreshCw className="w-4 h-4 animate-spin" /> Funding...</>
-          ) : (
-            <><Plus className="w-4 h-4" /> Fund Wallet</>
-          )}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-// ─── Edit Business Modal ──────────────────────────────────────────
-function EditBusinessModal({
-  business,
-  onClose,
-  onSubmit,
-}: {
-  business: Business;
-  onClose: () => void;
-  onSubmit: (data: Partial<AdminCreateBusinessRequest>) => Promise<void>;
-}) {
-  const [submitting, setSubmitting] = useState(false);
-  const [step, setStep] = useState(0);
-  const [form, setForm] = useState({
-    name: business.name || '',
-    description: business.description || '',
-    tagline: business.tagline || '',
-    locationId: toLocationId(business.locationId as any) || '',
-    categoryId: typeof (business as any).categoryId === 'object' ? (business as any).categoryId?._id || '' : (business as any).categoryId || '',
-    subcategoryId: typeof (business as any).subcategoryId === 'object' ? (business as any).subcategoryId?._id || '' : (business as any).subcategoryId || '',
-    longitude: (business as any).longitude || 3.3792,
-    latitude: (business as any).latitude || 6.5244,
-    logoUrl: business.logoUrl || '',
-    coverImageUrl: business.coverImageUrl || '',
-    claimContactPhone: (business as any).claimContactPhone || '',
-    claimContactEmail: (business as any).claimContactEmail || '',
-    address: {
-      street: (business.address as any)?.street || '',
-      city: (business.address as any)?.city || '',
-      state: (business.address as any)?.state || '',
-    },
-    contact: {
-      phone: business.contact?.phone || '',
-      email: business.contact?.email || '',
-      whatsapp: business.contact?.whatsapp || '',
-    },
-  });
-
-  const { data: locations } = useApi<Location[]>(() => api.locations.list({ limit: 100 }), []);
-  const { data: categories } = useApi<Category[]>(() => api.categories.list(), []);
-  const { data: subcategories } = useApi<Subcategory[]>(
-    () => form.categoryId ? api.subcategories.list({ categoryId: form.categoryId }) : Promise.resolve({ success: true, data: [] }),
-    [form.categoryId]
-  );
-
-  const update = (key: string, value: unknown) => setForm(f => ({ ...f, [key]: value }));
-
-  const handleSave = async () => {
-    if (!form.name) { toast.error('Business name is required'); return; }
-    setSubmitting(true);
-    try {
-      const data: any = { ...form };
-      if (data.address && !data.address.street) delete data.address;
-      if (data.contact && !data.contact.phone && !data.contact.email) delete data.contact;
-      await onSubmit(data);
-    } catch {
-      toast.error('Failed to update business');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const steps = ['Basic Info', 'Location & Category', 'Contact & Claim'];
-
-  return (
-    <Modal isOpen onClose={onClose} title={`Edit: ${business.name}`} subtitle="Update business details" size="lg">
-      <div className="space-y-5">
-        {/* Step indicator */}
-        <div className="flex items-center gap-2">
-          {steps.map((s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <button
-                onClick={() => setStep(i)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  i === step ? 'bg-ruby-600 text-white' : 'bg-gray-100 text-gray-500 cursor-pointer hover:bg-gray-200'
-                }`}
-              >
-                {s}
-              </button>
-              {i < steps.length - 1 && <ChevronDown className="w-3 h-3 text-gray-300 -rotate-90" />}
-            </div>
-          ))}
-        </div>
-
-        {/* Step 0: Basic Info */}
-        {step === 0 && (
-          <div className="space-y-4">
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Name *</label>
-              <input
-                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                value={form.name}
-                onChange={(e) => update('name', e.target.value)}
-                placeholder="e.g. Mama's Kitchen"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Description</label>
-              <textarea
-                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 resize-none"
-                rows={3}
-                value={form.description}
-                onChange={(e) => update('description', e.target.value)}
-                placeholder="Brief description of the business"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tagline</label>
-              <input
-                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                value={form.tagline}
-                onChange={(e) => update('tagline', e.target.value)}
-                placeholder="Short tagline"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <ImageUpload
-                value={form.logoUrl}
-                onChange={(url) => update('logoUrl', url || '')}
-                folder="businesses/logos"
-                label="Logo"
-                helpText="Square image recommended"
-                maxSizeMB={2}
-              />
-              <ImageUpload
-                value={form.coverImageUrl}
-                onChange={(url) => update('coverImageUrl', url || '')}
-                folder="businesses/covers"
-                label="Cover Image"
-                helpText="Landscape image recommended"
-                maxSizeMB={5}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Step 1: Location & Category */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Location</label>
-              <select
-                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                value={form.locationId}
-                onChange={(e) => update('locationId', e.target.value)}
-              >
-                <option value="">Select location</option>
-                {(locations || []).map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Category</label>
-              <select
-                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                value={form.categoryId}
-                onChange={(e) => { update('categoryId', e.target.value); update('subcategoryId', ''); }}
-              >
-                <option value="">Select category</option>
-                {(categories || []).map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Subcategory</label>
-              <select
-                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                value={form.subcategoryId}
-                onChange={(e) => update('subcategoryId', e.target.value)}
-                disabled={!form.categoryId}
-              >
-                <option value="">Select subcategory</option>
-                {(subcategories || []).map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Pin Business Location</label>
-              <p className="text-xs text-gray-400 mt-0.5 mb-2">Search for an address or click on the map to set the exact location</p>
-              <MapLocationPicker
-                latitude={form.latitude}
-                longitude={form.longitude}
-                onLocationChange={(lat, lng) => {
-                  update('latitude', lat);
-                  update('longitude', lng);
-                }}
-                onAddressResolved={(addr) => {
-                  setForm(f => ({
-                    ...f,
-                    address: {
-                      ...f.address,
-                      street: addr.street || f.address.street,
-                      city: addr.city || f.address.city,
-                      state: addr.state || f.address.state,
-                    },
-                  }));
-                }}
-                height="280px"
-                countryCode="ng"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Street Address</label>
-              <input
-                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                value={form.address.street}
-                onChange={(e) => setForm(f => ({ ...f, address: { ...f.address, street: e.target.value } }))}
-                placeholder="123 Main Street"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Contact & Claim */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Merchant Phone</label>
-                <input
-                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                  value={form.claimContactPhone}
-                  onChange={(e) => update('claimContactPhone', e.target.value)}
-                  placeholder="+234..."
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Merchant Email</label>
-                <input
-                  type="email"
-                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                  value={form.claimContactEmail}
-                  onChange={(e) => update('claimContactEmail', e.target.value)}
-                  placeholder="merchant@email.com"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Phone</label>
-                <input
-                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                  value={form.contact.phone}
-                  onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, phone: e.target.value } }))}
-                  placeholder="+234..."
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Email</label>
-                <input
-                  type="email"
-                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                  value={form.contact.email}
-                  onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, email: e.target.value } }))}
-                  placeholder="business@email.com"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">WhatsApp</label>
-              <input
-                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
-                value={form.contact.whatsapp}
-                onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, whatsapp: e.target.value } }))}
-                placeholder="+234..."
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Navigation */}
-        <div className="flex justify-between pt-2 border-t border-gray-100">
-          <button
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-            onClick={step === 0 ? onClose : () => setStep(s => s - 1)}
-          >
-            {step === 0 ? 'Cancel' : '← Back'}
-          </button>
-          {step < steps.length - 1 ? (
-            <button
-              className="px-5 py-2 text-sm font-medium text-white bg-ruby-600 rounded-lg hover:bg-ruby-700 transition-colors"
-              onClick={() => setStep(s => s + 1)}
-            >
-              Next →
-            </button>
-          ) : (
-            <button
-              className="px-5 py-2 text-sm font-medium text-white bg-ruby-600 rounded-lg hover:bg-ruby-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-              onClick={handleSave}
-              disabled={submitting}
-            >
-              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
             </button>
           )}
         </div>

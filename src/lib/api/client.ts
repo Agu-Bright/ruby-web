@@ -358,6 +358,22 @@ export const api = {
       clearTokens();
       return Promise.resolve({ success: true, data: undefined as unknown as void });
     },
+    // Business owner registration (public — creates account, sends OTP)
+    registerBusiness: (data: { email: string; password: string; phone?: string }) =>
+      request<{ message?: string; email?: string }>(
+        "/auth/business/register",
+        { method: "POST", body: data, noAuth: true },
+      ),
+    verifyBusinessOtp: (data: { email: string; otp: string }) =>
+      request<{ message?: string; email?: string }>(
+        "/auth/business/verify-otp",
+        { method: "POST", body: data, noAuth: true },
+      ),
+    resendBusinessOtp: (data: { email: string }) =>
+      request<{ message?: string }>(
+        "/auth/business/resend-otp",
+        { method: "POST", body: data, noAuth: true },
+      ),
   },
 
   // Media
@@ -484,11 +500,11 @@ export const api = {
   },
 
   subcategories: {
-    list: (params?: { categoryId?: string; isActive?: boolean }) =>
+    list: (params?: { categoryId?: string; isActive?: boolean; limit?: number }) =>
       request<import("@/lib/types").Subcategory[]>(
         "/admin/taxonomy/subcategories",
         {
-          params: params as Record<
+          params: { limit: 500, ...params } as Record<
             string,
             string | number | boolean | undefined
           >,
@@ -1079,6 +1095,13 @@ export const api = {
       request<import("@/lib/types").EmergencyAlertStats>("/admin/emergency/alerts/stats", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
+  },
+
+  appVersions: {
+    list: () =>
+      request<any[]>("/admin/system/app-versions"),
+    upsert: (data: { app: string; platform: string; minVersion: string; latestVersion?: string; storeUrl?: string; forceUpdate?: boolean; updateMessage?: string }) =>
+      request<any>("/admin/system/app-version", { method: "PATCH", body: data }),
   },
 
   notifications: {

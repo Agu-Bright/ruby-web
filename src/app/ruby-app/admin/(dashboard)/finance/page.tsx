@@ -51,7 +51,7 @@ const getFeeTypeLabel = (type: string) => FEE_TYPES.find(f => f.value === type)?
 
 type Tab = 'payouts' | 'ledger' | 'wallets' | 'fees';
 
-const PAYOUT_STATUSES: PayoutStatus[] = ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED'];
+const PAYOUT_STATUSES: PayoutStatus[] = ['PROCESSING', 'COMPLETED', 'FAILED', 'REJECTED', 'CANCELLED'];
 
 export default function FinancePage() {
   const { admin, isSuperAdmin } = useAuth();
@@ -114,19 +114,14 @@ export default function FinancePage() {
   );
 
   const handlePayoutAction = async (payout: Payout, action: string) => {
-    const reason = action === 'DENY' ? prompt('Reason for denial:') : undefined;
-    if (action === 'DENY' && !reason) return;
     setActionLoading(true);
     try {
       switch (action) {
-        case 'APPROVE':
-          await api.payouts.approve(payout._id);
-          break;
-        case 'DENY':
-          await api.payouts.reject(payout._id, { reason: reason || undefined });
-          break;
         case 'RETRY':
           await api.payouts.process(payout._id);
+          break;
+        case 'COMPLETE':
+          await api.payouts.complete(payout._id);
           break;
       }
       toast.success(`Payout ${action.toLowerCase()}d successfully`);
@@ -180,16 +175,6 @@ export default function FinancePage() {
           <button onClick={(e) => { e.stopPropagation(); setSelectedPayout(p); setShowDetailModal(true); }} className="p-1.5 hover:bg-gray-100 rounded-md transition-colors" title="View details">
             <Eye size={14} className="text-gray-500" />
           </button>
-          {p.status === 'PENDING' && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); handlePayoutAction(p, 'APPROVE'); }} className="p-1.5 hover:bg-green-50 rounded-md transition-colors" title="Approve">
-                <CheckCircle2 size={14} className="text-green-600" />
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); handlePayoutAction(p, 'DENY'); }} className="p-1.5 hover:bg-red-50 rounded-md transition-colors" title="Deny">
-                <XCircle size={14} className="text-red-600" />
-              </button>
-            </>
-          )}
           {p.status === 'FAILED' && (
             <button onClick={(e) => { e.stopPropagation(); handlePayoutAction(p, 'RETRY'); }} className="p-1.5 hover:bg-blue-50 rounded-md transition-colors" title="Retry">
               <RefreshCw size={14} className="text-blue-600" />
@@ -337,7 +322,7 @@ export default function FinancePage() {
     { key: 'fees', label: 'Fee Configs', icon: DollarSign },
   ];
 
-  const pendingCount = payoutStats?.pendingCount ?? 0;
+  const processingCount = payoutStats?.pendingCount ?? 0;
   const completedCount = payoutStats?.completedCount ?? 0;
   const failedCount = payoutStats?.failedCount ?? 0;
   const totalRequested = payoutStats?.totalRequested ?? 0;
@@ -348,8 +333,8 @@ export default function FinancePage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Total Requested', count: totalRequested, sub: formatCurrency(payoutStats?.totalAmount ?? 0), color: 'yellow', Icon: Clock },
-          { label: 'Pending', count: pendingCount, sub: formatCurrency(payoutStats?.pendingAmount ?? 0), color: 'blue', Icon: RefreshCw },
+          { label: 'Total Withdrawals', count: totalRequested, sub: formatCurrency(payoutStats?.totalAmount ?? 0), color: 'yellow', Icon: Clock },
+          { label: 'Processing', count: processingCount, sub: formatCurrency(payoutStats?.pendingAmount ?? 0), color: 'blue', Icon: RefreshCw },
           { label: 'Completed', count: completedCount, sub: formatCurrency(payoutStats?.completedAmount ?? 0), color: 'green', Icon: CheckCircle2 },
           { label: 'Failed', count: failedCount, sub: undefined as string | undefined, color: 'red', Icon: AlertTriangle },
         ].map(({ label, count, sub, color, Icon }) => (
@@ -452,14 +437,6 @@ export default function FinancePage() {
               <div className="bg-red-50 rounded-lg p-4">
                 <p className="text-xs font-medium text-red-600 uppercase mb-1">Reason</p>
                 <p className="text-sm text-red-800">{selectedPayout.reason || selectedPayout.rejectionReason}</p>
-              </div>
-            )}
-            {selectedPayout.status === 'PENDING' && (
-              <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
-                <button onClick={() => handlePayoutAction(selectedPayout, 'APPROVE')} disabled={actionLoading}
-                  className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50">Approve Payout</button>
-                <button onClick={() => handlePayoutAction(selectedPayout, 'DENY')} disabled={actionLoading}
-                  className="flex-1 bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50">Deny Payout</button>
               </div>
             )}
             {selectedPayout.status === 'FAILED' && (

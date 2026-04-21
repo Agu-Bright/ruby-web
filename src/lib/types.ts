@@ -285,6 +285,31 @@ export interface CreateCategoryRequest {
   isService?: boolean;
 }
 
+export interface CustomFieldOption {
+  value: string;
+  label: string;
+  order?: number;
+}
+
+export interface CustomFieldValidation {
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
+}
+
+export interface CustomField {
+  key: string;
+  label: string;
+  type: 'TEXT' | 'TEXTAREA' | 'NUMBER' | 'BOOLEAN' | 'SELECT' | 'MULTISELECT';
+  required?: boolean;
+  placeholder?: string;
+  helpText?: string;
+  order?: number;
+  options?: CustomFieldOption[];
+  validation?: CustomFieldValidation;
+}
+
 export interface Subcategory {
   _id: string;
   categoryId: string | { _id: string; name: string; slug: string };
@@ -297,6 +322,8 @@ export interface Subcategory {
   synonyms: string[];
   riskTier?: 'LOW' | 'MEDIUM' | 'HIGH';
   businessModel?: BusinessModel;
+  productFields?: CustomField[];
+  serviceFields?: CustomField[];
   createdAt: string;
   updatedAt: string;
 }
@@ -312,6 +339,8 @@ export interface CreateSubcategoryRequest {
   synonyms?: string[];
   riskTier?: 'LOW' | 'MEDIUM' | 'HIGH';
   businessModel?: BusinessModel;
+  productFields?: CustomField[];
+  serviceFields?: CustomField[];
 }
 
 export interface LocationCategoryConfig {
@@ -965,6 +994,20 @@ export interface Payout {
   rejectionReason?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AppVersion {
+  _id: string;
+  app: 'BUSINESS' | 'CUSTOMER';
+  platform: 'IOS' | 'ANDROID';
+  minVersion: string;
+  latestVersion?: string;
+  storeUrl?: string;
+  forceUpdate: boolean;
+  updateMessage?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PayoutActionRequest {

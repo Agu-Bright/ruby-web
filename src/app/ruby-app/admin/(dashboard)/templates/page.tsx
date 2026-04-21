@@ -290,7 +290,13 @@ export default function TemplatesPage() {
     if (!selectedSubcategoryId) { toast.error('Please select a subcategory first'); return; }
     setIsSubmitting(true);
     try {
-      const validFields = (form.fields || []).filter(f => f.key && f.label).map((f, i) => ({ ...f, order: i }));
+      const validFields = (form.fields || [])
+        .filter(f => f.key && f.label)
+        .map((f, i) => {
+          // Strip Mongo-internal fields — backend DTO uses whitelist + forbidNonWhitelisted
+          const { _id, __v, createdAt, updatedAt, ...clean } = f as any;
+          return { ...clean, order: i };
+        });
       const created = await api.templates.create({ ...form, fields: validFields });
       // Link the template to the selected subcategory
       const templateId = (created as any)?._id || (created as any)?.data?._id;
@@ -317,7 +323,12 @@ export default function TemplatesPage() {
     if (!editTemplate) return;
     setIsSubmitting(true);
     try {
-      const validFields = (form.fields || []).filter(f => f.key && f.label).map((f, i) => ({ ...f, order: i }));
+      const validFields = (form.fields || [])
+        .filter(f => f.key && f.label)
+        .map((f, i) => {
+          const { _id, __v, createdAt, updatedAt, ...clean } = f as any;
+          return { ...clean, order: i };
+        });
       await api.templates.update(editTemplate._id, { ...form, fields: validFields });
       toast.success('Template updated');
       setEditTemplate(null);

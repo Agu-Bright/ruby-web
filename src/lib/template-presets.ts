@@ -1,6 +1,7 @@
 import {
   Utensils, Hotel, Scissors, Dumbbell, ShoppingBag, Wrench,
   Briefcase, Music, Car, Sparkles, Crown, Palette,
+  Shirt, Droplets, SprayCan, Plug, Zap, Hammer,
 } from 'lucide-react';
 import type { TemplateField } from '@/lib/types';
 
@@ -309,6 +310,156 @@ export const TEMPLATE_PRESETS: TemplatePreset[] = [
         { value: 'braille', label: 'Braille Signage' },
       ] },
       { key: 'photography_allowed', label: 'Photography Allowed', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 5, options: [] },
+    ],
+  },
+  // ─── Tailoring (dedicated — replaces wrong "salon" assignment) ───
+  {
+    id: 'tailoring',
+    name: 'Tailor & Fashion Designer',
+    description: 'Custom outfits, alterations, and fashion design',
+    icon: Shirt,
+    color: 'from-amber-400 to-yellow-600',
+    fields: [
+      { key: 'service_types', label: 'Service Types', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 0, options: [
+        { value: 'custom_outfit', label: 'Custom Outfit' }, { value: 'alterations', label: 'Alterations' },
+        { value: 'bridal', label: 'Bridal/Wedding' }, { value: 'uniforms', label: 'Uniforms' },
+        { value: 'embroidery', label: 'Embroidery' }, { value: 'repairs', label: 'Repairs' },
+      ] },
+      { key: 'gender_focus', label: 'Serves', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 1, options: [
+        { value: 'men', label: 'Men' }, { value: 'women', label: 'Women' }, { value: 'unisex', label: 'Unisex' },
+      ] },
+      { key: 'garment_specialties', label: 'Garment Specialties', type: 'MULTISELECT', required: false, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 2, options: [
+        { value: 'agbada', label: 'Agbada' }, { value: 'kaftan', label: 'Kaftan' }, { value: 'suits', label: 'Suits' },
+        { value: 'dresses', label: 'Dresses' }, { value: 'traditional', label: 'Traditional Wear' }, { value: 'western', label: 'Western Wear' },
+      ] },
+      { key: 'starting_price', label: 'Starting Price (₦)', type: 'PRICE', required: true, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 3, placeholder: 'e.g. 15000', options: [] },
+      { key: 'turnaround_time', label: 'Typical Turnaround', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 4, options: [
+        { value: 'same_day', label: 'Same Day' }, { value: '2_3_days', label: '2-3 Days' },
+        { value: '1_week', label: '1 Week' }, { value: '2_plus_weeks', label: '2+ Weeks' },
+      ] },
+      { key: 'pickup_delivery', label: 'Pickup & Delivery Available', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 5, options: [] },
+      { key: 'rush_orders', label: 'Rush Orders Accepted', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 6, options: [] },
+      { key: 'accepts_appointments', label: 'Accepts Appointments', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 7, options: [] },
+    ],
+  },
+  // ─── Laundry & Dry Cleaning (dedicated) ───
+  {
+    id: 'laundry',
+    name: 'Laundry & Dry Cleaning',
+    description: 'Washing, dry cleaning, ironing, and garment care',
+    icon: Droplets,
+    color: 'from-sky-400 to-cyan-500',
+    fields: [
+      { key: 'service_types', label: 'Service Types', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 0, options: [
+        { value: 'wash_fold', label: 'Wash & Fold' }, { value: 'dry_cleaning', label: 'Dry Cleaning' },
+        { value: 'iron_only', label: 'Ironing Only' }, { value: 'shoe_cleaning', label: 'Shoe Cleaning' },
+        { value: 'stain_removal', label: 'Stain Removal' }, { value: 'special_care', label: 'Special Care' },
+      ] },
+      { key: 'turnaround', label: 'Turnaround Time', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 1, options: [
+        { value: 'same_day', label: 'Same Day' }, { value: 'next_day', label: 'Next Day' },
+        { value: '2_3_days', label: '2-3 Days' }, { value: '1_week', label: '1 Week' },
+      ] },
+      { key: 'pickup_delivery', label: 'Free Pickup & Delivery', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 2, options: [] },
+      { key: 'starting_price', label: 'Starting Price (₦)', type: 'PRICE', required: true, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 3, placeholder: 'e.g. 500 per kg or per item', options: [] },
+      { key: 'service_area', label: 'Service Area', type: 'TEXT', required: true, isPublic: true, isFilter: false, order: 4, placeholder: 'e.g. Lekki, Victoria Island, Ikeja', options: [] },
+      { key: 'special_care_items', label: 'Special Care Available', type: 'MULTISELECT', required: false, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 5, options: [
+        { value: 'suits', label: 'Suits/Formal Wear' }, { value: 'traditional', label: 'Traditional/Agbada' },
+        { value: 'leather', label: 'Leather' }, { value: 'silk', label: 'Silk/Delicate Fabrics' },
+        { value: 'bridal', label: 'Bridal Wear' }, { value: 'curtains', label: 'Curtains/Bedding' },
+      ] },
+      { key: 'minimum_order', label: 'Minimum Order (₦)', type: 'PRICE', required: false, isPublic: true, isFilter: false, order: 6, placeholder: 'e.g. 2000', options: [] },
+    ],
+  },
+  // ─── Cleaning (dedicated, replaces generic home_services) ───
+  {
+    id: 'cleaning',
+    name: 'Cleaning Services',
+    description: 'Residential, office, and deep cleaning',
+    icon: SprayCan,
+    color: 'from-teal-400 to-cyan-600',
+    fields: [
+      { key: 'cleaning_types', label: 'Cleaning Types', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 0, options: [
+        { value: 'regular', label: 'Regular Cleaning' }, { value: 'deep', label: 'Deep Cleaning' },
+        { value: 'post_construction', label: 'Post-Construction' }, { value: 'move_in_out', label: 'Move In/Out' },
+        { value: 'commercial', label: 'Office/Commercial' }, { value: 'fumigation', label: 'Fumigation' },
+      ] },
+      { key: 'property_sizes', label: 'Property Sizes Served', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 1, options: [
+        { value: 'studio', label: 'Studio' }, { value: '1_3_bedroom', label: '1-3 Bedroom' },
+        { value: '4_plus_bedroom', label: '4+ Bedroom' }, { value: 'office', label: 'Office' }, { value: 'shop', label: 'Shop/Store' },
+      ] },
+      { key: 'starting_price', label: 'Starting Price (₦)', type: 'PRICE', required: true, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 2, placeholder: 'e.g. 10000', options: [] },
+      { key: 'supplies_included', label: 'Cleaning Supplies Included', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 3, options: [] },
+      { key: 'recurring_plans', label: 'Recurring Plans Available', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 4, options: [] },
+      { key: 'emergency_service', label: 'Emergency/Same-Day', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 5, options: [] },
+      { key: 'service_area', label: 'Service Area', type: 'TEXT', required: true, isPublic: true, isFilter: false, order: 6, placeholder: 'e.g. Lagos Island, Lekki, Ikeja', options: [] },
+      { key: 'team_size', label: 'Typical Team Size', type: 'NUMBER', required: false, isPublic: true, isFilter: false, order: 7, placeholder: 'e.g. 3', options: [] },
+    ],
+  },
+  // ─── Plumbing (dedicated, replaces generic home_services) ───
+  {
+    id: 'plumbing',
+    name: 'Plumbing Services',
+    description: 'Pipe repair, installation, and water systems',
+    icon: Plug,
+    color: 'from-blue-500 to-indigo-600',
+    fields: [
+      { key: 'specializations', label: 'Specializations', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 0, options: [
+        { value: 'pipe_repair', label: 'Pipe Repair' }, { value: 'drainage', label: 'Drainage' },
+        { value: 'toilet_bathroom', label: 'Toilet/Bathroom' }, { value: 'water_heater', label: 'Water Heater' },
+        { value: 'sink_tap', label: 'Sink/Tap' }, { value: 'sewer', label: 'Sewer' },
+        { value: 'water_tank', label: 'Water Tank' }, { value: 'inspection', label: 'Inspection' },
+      ] },
+      { key: 'emergency_24_7', label: 'Emergency 24/7 Service', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 1, options: [] },
+      { key: 'call_out_fee', label: 'Call-Out Fee (₦)', type: 'PRICE', required: true, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 2, placeholder: 'e.g. 5000', options: [] },
+      { key: 'service_area', label: 'Service Area', type: 'TEXT', required: true, isPublic: true, isFilter: false, order: 3, placeholder: 'e.g. Lagos Mainland & Island', options: [] },
+      { key: 'parts_included', label: 'Parts/Materials Included', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 4, options: [] },
+      { key: 'guarantee_months', label: 'Work Guarantee (months)', type: 'NUMBER', required: false, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 5, placeholder: 'e.g. 6', options: [] },
+      { key: 'licensed', label: 'Licensed / Certified Plumber', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 6, options: [] },
+    ],
+  },
+  // ─── Electrical (dedicated, replaces generic home_services) ───
+  {
+    id: 'electrical',
+    name: 'Electrical Services',
+    description: 'Wiring, lighting, generators, and inverters',
+    icon: Zap,
+    color: 'from-yellow-400 to-amber-600',
+    fields: [
+      { key: 'specializations', label: 'Specializations', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 0, options: [
+        { value: 'wiring', label: 'Wiring/Rewiring' }, { value: 'lighting', label: 'Lighting' },
+        { value: 'generator', label: 'Generator' }, { value: 'inverter_solar', label: 'Inverter/Solar' },
+        { value: 'cctv_security', label: 'CCTV/Security' }, { value: 'appliance_install', label: 'Appliance Installation' },
+        { value: 'panel_breaker', label: 'Panel/Breaker' },
+      ] },
+      { key: 'emergency_24_7', label: 'Emergency 24/7 Service', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 1, options: [] },
+      { key: 'call_out_fee', label: 'Call-Out Fee (₦)', type: 'PRICE', required: true, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 2, placeholder: 'e.g. 5000', options: [] },
+      { key: 'sector_served', label: 'Sector Served', type: 'SELECT', required: true, isPublic: true, isFilter: true, filterType: 'CHECKBOX', order: 3, options: [
+        { value: 'residential', label: 'Residential' }, { value: 'commercial', label: 'Commercial' }, { value: 'both', label: 'Both' },
+      ] },
+      { key: 'licensed', label: 'Licensed Electrician', type: 'BOOLEAN', required: true, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 4, options: [] },
+      { key: 'service_area', label: 'Service Area', type: 'TEXT', required: true, isPublic: true, isFilter: false, order: 5, placeholder: 'e.g. Lagos, Abuja', options: [] },
+      { key: 'guarantee_months', label: 'Work Guarantee (months)', type: 'NUMBER', required: false, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 6, placeholder: 'e.g. 6', options: [] },
+    ],
+  },
+  // ─── Repairs (dedicated, replaces generic home_services for appliance/electronics repair) ───
+  {
+    id: 'repairs',
+    name: 'Repairs & Maintenance',
+    description: 'Appliance, electronics, and general repairs',
+    icon: Hammer,
+    color: 'from-stone-400 to-stone-600',
+    fields: [
+      { key: 'repair_categories', label: 'Repair Categories', type: 'MULTISELECT', required: true, isPublic: true, isFilter: true, filterType: 'MULTI_CHECKBOX', order: 0, options: [
+        { value: 'appliances', label: 'Appliances (Fridge, Washer, etc.)' }, { value: 'electronics', label: 'Electronics (TV, Audio)' },
+        { value: 'phone_laptop', label: 'Phone/Laptop' }, { value: 'ac_hvac', label: 'AC/HVAC' },
+        { value: 'generator', label: 'Generator' }, { value: 'furniture', label: 'Furniture' }, { value: 'automobile', label: 'Automobile' },
+      ] },
+      { key: 'brand_expertise', label: 'Brand Expertise', type: 'TEXT', required: false, isPublic: true, isFilter: false, order: 1, placeholder: 'e.g. Samsung, LG, Apple, HP', options: [] },
+      { key: 'diagnostic_fee', label: 'Diagnostic Fee (₦)', type: 'PRICE', required: false, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 2, placeholder: 'e.g. 3000', options: [] },
+      { key: 'parts_included', label: 'Replacement Parts Included', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 3, options: [] },
+      { key: 'emergency_service', label: 'Emergency/Same-Day Service', type: 'BOOLEAN', required: false, isPublic: true, isFilter: true, filterType: 'TOGGLE', order: 4, options: [] },
+      { key: 'service_area', label: 'Service Area', type: 'TEXT', required: true, isPublic: true, isFilter: false, order: 5, placeholder: 'e.g. Lagos, Abuja', options: [] },
+      { key: 'guarantee_months', label: 'Work Guarantee (months)', type: 'NUMBER', required: false, isPublic: true, isFilter: true, filterType: 'RANGE_SLIDER', order: 6, placeholder: 'e.g. 3', options: [] },
     ],
   },
 ];

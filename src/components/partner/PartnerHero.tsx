@@ -1,4 +1,6 @@
 import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 export default function PartnerHero() {
   return (
@@ -27,10 +29,24 @@ export default function PartnerHero() {
             <span className="text-white">Reach More Customers.</span>
           </h1>
 
-          <p className="font-medium text-base sm:text-lg text-white/80 max-w-2xl mb-10 leading-relaxed">
+          <p className="font-medium text-base sm:text-lg text-white/80 max-w-2xl mb-8 leading-relaxed">
             Ruby+ helps you manage your online presence, track performance, and
             reach more customers—both nearby and beyond.
           </p>
+
+          {/* Primary CTA */}
+          <div className="mb-8">
+            <Link
+              href="/business/register"
+              className="inline-flex items-center gap-2 bg-ruby-red text-white px-8 py-4 rounded-lg font-semibold text-base hover:bg-ruby-red/90 transition-colors shadow-lg shadow-ruby-red/30"
+            >
+              Register Your Business
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <p className="text-white/70 text-sm mt-3">
+              Free to register. Get set up in minutes.
+            </p>
+          </div>
 
           {/* App Store Badges */}
           <div className="flex flex-wrap gap-3">

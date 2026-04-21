@@ -170,7 +170,7 @@ export default function ReviewsPage() {
         <div className="flex items-center gap-1.5">
           {r.isVerified && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-              <ShieldCheck className="w-3 h-3" /> Verified
+              <ShieldCheck className="w-3 h-3" /> Featured
             </span>
           )}
           {r.isFlagged && (
@@ -207,7 +207,7 @@ export default function ReviewsPage() {
             className={`p-1.5 rounded-md hover:bg-gray-100 ${
               r.isVerified ? 'text-green-600' : 'text-gray-400'
             }`}
-            title={r.isVerified ? 'Unverify' : 'Verify (show on home screen)'}
+            title={r.isVerified ? 'Remove from Home Screen' : 'Feature on Home Screen'}
           >
             <ShieldCheck className="w-4 h-4" />
           </button>
@@ -237,19 +237,22 @@ export default function ReviewsPage() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Status filter tabs */}
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-            {(['all', 'verified', 'flagged'] as FilterStatus[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => handleStatusFilter(s)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md capitalize transition-colors ${
-                  statusFilter === s
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+            {(['all', 'verified', 'flagged'] as FilterStatus[]).map((s) => {
+              const labels: Record<string, string> = { all: 'All', verified: 'Featured', flagged: 'Flagged' };
+              return (
+                <button
+                  key={s}
+                  onClick={() => handleStatusFilter(s)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    statusFilter === s
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {labels[s]}
+                </button>
+              );
+            })}
           </div>
 
           {/* Rating filter */}
@@ -357,7 +360,7 @@ export default function ReviewsPage() {
             <div className="flex items-center gap-2 pt-2 border-t">
               {selectedReview.isVerified && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Verified — showing on home screen
+                  <ShieldCheck className="w-3.5 h-3.5" /> Featured — showing on home screen
                 </span>
               )}
               {selectedReview.isFlagged && (

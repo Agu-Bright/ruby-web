@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { Modal, StatCard, StatusBadge, ImageUpload } from '@/components/ui';
+import { FieldBuilder } from '@/components/ui/field-builder';
 import type {
   CategoryGroup, CategoryGroupType, Category, Subcategory, Template,
   CreateCategoryRequest, CreateSubcategoryRequest, CreateCategoryGroupRequest,
@@ -1171,6 +1172,7 @@ function SubcategoriesTab() {
 
   const defaultForm = useCallback((): CreateSubcategoryRequest => ({
     categoryId: '', name: '', slug: '', displayOrder: 0, isActive: true, synonyms: [],
+    productFields: [], serviceFields: [],
   }), []);
 
   const [form, setForm] = useState<CreateSubcategoryRequest>(defaultForm());
@@ -1324,6 +1326,8 @@ function SubcategoriesTab() {
       displayOrder: sub.displayOrder, isActive: sub.isActive,
       synonyms: sub.synonyms || [], businessModel: sub.businessModel,
       riskTier: sub.riskTier, templateId: tmplId,
+      productFields: sub.productFields || [],
+      serviceFields: sub.serviceFields || [],
     });
     setSynonymInput('');
     setEditSubcategory(sub);
@@ -1588,6 +1592,26 @@ function SubcategoriesTab() {
             </div>
           </div>
 
+          {/* Custom Product Fields */}
+          <div className="space-y-4">
+            <FieldBuilder
+              label="Product Creation Fields"
+              description="Custom fields business owners fill when creating a product in this subcategory"
+              fields={form.productFields || []}
+              onChange={(f) => setForm({ ...form, productFields: f })}
+            />
+          </div>
+
+          {/* Custom Service Fields */}
+          <div className="space-y-4">
+            <FieldBuilder
+              label="Service Creation Fields"
+              description="Custom fields business owners fill when creating a service in this subcategory"
+              fields={form.serviceFields || []}
+              onChange={(f) => setForm({ ...form, serviceFields: f })}
+            />
+          </div>
+
           {/* Additional */}
           <div className="space-y-4">
             <SectionHeader icon={List} title="Additional" description="Synonyms and display order" />
@@ -1763,6 +1787,26 @@ function SubcategoriesTab() {
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">Businesses in this subcategory will fill out this template during onboarding</p>
               </div>
+            </div>
+
+            {/* Custom Product Fields */}
+            <div className="space-y-4">
+              <FieldBuilder
+                label="Product Creation Fields"
+                description="Custom fields business owners fill when creating a product"
+                fields={form.productFields || []}
+                onChange={(f) => setForm({ ...form, productFields: f })}
+              />
+            </div>
+
+            {/* Custom Service Fields */}
+            <div className="space-y-4">
+              <FieldBuilder
+                label="Service Creation Fields"
+                description="Custom fields business owners fill when creating a service"
+                fields={form.serviceFields || []}
+                onChange={(f) => setForm({ ...form, serviceFields: f })}
+              />
             </div>
 
             <div className="space-y-4">

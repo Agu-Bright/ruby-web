@@ -186,7 +186,14 @@ export default function LocationsPage() {
 
   const { mutate: activateLocation } = useMutation((id: string) => api.locations.activate(id));
   const { mutate: deactivateLocation } = useMutation((id: string) => api.locations.deactivate(id));
-  const { mutate: deleteLocation } = useMutation((id: string) => api.locations.delete(id));
+  // useMutation catches errors internally and returns null from mutate(); we use
+  // onError to surface the real backend message (e.g. "Cannot delete location
+  // with child locations. Delete children first.") instead of a fake success toast.
+  const deleteErrorRef = useRef<string | null>(null);
+  const { mutate: deleteLocation } = useMutation(
+    (id: string) => api.locations.delete(id),
+    { onError: (msg) => { deleteErrorRef.current = msg; } },
+  );
 
   // Stats
   const stats = useMemo(() => {
@@ -249,14 +256,15 @@ export default function LocationsPage() {
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
-    try {
-      await deleteLocation(deleteTarget._id);
-      toast.success('Location deleted');
-      setDeleteTarget(null);
-      refetch();
-    } catch {
-      toast.error('Failed to delete location. It may have child locations.');
+    deleteErrorRef.current = null;
+    await deleteLocation(deleteTarget._id);
+    if (deleteErrorRef.current) {
+      toast.error(deleteErrorRef.current);
+      return;
     }
+    toast.success('Location deleted');
+    setDeleteTarget(null);
+    refetch();
   }, [deleteTarget, deleteLocation, refetch]);
 
   const handleCreated = useCallback((res: CreateLocationResponse) => {

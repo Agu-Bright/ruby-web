@@ -29,6 +29,7 @@ import {
   Radio,
   Scale,
   Star,
+  Smartphone,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -82,9 +83,10 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: "Finance & Logs",
+    title: "Finance & System",
     items: [
       { label: "Finance", href: "/ruby-app/admin/finance", icon: Wallet },
+      { label: "App Versions", href: "/ruby-app/admin/app-versions", icon: Smartphone },
       { label: "Audit Logs", href: "/ruby-app/admin/audit-logs", icon: ScrollText },
     ],
   },

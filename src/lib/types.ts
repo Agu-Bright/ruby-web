@@ -1039,6 +1039,10 @@ export interface FeeConfig {
   };
   servicePlatformFeePercent?: number;
   currency?: string;
+  // Flat/simple fee shape used by the admin Finance page (per-feeType rows)
+  feeType?: FeeType;
+  flatFee?: number;
+  percentage?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -1289,9 +1293,10 @@ export interface Promo {
   title: string;
   description?: string;
   imageUrl: string;
-  linkType: 'BUSINESS' | 'EXTERNAL';
+  linkType: 'BUSINESS' | 'EXTERNAL' | 'IN_APP';
   businessId?: string | { _id: string; name: string; slug: string; logoUrl?: string };
   externalUrl?: string;
+  screenRoute?: string;
   locationId?: string | { _id: string; name: string };
   isActive: boolean;
   displayOrder: number;

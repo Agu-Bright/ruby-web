@@ -286,14 +286,14 @@ export default function FinancePage() {
       key: 'feeType',
       header: 'Fee Type',
       render: (f) => (
-        <p className="text-sm font-medium text-gray-900">{getFeeTypeLabel(f.feeType)}</p>
+        <p className="text-sm font-medium text-gray-900">{getFeeTypeLabel(f.feeType ?? '')}</p>
       ),
     },
     {
       key: 'flatFee',
       header: 'Flat Fee (NGN)',
       render: (f) => (
-        <span className="text-sm font-semibold text-gray-900">{formatCurrency(f.flatFee)}</span>
+        <span className="text-sm font-semibold text-gray-900">{formatCurrency(f.flatFee ?? 0)}</span>
       ),
     },
     { key: 'isActive', header: 'Status', render: (f) => <StatusBadge status={f.isActive ? 'ACTIVE' : 'INACTIVE'} /> },
@@ -477,8 +477,8 @@ export default function FinancePage() {
           </div>
           {selectedFee && (
             <div className="bg-gray-50 rounded-lg p-3 text-sm">
-              <p className="font-medium text-gray-900">{getFeeTypeLabel(selectedFee.feeType)}</p>
-              <p className="text-gray-500">Flat fee: {formatCurrency(selectedFee.flatFee)}</p>
+              <p className="font-medium text-gray-900">{getFeeTypeLabel(selectedFee.feeType ?? '')}</p>
+              <p className="text-gray-500">Flat fee: {formatCurrency(selectedFee.flatFee ?? 0)}</p>
             </div>
           )}
           <div className="flex items-center gap-3 pt-2">

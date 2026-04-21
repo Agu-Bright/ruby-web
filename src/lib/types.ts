@@ -1251,6 +1251,7 @@ export interface AdCampaign {
   rejectionReason?: string;
   locationId?: string | { _id: string; name: string; slug: string };
   reviewIds?: string[];
+  isOrganic?: boolean;
   createdAt: string;
   updatedAt: string;
 }

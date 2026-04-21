@@ -662,6 +662,9 @@ export const api = {
       request<{ claimCode: string }>(`/admin/businesses/${id}/regenerate-claim-code`, {
         method: "POST",
       }),
+    // Multi-branch: list child branches of a parent business
+    getBranches: (parentId: string) =>
+      request<import("@/lib/types").Business[]>(`/admin/businesses/${parentId}/branches`),
     // Keep backward-compat alias
     updateStatus: (
       id: string,

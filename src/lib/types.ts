@@ -1018,6 +1018,12 @@ export interface PayoutActionRequest {
 // ============================================================
 // Fee Configuration
 // ============================================================
+export type FeeType =
+  | 'ORDER_PLATFORM_FEE'
+  | 'BOOKING_PLATFORM_FEE'
+  | 'PAYMENT_PROCESSING_FEE'
+  | 'DELIVERY_PLATFORM_FEE';
+
 export interface FeeConfig {
   _id: string;
   name: string;

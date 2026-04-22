@@ -6,7 +6,7 @@ import {
   FolderTree, Tag, Layers, Eye, Pencil, Power, PowerOff, Plus, Search,
   RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Activity, Check, Briefcase, Settings, List,
   Package, MapPin, ShoppingBag, Calendar, X, AlertCircle, Hash, FileText,
-  Rocket,
+  Rocket, Image as ImageIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApi } from '@/lib/hooks';
@@ -1171,7 +1171,7 @@ function SubcategoriesTab() {
   const autoFilled = useRef<Set<string>>(new Set());
 
   const defaultForm = useCallback((): CreateSubcategoryRequest => ({
-    categoryId: '', name: '', slug: '', displayOrder: 0, isActive: true, synonyms: [],
+    categoryId: '', name: '', slug: '', displayOrder: 0, isActive: true, featureOnHome: false, synonyms: [],
     productFields: [], serviceFields: [],
   }), []);
 
@@ -1323,7 +1323,9 @@ function SubcategoriesTab() {
     const tmplId = typeof sub.templateId === 'object' ? sub.templateId._id : sub.templateId;
     setForm({
       categoryId: catId, name: sub.name, slug: sub.slug,
+      iconKey: sub.iconKey, iconUrl: sub.iconUrl,
       displayOrder: sub.displayOrder, isActive: sub.isActive,
+      featureOnHome: sub.featureOnHome ?? false,
       synonyms: sub.synonyms || [], businessModel: sub.businessModel,
       riskTier: sub.riskTier, templateId: tmplId,
       productFields: sub.productFields || [],
@@ -1531,6 +1533,20 @@ function SubcategoriesTab() {
             </div>
           </div>
 
+          {/* Icon */}
+          <div className="space-y-4">
+            <SectionHeader icon={ImageIcon} title="Icon" description="Optional icon shown on the customer app" />
+            <div>
+              <label className="label-text">Icon Key</label>
+              <input value={form.iconKey || ''} onChange={(e) => setForm({ ...form, iconKey: e.target.value })} className="input-field" placeholder="e.g. utensils, scissors, wrench" />
+            </div>
+            <ImageUpload
+              label="Icon Image"
+              value={form.iconUrl}
+              onChange={(url) => setForm({ ...form, iconUrl: url })}
+            />
+          </div>
+
           {/* Business Classification */}
           <div className="space-y-4">
             <SectionHeader icon={Briefcase} title="Business Classification" description="Business model, risk tier, and template" />
@@ -1646,6 +1662,18 @@ function SubcategoriesTab() {
               <label className="label-text">Display Order <AutoFillHint visible={(form.displayOrder || 0) > 0 && autoFilled.current.has('displayOrder')} /></label>
               <input type="number" value={form.displayOrder ?? 0} onChange={(e) => { autoFilled.current.delete('displayOrder'); setForm({ ...form, displayOrder: parseInt(e.target.value) || 0 }); }} className="input-field" />
             </div>
+            <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <input
+                type="checkbox"
+                checked={form.featureOnHome ?? false}
+                onChange={(e) => setForm({ ...form, featureOnHome: e.target.checked })}
+                className="w-4 h-4 mt-0.5 rounded border-gray-300 text-ruby-600 focus:ring-ruby-500"
+              />
+              <div>
+                <div className="text-sm font-medium text-gray-900">Feature on home screen</div>
+                <div className="text-xs text-gray-500 mt-0.5">Show this subcategory as a top tile on the customer app&apos;s home screen, alongside top-level categories. Tapping it takes the user straight to the filtered business list.</div>
+              </div>
+            </label>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-5 border-t border-gray-200">
@@ -1740,6 +1768,20 @@ function SubcategoriesTab() {
                   <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                 </div>
               </div>
+            </div>
+
+            {/* Icon */}
+            <div className="space-y-4">
+              <SectionHeader icon={ImageIcon} title="Icon" description="Optional icon shown on the customer app" />
+              <div>
+                <label className="label-text">Icon Key</label>
+                <input value={form.iconKey || ''} onChange={(e) => setForm({ ...form, iconKey: e.target.value })} className="input-field" placeholder="e.g. utensils, scissors, wrench" />
+              </div>
+              <ImageUpload
+                label="Icon Image"
+                value={form.iconUrl}
+                onChange={(url) => setForm({ ...form, iconUrl: url })}
+              />
             </div>
 
             <div className="space-y-4">
@@ -1842,6 +1884,18 @@ function SubcategoriesTab() {
                 <label className="label-text">Display Order</label>
                 <input type="number" value={form.displayOrder ?? 0} onChange={(e) => setForm({ ...form, displayOrder: parseInt(e.target.value) || 0 })} className="input-field" />
               </div>
+              <label className="flex items-start gap-3 cursor-pointer p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <input
+                  type="checkbox"
+                  checked={form.featureOnHome ?? false}
+                  onChange={(e) => setForm({ ...form, featureOnHome: e.target.checked })}
+                  className="w-4 h-4 mt-0.5 rounded border-gray-300 text-ruby-600 focus:ring-ruby-500"
+                />
+                <div>
+                  <div className="text-sm font-medium text-gray-900">Feature on home screen</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Show this subcategory as a top tile on the customer app&apos;s home screen, alongside top-level categories. Tapping it takes the user straight to the filtered business list.</div>
+                </div>
+              </label>
             </div>
 
             <div className="flex justify-end gap-3 pt-5 border-t border-gray-200">

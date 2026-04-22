@@ -40,7 +40,7 @@ print('\n--- PHASE 1: ADMIN SETUP ---\n')
 
 # 1.1 Admin login
 r = requests.post(f'{BASE}/auth/admin/login', json={
-    'email': 'admin@rubyplus.com',
+    'email': 'admin@rubyplus.net',
     'password': 'Admin123!@#'
 })
 admin_data = r.json()

@@ -364,6 +364,23 @@ export const api = {
         "/auth/business/register",
         { method: "POST", body: data, noAuth: true },
       ),
+    // Business owner sign-in with Apple (public — creates account or logs in existing user)
+    loginBusinessWithApple: (data: {
+      identityToken: string;
+      firstName?: string;
+      lastName?: string;
+    }) =>
+      request<{
+        accessToken?: string;
+        refreshToken?: string;
+        tokens?: { accessToken: string; refreshToken: string };
+        user?: { id: string; email: string; firstName?: string; lastName?: string };
+        hasBusinesses?: boolean;
+        business?: { id: string; name: string };
+      }>(
+        "/auth/business/apple",
+        { method: "POST", body: data, noAuth: true },
+      ),
     verifyBusinessOtp: (data: { email: string; otp: string }) =>
       request<{ message?: string; email?: string }>(
         "/auth/business/verify-otp",
@@ -851,6 +868,35 @@ export const api = {
       }),
     get: (id: string) =>
       request<import("@/lib/types").Dispute>(`/admin/disputes/${id}`),
+    /** Admin sends a reply (or internal note) to a dispute thread. */
+    addMessage: (
+      id: string,
+      data: import("@/lib/types").AddDisputeMessageRequest,
+    ) =>
+      request<import("@/lib/types").Dispute>(`/admin/disputes/${id}/messages`, {
+        method: "POST",
+        body: data,
+      }),
+    updateStatus: (id: string, data: { status: string; note?: string }) =>
+      request<import("@/lib/types").Dispute>(`/admin/disputes/${id}/status`, {
+        method: "PUT",
+        body: data,
+      }),
+    assign: (id: string, data: { adminId: string; note?: string }) =>
+      request<import("@/lib/types").Dispute>(`/admin/disputes/${id}/assign`, {
+        method: "POST",
+        body: data,
+      }),
+    close: (id: string, data: { note: string }) =>
+      request<import("@/lib/types").Dispute>(`/admin/disputes/${id}/close`, {
+        method: "POST",
+        body: data,
+      }),
+    escalate: (id: string, data: { reason: string }) =>
+      request<import("@/lib/types").Dispute>(`/admin/disputes/${id}/escalate`, {
+        method: "POST",
+        body: data,
+      }),
     resolve: (
       id: string,
       data: import("@/lib/types").DisputeResolutionRequest,

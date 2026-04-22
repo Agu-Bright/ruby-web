@@ -75,7 +75,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder="admin@rubyplus.com"
+              placeholder="admin@rubyplus.net"
               required
               autoComplete="email"
               autoFocus

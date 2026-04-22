@@ -604,7 +604,7 @@ function CreateAdminModal({
       setForm(prev => ({
         ...prev,
         locationIds: newLocationIds,
-        email: `${citySlug}.admin@rubyplus.com`,
+        email: `${citySlug}.admin@rubyplus.net`,
         firstName: location.name,
         lastName: 'Admin',
         password,
@@ -802,7 +802,7 @@ function CreateAdminModal({
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="input-field"
-              placeholder="admin@rubyplus.com"
+              placeholder="admin@rubyplus.net"
               required
             />
           </div>

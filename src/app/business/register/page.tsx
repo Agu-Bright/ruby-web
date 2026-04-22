@@ -8,6 +8,7 @@ import { Eye, EyeOff, Loader2, Check, ShoppingBag, Calendar, Wallet, BarChart3 }
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { ApiClientError } from '@/lib/api/client';
+import { useAppleSignIn } from '@/lib/hooks/useAppleSignIn';
 
 interface FormState {
   email: string;
@@ -29,6 +30,8 @@ export default function BusinessRegisterPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [appleSubmitting, setAppleSubmitting] = useState(false);
+  const { status: appleStatus, signIn: signInWithApple } = useAppleSignIn();
 
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -79,6 +82,39 @@ export default function BusinessRegisterPage() {
       toast.error(message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    if (appleStatus !== 'ready') {
+      toast.error('Apple Sign-In is not available right now. Please use email/password below.');
+      return;
+    }
+    setAppleSubmitting(true);
+    try {
+      const result = await signInWithApple();
+      if (!result) {
+        toast.error('Apple Sign-In returned no identity token. Please try again.');
+        return;
+      }
+      await api.auth.loginBusinessWithApple({
+        identityToken: result.identityToken,
+        firstName: result.firstName,
+        lastName: result.lastName,
+      });
+      // Apple users skip OTP — account is created and email is already verified.
+      // Send them to the success page to download the app and complete onboarding.
+      router.push('/business/success');
+    } catch (err) {
+      // Apple popup throws on user-cancel — don't show a scary error
+      const msg = (err as Error)?.message || '';
+      if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('popup')) {
+        return;
+      }
+      const apiErr = err as ApiClientError;
+      toast.error(apiErr?.message || 'Apple Sign-In failed. Please try again.');
+    } finally {
+      setAppleSubmitting(false);
     }
   };
 
@@ -140,6 +176,45 @@ export default function BusinessRegisterPage() {
                 Takes 2 minutes. You&apos;ll complete the rest on the Ruby+ Business app.
               </p>
             </div>
+
+            {/* Sign up with Apple */}
+            {appleStatus !== 'unavailable' && (
+              <div className="space-y-4 mb-6">
+                <button
+                  type="button"
+                  onClick={handleAppleSignUp}
+                  disabled={appleStatus !== 'ready' || appleSubmitting}
+                  className="w-full bg-black text-white font-semibold py-3.5 rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  aria-label="Sign up with Apple"
+                >
+                  {appleSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Signing you up...
+                    </>
+                  ) : (
+                    <>
+                      {/* Apple logo (SF Symbol style) */}
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                      </svg>
+                      Sign up with Apple
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-xs text-gray-400 uppercase tracking-wider">or</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email */}

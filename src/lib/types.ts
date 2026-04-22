@@ -316,8 +316,11 @@ export interface Subcategory {
   slug: string;
   name: string;
   titles: LocalizedText;
+  iconKey?: string;
+  iconUrl?: string;
   displayOrder: number;
   isActive: boolean;
+  featureOnHome?: boolean;
   templateId?: string | { _id: string; name: string; version?: number };
   synonyms: string[];
   riskTier?: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -333,8 +336,11 @@ export interface CreateSubcategoryRequest {
   name: string;
   slug: string;
   titles?: LocalizedText;
+  iconKey?: string;
+  iconUrl?: string;
   displayOrder?: number;
   isActive?: boolean;
+  featureOnHome?: boolean;
   templateId?: string;
   synonyms?: string[];
   riskTier?: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -904,29 +910,76 @@ export interface Booking {
 // ============================================================
 // Disputes
 // ============================================================
-export type DisputeStatus = 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'ESCALATED' | 'CLOSED';
-export type DisputeType = 'ORDER' | 'BOOKING';
+export type DisputeStatus =
+  | 'OPEN'
+  | 'UNDER_REVIEW'
+  | 'AWAITING_RESPONSE'
+  | 'RESOLVED'
+  | 'ESCALATED'
+  | 'CLOSED';
+
+export type DisputeType =
+  | 'ORDER'
+  | 'BOOKING'
+  | 'PAYMENT'
+  | 'PAYOUT'
+  | 'WALLET'
+  | 'DELIVERY'
+  | 'RIDE'
+  | 'AD'
+  | 'GENERAL';
+
+export interface DisputeMessage {
+  _id?: string;
+  senderId: string;
+  senderRole?: 'CUSTOMER' | 'BUSINESS' | 'ADMIN';
+  /** @deprecated — older documents use `sender`/`text`. Keep for compat. */
+  sender?: string;
+  message?: string;
+  /** @deprecated — older documents use `text`. */
+  text?: string;
+  attachments?: string[];
+  isInternal?: boolean;
+  createdAt: string;
+}
 
 export interface Dispute {
   _id: string;
+  disputeRef?: string;
   type: DisputeType;
-  referenceId: string;
-  userId: string;
+  // Legacy FKs
+  orderId?: string | { _id: string; orderNumber?: string };
+  bookingId?: string | { _id: string; bookingRef?: string };
+  // Generic reference
+  referenceId?: string;
+  referenceLabel?: string;
+  transactionRef?: string;
+  referenceAmount?: number;
+  isAdminOnly?: boolean;
+  userId: string | { _id: string; firstName?: string; lastName?: string; email?: string };
   filedById?: string;
   filedByName?: string;
-  businessId: string;
+  filedByRole?: 'CUSTOMER' | 'BUSINESS';
+  businessId?: string | { _id: string; name?: string };
   againstId?: string;
   againstName?: string;
-  locationId: string;
+  locationId?: string;
   status: DisputeStatus;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   reason: string;
   description: string;
+  /** @deprecated — prefer `disputedAmount` / `referenceAmount`. */
   amount?: number;
+  disputedAmount?: number;
   currency?: string;
   resolution?: string;
+  resolutionNotes?: string;
   resolvedBy?: string;
   resolvedAt?: string;
-  messages?: { sender: string; text: string; createdAt: string }[];
+  messages?: DisputeMessage[];
+  assignedTo?: string;
+  assignedAt?: string;
+  dueDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -935,6 +988,12 @@ export interface DisputeResolutionRequest {
   status: DisputeStatus;
   resolution: string;
   refundAmount?: number;
+}
+
+export interface AddDisputeMessageRequest {
+  message: string;
+  attachments?: string[];
+  isInternal?: boolean;
 }
 
 // ============================================================

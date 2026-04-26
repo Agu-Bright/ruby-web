@@ -1899,6 +1899,11 @@ function BusinessWalletTab({
   // Fetch the business's wallet. The backend lazily creates a new wallet on
   // first access if none exists, so we always get back at least an empty
   // wallet for a real business.
+  //
+  // The response shape is `{ success, data: Wallet[] }` from the API client's
+  // request() helper — we MUST unwrap `res.data`, not iterate `res` directly.
+  // Also defensive against the rare double-nested `{ data: { data: [] } }`
+  // shape (mirrors the customers page's wallet fetch).
   useEffect(() => {
     let cancelled = false;
     setWalletLoading(true);
@@ -1907,9 +1912,13 @@ function BusinessWalletTab({
       .getWallet(businessId)
       .then(res => {
         if (cancelled) return;
-        // res might be a single wallet or array depending on multi-currency support
-        const list = Array.isArray(res) ? res : [res];
-        const primary = list.find((w: Wallet) => w.currency === 'NGN') || list[0] || null;
+        const rawData = res.data;
+        const wallets: Wallet[] = Array.isArray(rawData)
+          ? rawData
+          : Array.isArray((rawData as any)?.data)
+            ? (rawData as any).data
+            : [];
+        const primary = wallets.find(w => w.currency === 'NGN') || wallets[0] || null;
         setWallet(primary);
       })
       .catch((err: unknown) => {
@@ -1934,7 +1943,14 @@ function BusinessWalletTab({
     api.businesses
       .getWalletTransactions(wallet._id, { limit: 20 })
       .then(res => {
-        if (!cancelled) setTransactions(Array.isArray(res) ? res : []);
+        if (cancelled) return;
+        const rawData = res.data;
+        const list: LedgerEntry[] = Array.isArray(rawData)
+          ? rawData
+          : Array.isArray((rawData as any)?.data)
+            ? (rawData as any).data
+            : [];
+        setTransactions(list);
       })
       .catch(() => {
         if (!cancelled) setTransactions([]);
@@ -2099,15 +2115,21 @@ function FundBusinessWalletModal({
 
   // Fetch the wallet inside the modal too — the BusinessWalletTab already has
   // it but we don't want to thread it through props if the user opened the
-  // modal from a different entry-point in the future.
+  // modal from a different entry-point in the future. Same response-unwrap
+  // shape as BusinessWalletTab — `res.data` is the array, not `res` itself.
   useEffect(() => {
     let cancelled = false;
     api.businesses
       .getWallet(businessId)
       .then(res => {
         if (cancelled) return;
-        const list = Array.isArray(res) ? res : [res];
-        setWallet(list.find((w: Wallet) => w.currency === 'NGN') || list[0] || null);
+        const rawData = res.data;
+        const wallets: Wallet[] = Array.isArray(rawData)
+          ? rawData
+          : Array.isArray((rawData as any)?.data)
+            ? (rawData as any).data
+            : [];
+        setWallet(wallets.find(w => w.currency === 'NGN') || wallets[0] || null);
       })
       .catch(() => {
         if (cancelled) return;

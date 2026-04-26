@@ -6,6 +6,7 @@ import {
   Phone, Mail, Globe, Star, ShieldCheck, ShieldX, RotateCcw, RefreshCw,
   FileText, ExternalLink, AlertTriangle, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Trash2,
   Plus, Copy, Loader2, Package, Wrench, Edit2, Archive, Power, Image as ImageIcon, GitBranch,
+  Wallet as WalletIcon, AlertCircle, X as XIcon, ArrowDownLeft, ArrowUpRight, DollarSign,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -33,7 +34,8 @@ import type {
   Product, ProductStatus, UpdateProductRequest,
   ServiceListing, ServiceStatus, UpdateServiceRequest, PricingType, ServiceFulfillmentMode,
 } from '@/lib/types';
-import { formatDate, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName } from '@/lib/utils';
+import { formatDate, formatDateTime, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName } from '@/lib/utils';
+import type { Wallet, LedgerEntry } from '@/lib/types';
 
 const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'LIVE', 'REJECTED', 'SUSPENDED'];
 
@@ -152,7 +154,11 @@ export default function BusinessesPage() {
   const [search, setSearch] = useState('');
   const [branchTypeFilter, setBranchTypeFilter] = useState<'all' | 'brands' | 'branches' | 'standalone'>('all');
   const [detailBusiness, setDetailBusiness] = useState<Business | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog' | 'branches'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog' | 'branches' | 'wallet'>('info');
+  const [showFundBusinessModal, setShowFundBusinessModal] = useState(false);
+  // Bumping this forces BusinessWalletTab to refetch wallet + transactions.
+  // Used after a successful fund-wallet operation so the new balance shows up.
+  const [walletRefreshTick, setWalletRefreshTick] = useState(0);
   const [actionModal, setActionModal] = useState<{ business: Business; action: ActionType } | null>(null);
 
   // Catalog tab state
@@ -870,7 +876,7 @@ export default function BusinessesPage() {
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-gray-100">
-              {(['info', 'media', 'cac', 'hours', 'catalog', ...(displayBusiness.isParent || displayBusiness.parentBusinessId ? ['branches'] as const : [])] as const).map(tab => (
+              {(['info', 'media', 'cac', 'hours', 'catalog', 'wallet', ...(displayBusiness.isParent || displayBusiness.parentBusinessId ? ['branches'] as const : [])] as const).map(tab => (
                 <button
                   key={tab}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
@@ -880,7 +886,7 @@ export default function BusinessesPage() {
                   }`}
                   onClick={() => { setDetailTab(tab as any); if (tab === 'catalog') { setCatalogSearch(''); setCatalogStatusFilter(''); } }}
                 >
-                  {tab === 'info' ? 'Info' : tab === 'media' ? 'Media' : tab === 'cac' ? 'CAC' : tab === 'hours' ? 'Hours' : tab === 'branches' ? 'Branches' : 'Catalog'}
+                  {tab === 'info' ? 'Info' : tab === 'media' ? 'Media' : tab === 'cac' ? 'CAC' : tab === 'hours' ? 'Hours' : tab === 'branches' ? 'Branches' : tab === 'wallet' ? 'Wallet' : 'Catalog'}
                   {tab === 'cac' && displayBusiness.cacDocumentUrl && displayBusiness.cacDocumentStatus === 'PENDING' && (
                     <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse" />
                   )}
@@ -1458,6 +1464,18 @@ export default function BusinessesPage() {
               <BranchesTab businessId={displayBusiness._id} isParent={!!displayBusiness.isParent} />
             )}
 
+            {/* Tab: Wallet — admin can top up the business's NGN wallet
+                same way they can top up a customer's wallet. Bills the
+                platform; shows full transaction ledger. */}
+            {detailTab === 'wallet' && (
+              <BusinessWalletTab
+                businessId={displayBusiness._id}
+                businessName={displayBusiness.name}
+                refreshTick={walletRefreshTick}
+                onOpenFundModal={() => setShowFundBusinessModal(true)}
+              />
+            )}
+
             {/* Action bar */}
             <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-gray-100">
               <button
@@ -1635,6 +1653,20 @@ export default function BusinessesPage() {
           );
         })()}
       </Modal>
+
+      {/* ─── Fund Business Wallet Modal ─── */}
+      {showFundBusinessModal && detailBusiness && (
+        <FundBusinessWalletModal
+          businessId={detailBusiness._id}
+          businessName={detailBusiness.name}
+          onClose={() => setShowFundBusinessModal(false)}
+          onSuccess={() => {
+            setShowFundBusinessModal(false);
+            // Force the wallet tab to re-fetch the new balance + transactions
+            setWalletRefreshTick(t => t + 1);
+          }}
+        />
+      )}
 
       {/* ─── Create Business Modal ─── */}
       <CreateBusinessModal
@@ -1829,6 +1861,373 @@ function DetailField({ label, value }: { label: string; value: string }) {
     <div>
       <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{label}</span>
       <p className="text-sm font-medium text-gray-800 mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+// ─── Business Wallet Tab ──────────────────────────────────────
+//
+// Mirrors the customer-wallet UI on the customers admin page. The backend
+// fund endpoint (`POST /admin/wallets/:id/fund`) is wallet-type-agnostic so
+// this is a pure UI add — no new backend work. The wallet returned by
+// `/admin/wallets/by-business/:businessId` may be lazily-created by the
+// backend if the business has never had one before.
+
+function BusinessWalletTab({
+  businessId,
+  businessName,
+  refreshTick: externalRefreshTick,
+  onOpenFundModal,
+}: {
+  businessId: string;
+  businessName: string;
+  /** Parent bumps this to force a refetch (e.g. after a successful fund). */
+  refreshTick: number;
+  onOpenFundModal: () => void;
+}) {
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<LedgerEntry[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  // Local manual refresh tick — combines with externalRefreshTick so either
+  // a parent-driven (post-fund) refresh or a user-driven (refresh button)
+  // refresh re-runs the effects.
+  const [localRefreshTick, setLocalRefreshTick] = useState(0);
+  const refreshTick = externalRefreshTick + localRefreshTick;
+
+  // Fetch the business's wallet. The backend lazily creates a new wallet on
+  // first access if none exists, so we always get back at least an empty
+  // wallet for a real business.
+  useEffect(() => {
+    let cancelled = false;
+    setWalletLoading(true);
+    setWalletError(null);
+    api.businesses
+      .getWallet(businessId)
+      .then(res => {
+        if (cancelled) return;
+        // res might be a single wallet or array depending on multi-currency support
+        const list = Array.isArray(res) ? res : [res];
+        const primary = list.find((w: Wallet) => w.currency === 'NGN') || list[0] || null;
+        setWallet(primary);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setWalletError(err instanceof Error ? err.message : 'Failed to load wallet');
+      })
+      .finally(() => {
+        if (!cancelled) setWalletLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId, refreshTick]);
+
+  // Fetch the most recent 20 ledger entries for the wallet so the admin can
+  // see what's been spent / credited at a glance. Manual refresh follows
+  // any successful fund operation via `refreshTick`.
+  useEffect(() => {
+    if (!wallet?._id) return;
+    let cancelled = false;
+    setTxLoading(true);
+    api.businesses
+      .getWalletTransactions(wallet._id, { limit: 20 })
+      .then(res => {
+        if (!cancelled) setTransactions(Array.isArray(res) ? res : []);
+      })
+      .catch(() => {
+        if (!cancelled) setTransactions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTxLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wallet?._id, refreshTick]);
+
+  if (walletLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin w-5 h-5 border-2 border-ruby-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (walletError || !wallet) {
+    return (
+      <div className="text-center py-8 text-gray-400">
+        <WalletIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+        <p className="text-sm">{walletError || 'No wallet found for this business.'}</p>
+      </div>
+    );
+  }
+
+  const isFrozen = wallet.status === 'FROZEN';
+
+  return (
+    <div className="space-y-5">
+      {isFrozen && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-xs text-amber-700 flex items-start gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            This wallet is frozen. Funding is disabled until the wallet is unfrozen.
+          </p>
+        </div>
+      )}
+
+      {/* Balance card */}
+      <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl border border-emerald-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] text-emerald-600 uppercase tracking-wider font-semibold">Business Wallet Balance</p>
+            <p className="text-2xl font-bold text-emerald-800 mt-1">{formatCurrency(wallet.balance, wallet.currency)}</p>
+            <p className="text-[11px] text-emerald-500 mt-1">{wallet.status || 'ACTIVE'} · {wallet.currency}</p>
+          </div>
+          <button
+            onClick={onOpenFundModal}
+            disabled={isFrozen}
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" /> Add Funds
+          </button>
+        </div>
+      </div>
+
+      {/* Recent transactions */}
+      <div>
+        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center">
+              <DollarSign className="w-3.5 h-3.5 text-gray-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">Recent Transactions</h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">Last {transactions.length} entries</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setLocalRefreshTick(t => t + 1)}
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="mt-4">
+          {txLoading ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 animate-pulse">
+                  <div className="w-8 h-8 bg-gray-100 rounded-lg" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3 bg-gray-100 rounded w-2/3" />
+                    <div className="h-2 bg-gray-50 rounded w-1/3" />
+                  </div>
+                  <div className="h-4 bg-gray-100 rounded w-16" />
+                </div>
+              ))}
+            </div>
+          ) : transactions.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">
+              No transactions yet for {businessName}.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {transactions.map(tx => {
+                const isCredit = tx.direction === 'CREDIT';
+                return (
+                  <div
+                    key={tx._id}
+                    className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 text-left"
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center ${isCredit ? 'bg-emerald-100' : 'bg-red-100'}`}
+                    >
+                      {isCredit ? (
+                        <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <ArrowUpRight className="w-4 h-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 font-medium truncate">
+                        {tx.description || tx.referenceType || tx.type}
+                      </p>
+                      <p className="text-[11px] text-gray-400">{formatDateTime(tx.createdAt)}</p>
+                    </div>
+                    <div className={`text-sm font-semibold ${isCredit ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {isCredit ? '+' : '-'}
+                      {formatCurrency(tx.amount, tx.currency)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Fund Business Wallet Modal ──────────────────────────────
+//
+// Re-uses the same backend endpoint as the customer-wallet flow
+// (POST /admin/wallets/:walletId/fund). Posts a DEPOSIT ledger entry that
+// immediately credits the wallet and shows up in `recent transactions`.
+// Audit-logged by the backend for any non-trivial reconciliation later.
+
+function FundBusinessWalletModal({
+  businessId,
+  businessName,
+  onClose,
+  onSuccess,
+}: {
+  businessId: string;
+  businessName: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [loadingWallet, setLoadingWallet] = useState(true);
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch the wallet inside the modal too — the BusinessWalletTab already has
+  // it but we don't want to thread it through props if the user opened the
+  // modal from a different entry-point in the future.
+  useEffect(() => {
+    let cancelled = false;
+    api.businesses
+      .getWallet(businessId)
+      .then(res => {
+        if (cancelled) return;
+        const list = Array.isArray(res) ? res : [res];
+        setWallet(list.find((w: Wallet) => w.currency === 'NGN') || list[0] || null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setWallet(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingWallet(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!wallet) {
+      toast.error('No wallet available');
+      return;
+    }
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount < 100) {
+      toast.error('Minimum amount is NGN 100');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await api.businesses.fundWallet(wallet._id, {
+        amount: numAmount,
+        currency: wallet.currency,
+        description: description || `Admin funding for ${businessName}`,
+      });
+      toast.success(`Successfully funded ${formatCurrency(numAmount, wallet.currency)}`);
+      onSuccess();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to fund wallet');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-slide-up"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Fund Business Wallet</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+            <XIcon className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+        {loadingWallet ? (
+          <div className="px-6 py-10 flex items-center justify-center">
+            <div className="animate-spin w-5 h-5 border-2 border-ruby-600 border-t-transparent rounded-full" />
+          </div>
+        ) : !wallet ? (
+          <div className="px-6 py-6 text-sm text-gray-500 text-center">
+            No wallet available for this business.
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+            <div className="text-xs text-gray-500">
+              Funding wallet for <span className="font-semibold text-gray-700">{businessName}</span>
+              <span className="ml-2">· Current balance: {formatCurrency(wallet.balance, wallet.currency)}</span>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount (NGN)</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="Enter amount (min 100)"
+                min="100"
+                step="1"
+                required
+                className="input-field"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Description (optional)</label>
+              <input
+                type="text"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder={`Admin funding for ${businessName}`}
+                className="input-field"
+              />
+            </div>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs text-amber-700 flex items-start gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                This action immediately credits the business wallet and is audited.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn-primary flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" /> Funding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" /> Fund Wallet
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

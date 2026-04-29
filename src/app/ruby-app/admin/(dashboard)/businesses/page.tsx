@@ -2548,6 +2548,7 @@ function PandagoBadge({
       >
         {labels[status] || status}
       </span>
+      {/* TEMP: register button hidden — will be re-enabled later.
       {showRegisterButton && (
         <button
           onClick={(e) => {
@@ -2560,6 +2561,7 @@ function PandagoBadge({
           {registering ? 'Registering…' : status === 'NOT_REGISTERED' ? 'Register' : 'Re-register'}
         </button>
       )}
+      */}
       {status === 'FAILED' && outlet?.lastError && (
         <div className="text-[10px] text-red-600 truncate max-w-[140px]" title={outlet.lastError}>
           {outlet.lastError}
@@ -3037,6 +3039,113 @@ function CatalogEditServiceForm({ service, isSubmitting, onCancel, onSubmit }: {
   );
 }
 
+// ─── Gallery Uploader (multi-image) ───
+/**
+ * Multi-image gallery uploader used by Create + Edit business modals.
+ * Mirrors the business-app pattern: up to 8 gallery images, separate from
+ * the single logoUrl + coverImageUrl fields. Persists as `media: BusinessMediaItem[]`.
+ */
+function BusinessGalleryUploader({
+  value,
+  onChange,
+  max = 8,
+}: {
+  value: string[];
+  onChange: (urls: string[]) => void;
+  max?: number;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    e.target.value = ''; // reset so same file can be re-picked
+
+    const remaining = max - value.length;
+    if (remaining <= 0) {
+      toast.error(`Maximum ${max} gallery images`);
+      return;
+    }
+    const toUpload = files.slice(0, remaining);
+    if (files.length > remaining) {
+      toast.warning(`Only ${remaining} more allowed; first ${remaining} taken`);
+    }
+
+    setUploading(true);
+    const uploaded: string[] = [];
+    for (const file of toUpload) {
+      try {
+        const res = await api.media.upload(file, 'businesses/gallery');
+        if (res.data?.url) uploaded.push(res.data.url);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Upload failed';
+        toast.error(`${file.name}: ${msg}`);
+      }
+    }
+    setUploading(false);
+    if (uploaded.length > 0) onChange([...value, ...uploaded]);
+  };
+
+  const removeAt = (idx: number) => {
+    onChange(value.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          Gallery
+        </label>
+        <span className="text-[11px] text-gray-400">{value.length}/{max}</span>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {value.map((url, idx) => (
+          <div key={`${url}-${idx}`} className="relative group aspect-square rounded-lg overflow-hidden ring-1 ring-gray-200 bg-gray-50">
+            <img src={url} alt="" className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={() => removeAt(idx)}
+              className="absolute top-1 right-1 p-1 rounded-full bg-white/90 shadow-sm text-gray-600 hover:text-red-600 hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Remove"
+            >
+              <XIcon className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        {value.length < max && (
+          <button
+            type="button"
+            onClick={() => !uploading && inputRef.current?.click()}
+            disabled={uploading}
+            className="aspect-square rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100/50 transition-all flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {uploading ? (
+              <Loader2 className="w-4 h-4 text-ruby-500 animate-spin" />
+            ) : (
+              <>
+                <Plus className="w-4 h-4 text-gray-400" />
+                <span className="text-[10px] text-gray-400 mt-0.5">Add</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] text-gray-400 mt-1.5">
+        Up to {max} images shown on the public profile. JPEG, PNG, WebP — max 5MB each.
+      </p>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        onChange={handleFiles}
+        className="hidden"
+      />
+    </div>
+  );
+}
+
 // ─── Create Business Modal ───
 function CreateBusinessModal({
   isOpen,
@@ -3061,6 +3170,7 @@ function CreateBusinessModal({
     latitude: 0,
     logoUrl: '',
     coverImageUrl: '',
+    gallery: [] as string[],
     claimContactPhone: '',
     claimContactEmail: '',
     address: { street: '', city: '', state: '' } as { street: string; city: string; state: string },
@@ -3094,6 +3204,14 @@ function CreateBusinessModal({
     if (form.tagline) data.tagline = form.tagline;
     if (form.logoUrl) data.logoUrl = form.logoUrl;
     if (form.coverImageUrl) data.coverImageUrl = form.coverImageUrl;
+    if (form.gallery.length > 0) {
+      data.media = form.gallery.map((url, idx) => ({
+        url,
+        type: 'IMAGE',
+        order: idx,
+        isPrimary: false,
+      }));
+    }
     if (form.claimContactPhone) data.claimContactPhone = form.claimContactPhone;
     if (form.claimContactEmail) data.claimContactEmail = form.claimContactEmail;
     if (form.address.street) data.address = form.address;
@@ -3107,7 +3225,8 @@ function CreateBusinessModal({
       setStep(0);
       setForm({
         name: '', description: '', tagline: '', locationId: '', categoryId: '', subcategoryId: '',
-        longitude: 0, latitude: 0, logoUrl: '', coverImageUrl: '', claimContactPhone: '', claimContactEmail: '',
+        longitude: 0, latitude: 0, logoUrl: '', coverImageUrl: '', gallery: [],
+        claimContactPhone: '', claimContactEmail: '',
         address: { street: '', city: '', state: '' },
         contact: { phone: '', email: '', whatsapp: '' },
       });
@@ -3187,6 +3306,10 @@ function CreateBusinessModal({
                 maxSizeMB={5}
               />
             </div>
+            <BusinessGalleryUploader
+              value={form.gallery}
+              onChange={(urls) => update('gallery', urls)}
+            />
           </div>
         )}
 
@@ -3405,6 +3528,18 @@ function EditBusinessModal({
     latitude: (business as any).latitude || 6.5244,
     logoUrl: business.logoUrl || '',
     coverImageUrl: business.coverImageUrl || '',
+    // Gallery is the `media[]` array minus anything that looks like the
+    // logo/cover (so we don't double-render them as gallery thumbs).
+    gallery: ((business.media || []) as any[])
+      .filter((m) =>
+        typeof m === 'object' &&
+        m.url &&
+        m.type !== 'VIDEO' &&
+        !m.isPrimary &&
+        m.url !== business.logoUrl &&
+        m.url !== business.coverImageUrl,
+      )
+      .map((m) => m.url as string),
     claimContactPhone: (business as any).claimContactPhone || '',
     claimContactEmail: (business as any).claimContactEmail || '',
     // `address` is typed as string | BusinessAddress on the shared Business
@@ -3435,7 +3570,17 @@ function EditBusinessModal({
     if (!form.name) { toast.error('Business name is required'); return; }
     setSubmitting(true);
     try {
-      const data: any = { ...form };
+      // Strip the local-only `gallery` field and translate it into the
+      // backend's `media[]` shape. Sending `[]` is intentional — that lets
+      // admins clear the gallery on edit.
+      const { gallery, ...rest } = form;
+      const data: any = { ...rest };
+      data.media = gallery.map((url, idx) => ({
+        url,
+        type: 'IMAGE',
+        order: idx,
+        isPrimary: false,
+      }));
       if (data.address && !data.address.street) delete data.address;
       if (data.contact && !data.contact.phone && !data.contact.email) delete data.contact;
       await onSubmit(data);
@@ -3517,6 +3662,10 @@ function EditBusinessModal({
                 maxSizeMB={5}
               />
             </div>
+            <BusinessGalleryUploader
+              value={form.gallery}
+              onChange={(urls) => update('gallery', urls)}
+            />
           </div>
         )}
 

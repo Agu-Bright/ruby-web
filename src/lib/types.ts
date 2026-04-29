@@ -634,6 +634,16 @@ export interface Business {
   branchLabel?: string;
   catalogMode?: 'INHERIT' | 'INDEPENDENT' | 'MIXED';
   branchCount?: number;
+  // Pandago / Glovo outlet registration
+  pandagoOutlet?: {
+    status: 'NOT_REGISTERED' | 'PENDING' | 'ACTIVE' | 'FAILED' | 'STALE';
+    isLegacy: boolean;
+    registeredAt?: string;
+    registeredCoordinates?: { lat: number; lng: number };
+    lastAttemptAt?: string;
+    lastError?: string;
+    attemptCount: number;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -1738,4 +1748,141 @@ export interface UpdateServiceRequest {
   fulfillmentMode?: ServiceFulfillmentMode;
   status?: ServiceStatus;
   isFeatured?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Marketers / referral codes
+// ─────────────────────────────────────────────────────────────────────
+
+export type MarketerType = 'INFLUENCER' | 'MARKETER' | 'PARTNER';
+export type MarketerStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+
+export interface Marketer {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  type: MarketerType;
+  status: MarketerStatus;
+  customerCommission: number;
+  businessCommission: number;
+  bankAccountId?: string;
+  walletId?: string;
+  totalCustomerSignups: number;
+  totalBusinessSignups: number;
+  totalCustomerActivations: number;
+  totalBusinessActivations: number;
+  totalCommissionEarned: number;
+  totalCommissionPaid: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReferralCodeType = 'CUSTOMER' | 'BUSINESS' | 'BOTH';
+export type ReferralCodeStatus = 'ACTIVE' | 'DISABLED' | 'EXPIRED';
+
+export interface ReferralCode {
+  _id: string;
+  code: string;
+  marketerId: string;
+  type: ReferralCodeType;
+  status: ReferralCodeStatus;
+  expiresAt?: string;
+  maxUses?: number;
+  usesCount: number;
+  customCustomerCommission?: number;
+  customBusinessCommission?: number;
+  campaignTag?: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReferralAttributionType = 'CUSTOMER' | 'BUSINESS';
+export type ReferralAttributionStatus =
+  | 'PENDING'
+  | 'COMMISSION_OWED'
+  | 'PAID'
+  | 'VOIDED';
+
+export interface ReferralAttribution {
+  _id: string;
+  codeId: string | { _id: string; code: string; campaignTag?: string };
+  marketerId: string;
+  referredUserId:
+    | string
+    | { _id: string; firstName?: string; lastName?: string; email?: string; phone?: string };
+  referredBusinessId?: string | { _id: string; name: string; slug?: string };
+  type: ReferralAttributionType;
+  status: ReferralAttributionStatus;
+  referredAt: string;
+  activatedAt?: string;
+  commissionAmount: number;
+  commissionPaidAt?: string;
+  commissionLedgerEntryId?: string;
+  signupIp?: string;
+  signupUserAgent?: string;
+  voidReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMarketerRequest {
+  name: string;
+  email: string;
+  phone: string;
+  type?: MarketerType;
+  customerCommission?: number;
+  businessCommission?: number;
+  notes?: string;
+}
+
+export interface UpdateMarketerRequest {
+  name?: string;
+  phone?: string;
+  type?: MarketerType;
+  status?: MarketerStatus;
+  customerCommission?: number;
+  businessCommission?: number;
+  bankAccountId?: string;
+  notes?: string;
+}
+
+export interface GenerateCodeRequest {
+  code?: string; // optional vanity
+  type?: ReferralCodeType;
+  expiresAt?: string;
+  maxUses?: number;
+  customCustomerCommission?: number;
+  customBusinessCommission?: number;
+  campaignTag?: string;
+  notes?: string;
+}
+
+export interface UpdateCodeRequest {
+  status?: 'ACTIVE' | 'DISABLED';
+  expiresAt?: string;
+  maxUses?: number;
+  customCustomerCommission?: number;
+  customBusinessCommission?: number;
+  campaignTag?: string;
+  notes?: string;
+}
+
+export interface MarketerFilterParams {
+  page?: number;
+  limit?: number;
+  status?: MarketerStatus;
+  type?: MarketerType;
+  search?: string;
+}
+
+export interface AttributionFilterParams {
+  page?: number;
+  limit?: number;
+  status?: ReferralAttributionStatus;
+  type?: ReferralAttributionType;
 }

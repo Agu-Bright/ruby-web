@@ -79,6 +79,7 @@ const navGroups: NavGroup[] = [
       { label: "Disputes", href: "/ruby-app/admin/disputes", icon: AlertTriangle },
       { label: "Campaigns", href: "/ruby-app/admin/campaigns", icon: Megaphone },
       { label: "Promos", href: "/ruby-app/admin/promos", icon: Tag },
+      { label: "Marketers", href: "/ruby-app/admin/marketers", icon: Users },
       { label: "Broadcasts", href: "/ruby-app/admin/broadcasts", icon: Radio },
     ],
   },

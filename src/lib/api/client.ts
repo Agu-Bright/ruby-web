@@ -813,6 +813,25 @@ export const api = {
       request<import("@/lib/types").DeliveryStats>("/admin/delivery/stats", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
+    // Pandago outlet management — manual registration + bulk backfill for
+    // legacy/unclaimed businesses. Normal post-deploy claimed merchants
+    // auto-register on admin approval and don't expose these actions.
+    pandagoBackfill: (params?: { limit?: number; dryRun?: boolean }) =>
+      request<{
+        scanned: number;
+        registered: number;
+        failed: number;
+        skipped: number;
+        errors: { businessId: string; error: string }[];
+      }>("/admin/delivery/pandago/backfill", {
+        method: "POST",
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    pandagoRegisterBusiness: (businessId: string) =>
+      request<{ status: 'ACTIVE' | 'FAILED'; error?: string }>(
+        `/admin/delivery/pandago/businesses/${businessId}/register`,
+        { method: "POST" },
+      ),
   },
 
   // Bookings
@@ -1212,6 +1231,80 @@ export const api = {
       request<any>(`/admin/legal-documents/${id}/deactivate`, { method: "POST" }),
     delete: (id: string) =>
       request<any>(`/admin/legal-documents/${id}`, { method: "DELETE" }),
+  },
+
+  // ─────────────────────────────────────────────────────────────────
+  // Marketers / referral codes
+  // ─────────────────────────────────────────────────────────────────
+  marketers: {
+    list: (params?: import("@/lib/types").MarketerFilterParams) =>
+      request<import("@/lib/types").Marketer[]>("/admin/marketers", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    create: (data: import("@/lib/types").CreateMarketerRequest) =>
+      request<import("@/lib/types").Marketer>("/admin/marketers", {
+        method: "POST",
+        body: data,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").Marketer>(`/admin/marketers/${id}`),
+    update: (id: string, data: import("@/lib/types").UpdateMarketerRequest) =>
+      request<import("@/lib/types").Marketer>(`/admin/marketers/${id}`, {
+        method: "PATCH",
+        body: data,
+      }),
+    suspend: (id: string, reason?: string) =>
+      request<import("@/lib/types").Marketer>(
+        `/admin/marketers/${id}/suspend`,
+        { method: "POST", body: { reason } },
+      ),
+    reinstate: (id: string) =>
+      request<import("@/lib/types").Marketer>(
+        `/admin/marketers/${id}/reinstate`,
+        { method: "POST" },
+      ),
+    listCodes: (id: string) =>
+      request<import("@/lib/types").ReferralCode[]>(
+        `/admin/marketers/${id}/codes`,
+      ),
+    generateCode: (
+      id: string,
+      data: import("@/lib/types").GenerateCodeRequest,
+    ) =>
+      request<import("@/lib/types").ReferralCode>(
+        `/admin/marketers/${id}/codes`,
+        { method: "POST", body: data },
+      ),
+    updateCode: (
+      codeId: string,
+      data: import("@/lib/types").UpdateCodeRequest,
+    ) =>
+      request<import("@/lib/types").ReferralCode>(
+        `/admin/referral-codes/${codeId}`,
+        { method: "PATCH", body: data },
+      ),
+    listAttributions: (
+      id: string,
+      params?: import("@/lib/types").AttributionFilterParams,
+    ) =>
+      request<import("@/lib/types").ReferralAttribution[]>(
+        `/admin/marketers/${id}/attributions`,
+        { params: params as Record<string, string | number | boolean | undefined> },
+      ),
+    processPayout: (
+      id: string,
+      attributionIds: string[],
+      payoutToBank?: boolean,
+    ) =>
+      request<{
+        marketerId: string;
+        paidCount: number;
+        totalAmount: number;
+        ledgerEntryId?: string;
+      }>(`/admin/marketers/${id}/payouts`, {
+        method: "POST",
+        body: { attributionIds, payoutToBank },
+      }),
   },
 };
 

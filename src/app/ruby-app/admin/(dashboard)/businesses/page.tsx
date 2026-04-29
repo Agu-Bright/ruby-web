@@ -41,7 +41,7 @@ const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED',
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status';
+type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status' | 'edit';
 
 // ─── Action Dropdown Component ───
 function ActionDropdown({ business, onAction, onView }: {
@@ -65,6 +65,7 @@ function ActionDropdown({ business, onAction, onView }: {
 
   const items: { label: string; icon: typeof Eye; action: () => void; variant?: 'default' | 'success' | 'danger' | 'warning' }[] = [
     { label: 'View Details', icon: Eye, action: () => { onView(business); setOpen(false); } },
+    { label: 'Edit Business', icon: Edit2, action: () => { onAction(business, 'edit'); setOpen(false); } },
   ];
 
   if (business.status === 'PENDING_REVIEW') {
@@ -171,6 +172,25 @@ export default function BusinessesPage() {
   const [reason, setReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<BusinessStatus>('PENDING_REVIEW');
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Edit Business modal — opened from the row's action menu. Lives outside
+  // the generic actionModal flow because it has its own form state + steps,
+  // not a confirm-then-execute dialog.
+  const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
+
+  // Pandago — manual register + bulk backfill
+  // pandagoRegistering = current businessId being registered (loading state).
+  // backfillResult = preview/result of the most recent backfill call.
+  const [pandagoRegistering, setPandagoRegistering] = useState<string | null>(null);
+  const [pandagoBackfillResult, setPandagoBackfillResult] = useState<{
+    scanned: number;
+    registered: number;
+    failed: number;
+    skipped: number;
+    errors: { businessId: string; error: string }[];
+  } | null>(null);
+  const [pandagoBackfillLoading, setPandagoBackfillLoading] = useState(false);
+  const [pandagoBackfillModalOpen, setPandagoBackfillModalOpen] = useState(false);
 
   // Hierarchical branch tree state
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
@@ -416,12 +436,79 @@ export default function BusinessesPage() {
   }, [actionModal, reason, selectedStatus, approveBusiness, rejectBusiness, suspendBusiness, reinstateBusiness, verifyCac, featureBusiness, deleteBusiness, refetch, detailBusiness]);
 
   const openAction = (business: Business, action: ActionType) => {
+    // Edit doesn't go through the generic confirm-modal flow — it has its
+    // own multi-step form so we open EditBusinessModal directly.
+    if (action === 'edit') {
+      setEditingBusiness(business);
+      return;
+    }
     setActionModal({ business, action });
     setReason('');
     if (action === 'update-status') {
       setSelectedStatus(business.status as BusinessStatus);
     }
   };
+
+  /**
+   * Manually register a single legacy/unclaimed business with pandago.
+   * Eligibility is enforced both client-side (the badge only renders the
+   * button for eligible businesses) and server-side (returns 400
+   * NOT_ELIGIBLE_FOR_MANUAL_REGISTER for normal post-deploy claimed
+   * merchants).
+   */
+  const handlePandagoRegister = useCallback(
+    async (b: Business) => {
+      setPandagoRegistering(b._id);
+      try {
+        const res = await api.delivery.pandagoRegisterBusiness(b._id);
+        const result = res?.data || res;
+        if (result?.status === 'ACTIVE') {
+          toast.success(`"${b.name}" registered with pandago.`);
+        } else {
+          toast.error(`Registration failed: ${result?.error || 'unknown error'}`);
+        }
+        await refetch();
+      } catch (err) {
+        const msg =
+          (err as any)?.response?.data?.error?.message ||
+          (err as any)?.message ||
+          'Registration failed';
+        toast.error(msg);
+      } finally {
+        setPandagoRegistering(null);
+      }
+    },
+    [refetch],
+  );
+
+  const handlePandagoBackfill = useCallback(
+    async (commit: boolean) => {
+      setPandagoBackfillLoading(true);
+      try {
+        const res = await api.delivery.pandagoBackfill({
+          dryRun: !commit,
+          limit: 200,
+        });
+        const result = (res?.data || res) as typeof pandagoBackfillResult;
+        setPandagoBackfillResult(result);
+        if (commit && result) {
+          toast.success(
+            `Pandago backfill complete: ${result.registered} registered, ${result.failed} failed.`,
+          );
+          await refetch();
+        }
+      } catch (err) {
+        const msg =
+          (err as any)?.response?.data?.error?.message ||
+          (err as any)?.message ||
+          'Backfill failed';
+        toast.error(msg);
+      } finally {
+        setPandagoBackfillLoading(false);
+      }
+    },
+    [refetch],
+  );
 
   const getActionConfig = (action: ActionType) => {
     const configs: Record<ActionType, { title: string; description: (name: string) => string; label: string; variant: 'primary' | 'danger'; icon: typeof CheckCircle }> = {
@@ -488,6 +575,15 @@ export default function BusinessesPage() {
         variant: 'primary',
         icon: RefreshCw,
       },
+      // 'edit' short-circuits in openAction and uses its own modal — this
+      // entry exists only to satisfy the Record<ActionType, …> type.
+      edit: {
+        title: 'Edit Business',
+        description: (name) => `Edit details for "${name}".`,
+        label: 'Edit',
+        variant: 'primary',
+        icon: Edit2,
+      },
     };
     return configs[action];
   };
@@ -495,7 +591,7 @@ export default function BusinessesPage() {
   const needsReason = (action: ActionType) => ['reject', 'suspend', 'reject-cac'].includes(action);
 
   // ─── Table column headers ───
-  const tableHeaders = ['Business', 'Status', 'Owner', 'Location', 'Created', ''];
+  const tableHeaders = ['Business', 'Status', 'Owner', 'Location', 'Pandago', 'Created', ''];
 
   return (
     <div className="space-y-6">
@@ -503,13 +599,27 @@ export default function BusinessesPage() {
         title="Businesses"
         description="Review and manage business applications"
         action={
-          <button
-            className="inline-flex items-center gap-2 px-4 py-2 bg-ruby-600 text-white text-sm font-medium rounded-lg hover:bg-ruby-700 transition-colors"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <Plus className="w-4 h-4" />
-            Create Business
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={() => {
+                setPandagoBackfillResult(null);
+                setPandagoBackfillModalOpen(true);
+                handlePandagoBackfill(false); // dry-run preview on open
+              }}
+              title="Bulk-register legacy and unclaimed businesses with pandago"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Pandago backfill
+            </button>
+            <button
+              className="inline-flex items-center gap-2 px-4 py-2 bg-ruby-600 text-white text-sm font-medium rounded-lg hover:bg-ruby-700 transition-colors"
+              onClick={() => setShowCreateModal(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Create Business
+            </button>
+          </div>
         }
       />
 
@@ -689,6 +799,10 @@ export default function BusinessesPage() {
                             <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             <span className="truncate">{getLocationName(b.locationId) || '—'}</span>
                           </div>
+                        </td>
+                        {/* Pandago — outlet registration status */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <PandagoBadge business={b} onRegister={handlePandagoRegister} registering={pandagoRegistering === b._id} />
                         </td>
                         {/* Created */}
                         <td className="px-4 py-3 text-sm text-gray-500">{formatDate(b.createdAt)}</td>
@@ -1668,6 +1782,100 @@ export default function BusinessesPage() {
         />
       )}
 
+      {/* ─── Edit Business Modal ─── */}
+      {editingBusiness && (
+        <EditBusinessModal
+          business={editingBusiness}
+          onClose={() => setEditingBusiness(null)}
+          onSubmit={async (data) => {
+            const result = await api.businesses.adminUpdate(editingBusiness._id, data);
+            const updated = result?.data || result;
+            if (updated) {
+              toast.success(`"${editingBusiness.name}" updated`);
+              setEditingBusiness(null);
+              refetch();
+            }
+          }}
+        />
+      )}
+
+      {/* ─── Pandago Backfill Modal ─── */}
+      <Modal
+        isOpen={pandagoBackfillModalOpen}
+        onClose={() => setPandagoBackfillModalOpen(false)}
+        title="Pandago outlet backfill"
+        subtitle="Bulk-register legacy and unclaimed businesses with pandago"
+        size="md"
+      >
+        <div className="space-y-4 p-4">
+          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
+            This will register every <strong>legacy</strong> (pre-feature) and
+            <strong> unclaimed</strong> business with pandago. Normal post-feature
+            claimed merchants auto-register on admin approval and are excluded.
+          </div>
+
+          {pandagoBackfillLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <span className="ml-2 text-sm text-gray-500">Loading…</span>
+            </div>
+          ) : pandagoBackfillResult ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-4 gap-2">
+                <StatCard title="Scanned" value={pandagoBackfillResult.scanned} icon={Search} />
+                <StatCard title="Registered" value={pandagoBackfillResult.registered} icon={CheckCircle} />
+                <StatCard title="Failed" value={pandagoBackfillResult.failed} icon={XCircle} />
+                <StatCard title="Skipped" value={pandagoBackfillResult.skipped} icon={Ban} />
+              </div>
+              {pandagoBackfillResult.errors.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                    Errors / would-fail ({pandagoBackfillResult.errors.length})
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {pandagoBackfillResult.errors.map((e) => (
+                      <div key={e.businessId} className="px-3 py-2 text-xs border-t border-gray-100 flex justify-between gap-2">
+                        <span className="font-mono text-gray-400 truncate">{e.businessId.slice(-8)}</span>
+                        <span className="text-gray-700 flex-1 truncate">{e.error}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 italic">No data yet.</div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <button
+              onClick={() => setPandagoBackfillModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Close
+            </button>
+            <button
+              onClick={() => handlePandagoBackfill(false)}
+              disabled={pandagoBackfillLoading}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
+              Refresh preview
+            </button>
+            <button
+              onClick={() => handlePandagoBackfill(true)}
+              disabled={
+                pandagoBackfillLoading ||
+                !pandagoBackfillResult ||
+                pandagoBackfillResult.scanned === 0
+              }
+              className="px-4 py-2 text-sm font-medium text-white bg-ruby-600 rounded-lg hover:bg-ruby-700 disabled:opacity-50"
+            >
+              {pandagoBackfillLoading ? 'Running…' : 'Commit backfill'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* ─── Create Business Modal ─── */}
       <CreateBusinessModal
         isOpen={showCreateModal}
@@ -2281,6 +2489,83 @@ function CacBadge({ status }: { status?: string }) {
       <Icon className="w-2.5 h-2.5" />
       CAC {status}
     </span>
+  );
+}
+
+/**
+ * Pandago outlet status badge with conditional manual-register action.
+ *
+ * Visibility rules for the action button:
+ *   - Legacy (`pandagoOutlet.isLegacy === true`) OR unclaimed
+ *     (`isClaimed === false`) businesses: button is shown for
+ *     NOT_REGISTERED / FAILED / STALE statuses.
+ *   - Normal post-deploy claimed merchants: badge only, NO button. Those
+ *     auto-register on admin approval; cron retries on failure.
+ */
+function PandagoBadge({
+  business,
+  onRegister,
+  registering,
+}: {
+  business: Business;
+  onRegister: (b: Business) => void;
+  registering: boolean;
+}) {
+  const outlet = business.pandagoOutlet;
+  const status = outlet?.status || 'NOT_REGISTERED';
+
+  const styles: Record<string, string> = {
+    ACTIVE: 'bg-green-50 text-green-700 border-green-200',
+    PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
+    FAILED: 'bg-red-50 text-red-700 border-red-200',
+    STALE: 'bg-orange-50 text-orange-700 border-orange-200',
+    NOT_REGISTERED: 'bg-gray-50 text-gray-500 border-gray-200',
+  };
+  const labels: Record<string, string> = {
+    ACTIVE: 'Active',
+    PENDING: 'Pending',
+    FAILED: 'Failed',
+    STALE: 'Stale',
+    NOT_REGISTERED: 'Not registered',
+  };
+
+  const isManualEligible =
+    outlet?.isLegacy === true || business.isClaimed === false;
+  const showRegisterButton =
+    isManualEligible && (status === 'NOT_REGISTERED' || status === 'FAILED' || status === 'STALE');
+
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <span
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded border w-fit ${styles[status] || styles.NOT_REGISTERED}`}
+        title={
+          status === 'FAILED' && outlet?.lastError
+            ? `Last error: ${outlet.lastError}`
+            : !isManualEligible && status !== 'ACTIVE'
+              ? 'Auto-registers on admin approval. Cron retries on failure.'
+              : undefined
+        }
+      >
+        {labels[status] || status}
+      </span>
+      {showRegisterButton && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRegister(business);
+          }}
+          disabled={registering}
+          className="text-[10px] font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50 hover:underline w-fit"
+        >
+          {registering ? 'Registering…' : status === 'NOT_REGISTERED' ? 'Register' : 'Re-register'}
+        </button>
+      )}
+      {status === 'FAILED' && outlet?.lastError && (
+        <div className="text-[10px] text-red-600 truncate max-w-[140px]" title={outlet.lastError}>
+          {outlet.lastError}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -3077,6 +3362,317 @@ function CreateBusinessModal({
                   Create Business
                 </>
               )}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Admin "Edit Business" multi-step modal.
+ *
+ * Restored from commit 6678be7 — was accidentally removed during the
+ * multi-branch refactor (commit 7c840f6) along with its action-dropdown
+ * entry. Backend endpoint (PUT /admin/businesses/:id via
+ * api.businesses.adminUpdate) was untouched, so this is a pure UI restore.
+ *
+ * Three-step flow:
+ *   0. Basic info — name, description, tagline, logo + cover images
+ *   1. Location & category — location, category/subcategory, map pin, street
+ *   2. Contact & claim — merchant contact (for unclaimed) + business contact
+ */
+function EditBusinessModal({
+  business,
+  onClose,
+  onSubmit,
+}: {
+  business: Business;
+  onClose: () => void;
+  onSubmit: (data: Partial<AdminCreateBusinessRequest>) => Promise<void>;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState({
+    name: business.name || '',
+    description: business.description || '',
+    tagline: business.tagline || '',
+    locationId: toLocationId(business.locationId as any) || '',
+    categoryId: typeof (business as any).categoryId === 'object' ? (business as any).categoryId?._id || '' : (business as any).categoryId || '',
+    subcategoryId: typeof (business as any).subcategoryId === 'object' ? (business as any).subcategoryId?._id || '' : (business as any).subcategoryId || '',
+    longitude: (business as any).longitude || 3.3792,
+    latitude: (business as any).latitude || 6.5244,
+    logoUrl: business.logoUrl || '',
+    coverImageUrl: business.coverImageUrl || '',
+    claimContactPhone: (business as any).claimContactPhone || '',
+    claimContactEmail: (business as any).claimContactEmail || '',
+    // `address` is typed as string | BusinessAddress on the shared Business
+    // interface — cast to `any` since admin pages always get the structured
+    // form back, never a flat string.
+    address: {
+      street: (business.address as any)?.street || '',
+      city: (business.address as any)?.city || '',
+      state: (business.address as any)?.state || '',
+    },
+    contact: {
+      phone: business.contact?.phone || '',
+      email: business.contact?.email || '',
+      whatsapp: business.contact?.whatsapp || '',
+    },
+  });
+
+  const { data: locations } = useApi<Location[]>(() => api.locations.list({ limit: 100 }), []);
+  const { data: categories } = useApi<Category[]>(() => api.categories.list(), []);
+  const { data: subcategories } = useApi<Subcategory[]>(
+    () => form.categoryId ? api.subcategories.list({ categoryId: form.categoryId }) : Promise.resolve({ success: true, data: [] }),
+    [form.categoryId]
+  );
+
+  const update = (key: string, value: unknown) => setForm(f => ({ ...f, [key]: value }));
+
+  const handleSave = async () => {
+    if (!form.name) { toast.error('Business name is required'); return; }
+    setSubmitting(true);
+    try {
+      const data: any = { ...form };
+      if (data.address && !data.address.street) delete data.address;
+      if (data.contact && !data.contact.phone && !data.contact.email) delete data.contact;
+      await onSubmit(data);
+    } catch {
+      toast.error('Failed to update business');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const steps = ['Basic Info', 'Location & Category', 'Contact & Claim'];
+
+  return (
+    <Modal isOpen onClose={onClose} title={`Edit: ${business.name}`} subtitle="Update business details" size="lg">
+      <div className="space-y-5">
+        {/* Step indicator */}
+        <div className="flex items-center gap-2">
+          {steps.map((s, i) => (
+            <div key={s} className="flex items-center gap-2">
+              <button
+                onClick={() => setStep(i)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  i === step ? 'bg-ruby-600 text-white' : 'bg-gray-100 text-gray-500 cursor-pointer hover:bg-gray-200'
+                }`}
+              >
+                {s}
+              </button>
+              {i < steps.length - 1 && <ChevronDown className="w-3 h-3 text-gray-300 -rotate-90" />}
+            </div>
+          ))}
+        </div>
+
+        {/* Step 0: Basic Info */}
+        {step === 0 && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Name *</label>
+              <input
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.name}
+                onChange={(e) => update('name', e.target.value)}
+                placeholder="e.g. Mama's Kitchen"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Description</label>
+              <textarea
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 resize-none"
+                rows={3}
+                value={form.description}
+                onChange={(e) => update('description', e.target.value)}
+                placeholder="Brief description of the business"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tagline</label>
+              <input
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.tagline}
+                onChange={(e) => update('tagline', e.target.value)}
+                placeholder="Short tagline"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <ImageUpload
+                value={form.logoUrl}
+                onChange={(url) => update('logoUrl', url || '')}
+                folder="businesses/logos"
+                label="Logo"
+                helpText="Square image recommended"
+                maxSizeMB={2}
+              />
+              <ImageUpload
+                value={form.coverImageUrl}
+                onChange={(url) => update('coverImageUrl', url || '')}
+                folder="businesses/covers"
+                label="Cover Image"
+                helpText="Landscape image recommended"
+                maxSizeMB={5}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Location & Category */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Location</label>
+              <select
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.locationId}
+                onChange={(e) => update('locationId', e.target.value)}
+              >
+                <option value="">Select location</option>
+                {(locations || []).map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Category</label>
+              <select
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.categoryId}
+                onChange={(e) => { update('categoryId', e.target.value); update('subcategoryId', ''); }}
+              >
+                <option value="">Select category</option>
+                {(categories || []).map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Subcategory</label>
+              <select
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.subcategoryId}
+                onChange={(e) => update('subcategoryId', e.target.value)}
+                disabled={!form.categoryId}
+              >
+                <option value="">Select subcategory</option>
+                {(subcategories || []).map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Pin Business Location</label>
+              <p className="text-xs text-gray-400 mt-0.5 mb-2">Search for an address or click on the map to set the exact location</p>
+              <MapLocationPicker
+                latitude={form.latitude}
+                longitude={form.longitude}
+                onLocationChange={(lat, lng) => {
+                  update('latitude', lat);
+                  update('longitude', lng);
+                }}
+                onAddressResolved={(addr) => {
+                  setForm(f => ({
+                    ...f,
+                    address: {
+                      ...f.address,
+                      street: addr.street || f.address.street,
+                      city: addr.city || f.address.city,
+                      state: addr.state || f.address.state,
+                    },
+                  }));
+                }}
+                height="280px"
+                countryCode="ng"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Street Address</label>
+              <input
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.address.street}
+                onChange={(e) => setForm(f => ({ ...f, address: { ...f.address, street: e.target.value } }))}
+                placeholder="123 Main Street"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Contact & Claim */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Merchant Phone</label>
+                <input
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.claimContactPhone}
+                  onChange={(e) => update('claimContactPhone', e.target.value)}
+                  placeholder="+234..."
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Merchant Email</label>
+                <input
+                  type="email"
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.claimContactEmail}
+                  onChange={(e) => update('claimContactEmail', e.target.value)}
+                  placeholder="merchant@email.com"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Phone</label>
+                <input
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.contact.phone}
+                  onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, phone: e.target.value } }))}
+                  placeholder="+234..."
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business Email</label>
+                <input
+                  type="email"
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.contact.email}
+                  onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, email: e.target.value } }))}
+                  placeholder="business@email.com"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">WhatsApp</label>
+              <input
+                className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                value={form.contact.whatsapp}
+                onChange={(e) => setForm(f => ({ ...f, contact: { ...f.contact, whatsapp: e.target.value } }))}
+                placeholder="+234..."
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <div className="flex justify-between pt-2 border-t border-gray-100">
+          <button
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            onClick={step === 0 ? onClose : () => setStep(s => s - 1)}
+          >
+            {step === 0 ? 'Cancel' : '← Back'}
+          </button>
+          {step < steps.length - 1 ? (
+            <button
+              className="px-5 py-2 text-sm font-medium text-white bg-ruby-600 rounded-lg hover:bg-ruby-700 transition-colors"
+              onClick={() => setStep(s => s + 1)}
+            >
+              Next →
+            </button>
+          ) : (
+            <button
+              className="px-5 py-2 text-sm font-medium text-white bg-ruby-600 rounded-lg hover:bg-ruby-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              onClick={handleSave}
+              disabled={submitting}
+            >
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
             </button>
           )}
         </div>

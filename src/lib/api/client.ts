@@ -1305,6 +1305,62 @@ export const api = {
         method: "POST",
         body: { attributionIds, payoutToBank },
       }),
+    /**
+     * Issue a fresh viewToken for the marketer; invalidates the previous
+     * shareable `/m/:token` URL. Returns the updated marketer.
+     */
+    regenerateViewToken: (id: string) =>
+      request<import("@/lib/types").Marketer>(
+        `/admin/marketers/${id}/regenerate-view-token`,
+        { method: "POST" },
+      ),
+    /**
+     * Public (no-auth) read-only stats snapshot keyed off viewToken.
+     * Used by the `/m/[token]` page.
+     */
+    publicView: (token: string) =>
+      request<import("@/lib/types").PublicMarketerView>(
+        `/public/marketers/by-token/${encodeURIComponent(token)}`,
+      ),
+  },
+
+  // ─────────────────────────────────────────────────────────────────
+  // Auto-payouts (direct-to-merchant settlement)
+  // ─────────────────────────────────────────────────────────────────
+  autoPayouts: {
+    list: (params?: {
+      status?: import("@/lib/types").AutoPayoutStatus;
+      businessId?: string;
+      page?: number;
+      limit?: number;
+    }) =>
+      request<import("@/lib/types").AutoPayout[]>("/admin/auto-payouts", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    stats: () =>
+      request<import("@/lib/types").AutoPayoutStats>(
+        "/admin/auto-payouts/stats",
+      ),
+    retry: (id: string) =>
+      request<import("@/lib/types").AutoPayout>(
+        `/admin/auto-payouts/${id}/retry`,
+        { method: "POST" },
+      ),
+    retryAll: () =>
+      request<{ scanned: number; retried: number }>(
+        "/admin/auto-payouts/retry-all",
+        { method: "POST" },
+      ),
+    /**
+     * One-time bulk operation that pays out every merchant's existing
+     * positive wallet balance to their bank. Used during switchover
+     * from manual withdrawal to auto-payout. Idempotent.
+     */
+    switchoverSweep: () =>
+      request<import("@/lib/types").SwitchoverSweepResult>(
+        "/admin/auto-payouts/switchover-sweep",
+        { method: "POST" },
+      ),
   },
 };
 

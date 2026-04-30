@@ -705,6 +705,59 @@ export interface AdminCreateBusinessRequest {
 }
 
 // ============================================================
+// Auto-payouts (direct-to-merchant settlement)
+// ============================================================
+export type AutoPayoutSourceType = 'ORDER' | 'BOOKING' | 'QR_PAYMENT';
+export type AutoPayoutStatus =
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'SUCCEEDED'
+  | 'FAILED_TRANSIENT'
+  | 'FAILED_PERMANENT'
+  | 'DEFERRED_NEGATIVE_BALANCE';
+
+export interface AutoPayout {
+  _id: string;
+  sourceType: AutoPayoutSourceType;
+  sourceId: string;
+  businessId: string;
+  walletId: string;
+  bankAccountId?: string;
+  earnedAmount: number;
+  transferAmount: number;
+  currency: string;
+  status: AutoPayoutStatus;
+  providerTransferCode?: string;
+  providerReference?: string;
+  lastError?: string;
+  attemptCount: number;
+  lastAttemptAt?: string;
+  nextRetryAt?: string;
+  completedAt?: string;
+  walletBalanceBefore?: number;
+  walletBalanceAfter?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AutoPayoutStats {
+  queued: number;
+  processing: number;
+  succeededToday: number;
+  failedToday: number;
+  deferred: number;
+}
+
+export interface SwitchoverSweepResult {
+  scanned: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  errors: Array<{ businessId: string; reason: string }>;
+}
+
+// ============================================================
 // Orders
 // ============================================================
 export type OrderStatus = 'PLACED' | 'ACCEPTED' | 'REJECTED' | 'PREPARING' | 'READY' | 'DISPATCHED' | 'PICKED_UP' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED';
@@ -1775,9 +1828,50 @@ export interface Marketer {
   totalCommissionEarned: number;
   totalCommissionPaid: number;
   notes?: string;
+  /**
+   * Opaque token used to share a read-only public stats URL with the
+   * marketer (`/m/:viewToken`). Regenerate to revoke a leaked link.
+   */
+  viewToken: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Slim, privacy-preserving snapshot returned by
+ * `GET /public/marketers/by-token/:token`. Powers the public marketer
+ * stats page; never includes referred-user PII or internal IDs.
+ */
+export interface PublicMarketerView {
+  marketer: {
+    name: string;
+    type: MarketerType;
+    status: MarketerStatus;
+    totalCustomerSignups: number;
+    totalCustomerActivations: number;
+    totalBusinessSignups: number;
+    totalBusinessActivations: number;
+    totalCommissionEarned: number;
+    totalCommissionPaid: number;
+    memberSince: string;
+  };
+  codes: Array<{
+    code: string;
+    type: ReferralCodeType;
+    status: ReferralCodeStatus;
+    usesCount: number;
+    maxUses?: number;
+    campaignTag?: string;
+    expiresAt?: string;
+  }>;
+  recentAttributions: Array<{
+    type: 'CUSTOMER' | 'BUSINESS';
+    status: ReferralAttributionStatus;
+    referredAt: string;
+    activatedAt?: string;
+    commissionAmount: number;
+  }>;
 }
 
 export type ReferralCodeType = 'CUSTOMER' | 'BUSINESS' | 'BOTH';

@@ -16,6 +16,8 @@ import {
   CheckCircle,
   XCircle,
   Tag as TagIcon,
+  Link2,
+  RefreshCw,
 } from 'lucide-react';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
@@ -129,6 +131,40 @@ export default function MarketerDetailPage() {
     toast.success(`Copied "${code}"`);
   };
 
+  // Build the public marketer dashboard URL from the current viewToken.
+  // Uses NEXT_PUBLIC_APP_URL (production) and falls back to window.origin
+  // (local dev / preview). The `/m/:token` route is the public page.
+  const shareUrl = useMemo(() => {
+    if (!marketer?.viewToken) return '';
+    const base =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : '');
+    return `${base.replace(/\/$/, '')}/m/${marketer.viewToken}`;
+  }, [marketer?.viewToken]);
+
+  const copyShareLink = () => {
+    if (!shareUrl) return;
+    navigator.clipboard?.writeText(shareUrl).catch(() => {});
+    toast.success('Share link copied — send it to the marketer');
+  };
+
+  const handleRegenerateLink = async () => {
+    if (
+      !confirm(
+        'Regenerate the share link? The current link will stop working immediately. The marketer will need the new URL.',
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.marketers.regenerateViewToken(marketerId);
+      toast.success('New share link generated');
+      refetchMarketer();
+    } catch {
+      toast.error('Failed to regenerate share link');
+    }
+  };
+
   if (marketerLoading || !marketer) {
     return (
       <div className="space-y-4 animate-pulse">
@@ -157,6 +193,52 @@ export default function MarketerDetailPage() {
           </Link>
         }
       />
+
+      {/* ─── Share link to public marketer dashboard ──
+          Marketers don't have logins; admin shares this URL so they can
+          self-serve their stats. Regenerate to revoke a leaked link. */}
+      {marketer.viewToken && (
+        <div className="card p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
+              <Link2 className="w-4 h-4 text-gray-400" />
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                Marketer share link
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <input
+                readOnly
+                value={shareUrl}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20"
+              />
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={copyShareLink}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-ruby-600 rounded-lg hover:bg-ruby-700"
+                title="Copy link to clipboard"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copy
+              </button>
+              <button
+                onClick={handleRegenerateLink}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                title="Generate a new link and invalidate the current one"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Regenerate
+              </button>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-2">
+            Read-only public dashboard for the marketer. No login required —
+            possession of the link is the access. Regenerate to revoke.
+          </p>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

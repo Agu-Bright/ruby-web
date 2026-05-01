@@ -705,6 +705,87 @@ export interface AdminCreateBusinessRequest {
 }
 
 // ============================================================
+// Home sections (admin-managed customer-app home layout)
+// ============================================================
+export type HomeSectionType = 'REVIEWS' | 'WHATS_HOT' | 'CATEGORY' | 'CURATED';
+
+export interface HomeSection {
+  _id: string;
+  type: HomeSectionType;
+  title: string;
+  subtitle?: string;
+  /** Populated as { _id, name, slug, iconKey } when set. Only meaningful for CATEGORY rows. */
+  categoryId?: string | { _id: string; name: string; slug: string; iconKey?: string };
+  /**
+   * Optional subcategory drill-down for CATEGORY rows (e.g. only "Plumbers"
+   * within Home Services). Populated as { _id, name, slug } when set.
+   */
+  subcategoryId?: string | { _id: string; name: string; slug: string };
+  /** Curated business IDs (CURATED only). Order is significant — preserved at render time. */
+  businessIds?: string[];
+  /** Populated as { _id, name, slug } when set. Null = global. */
+  locationId?: string | { _id: string; name: string; slug: string };
+  displayOrder: number;
+  isActive: boolean;
+  bannerUrl?: string;
+  createdBy: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateHomeSectionRequest {
+  /**
+   * Admin-creatable section types. Backend rejects creation of REVIEWS and
+   * WHATS_HOT (those are seed-only). Per-type required fields are
+   * enforced server-side:
+   *  - CURATED  → businessIds required
+   *  - CATEGORY → categoryId required (subcategoryId optional drill-down)
+   */
+  type: 'CURATED' | 'CATEGORY';
+  title: string;
+  subtitle?: string;
+  businessIds?: string[];
+  categoryId?: string;
+  subcategoryId?: string;
+  locationId?: string;
+  displayOrder?: number;
+  isActive?: boolean;
+  bannerUrl?: string;
+}
+
+export interface UpdateHomeSectionRequest {
+  title?: string;
+  subtitle?: string;
+  categoryId?: string;
+  /** Pass empty string to clear an existing subcategory drill-down. */
+  subcategoryId?: string;
+  businessIds?: string[];
+  locationId?: string | null;
+  displayOrder?: number;
+  isActive?: boolean;
+  bannerUrl?: string;
+}
+
+export interface ReorderHomeSectionsRequest {
+  items: Array<{ id: string; displayOrder: number }>;
+}
+
+/** Public feed shape returned by GET /public/home-sections. */
+export interface HomeSectionFeedItem {
+  _id: string;
+  type: HomeSectionType;
+  title: string;
+  subtitle?: string;
+  bannerUrl?: string;
+  categoryId?: { _id: string; name: string; slug: string; iconKey?: string };
+  locationId?: { _id: string; name: string; slug: string };
+  /** First ~10 items hydrated inline (Business or Review shape depending on type). */
+  items: any[];
+  hasMore: boolean;
+}
+
+// ============================================================
 // Auto-payouts (direct-to-merchant settlement)
 // ============================================================
 export type AutoPayoutSourceType = 'ORDER' | 'BOOKING' | 'QR_PAYMENT';
@@ -716,11 +797,20 @@ export type AutoPayoutStatus =
   | 'FAILED_PERMANENT'
   | 'DEFERRED_NEGATIVE_BALANCE';
 
+/**
+ * Backend `list()` populates `businessId` as a sub-document. Older
+ * code paths or rows from the queued table may still surface it as a
+ * raw ObjectId string, so the type allows both forms.
+ */
+export type AutoPayoutBusiness =
+  | string
+  | { _id: string; name?: string; slug?: string; logoUrl?: string };
+
 export interface AutoPayout {
   _id: string;
   sourceType: AutoPayoutSourceType;
   sourceId: string;
-  businessId: string;
+  businessId: AutoPayoutBusiness;
   walletId: string;
   bankAccountId?: string;
   earnedAmount: number;
@@ -741,12 +831,47 @@ export interface AutoPayout {
   updatedAt: string;
 }
 
+/**
+ * Detail-view response for the dashboard drill-down modal. Includes the
+ * resolved bank-account snapshot at processing time and a brief reference
+ * to the source booking/order for navigation.
+ */
+export interface AutoPayoutDetail {
+  payout: AutoPayout;
+  bank: {
+    _id: string;
+    accountName?: string;
+    accountNumber?: string;
+    accountNumberLast4?: string;
+    bankName?: string;
+    bankCode?: string;
+    status?: string;
+    isPrimary?: boolean;
+    providerRecipientCode?: string;
+  } | null;
+  source: {
+    type: AutoPayoutSourceType;
+    ref?: string;
+    status?: string;
+  } | null;
+}
+
 export interface AutoPayoutStats {
   queued: number;
   processing: number;
+  /** Rows in PROCESSING for >5 min — likely stuck */
+  stuckProcessing: number;
   succeededToday: number;
   failedToday: number;
+  /** Total FAILED_PERMANENT rows ever — money waiting on ops attention */
+  failedPermanent: number;
   deferred: number;
+  /** Sum of transferAmount for SUCCEEDED rows today (NGN) */
+  amountSucceededToday: number;
+  /** Sum of earnedAmount for FAILED_PERMANENT rows (NGN) */
+  amountStuckPermanent: number;
+  /** Sum of earnedAmount for DEFERRED_NEGATIVE_BALANCE rows (NGN) */
+  amountInDeferred: number;
 }
 
 export interface SwitchoverSweepResult {
@@ -754,7 +879,7 @@ export interface SwitchoverSweepResult {
   succeeded: number;
   failed: number;
   skipped: number;
-  errors: Array<{ businessId: string; reason: string }>;
+  errors: Array<{ businessId: string; businessName?: string; reason: string }>;
 }
 
 // ============================================================

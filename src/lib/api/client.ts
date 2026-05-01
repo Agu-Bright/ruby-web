@@ -1331,12 +1331,19 @@ export const api = {
     list: (params?: {
       status?: import("@/lib/types").AutoPayoutStatus;
       businessId?: string;
+      sourceType?: import("@/lib/types").AutoPayoutSourceType;
+      fromDate?: string;
+      toDate?: string;
       page?: number;
       limit?: number;
     }) =>
       request<import("@/lib/types").AutoPayout[]>("/admin/auto-payouts", {
         params: params as Record<string, string | number | boolean | undefined>,
       }),
+    detail: (id: string) =>
+      request<import("@/lib/types").AutoPayoutDetail>(
+        `/admin/auto-payouts/${id}`,
+      ),
     stats: () =>
       request<import("@/lib/types").AutoPayoutStats>(
         "/admin/auto-payouts/stats",
@@ -1352,6 +1359,58 @@ export const api = {
         { method: "POST" },
       ),
     /**
+     * Download a CSV of auto-payouts matching the current filters. Done
+     * via authed `fetch` (rather than a plain anchor) because the bearer
+     * token lives in localStorage and a browser-initiated GET wouldn't
+     * include it.
+     *
+     * Triggers a file download in the browser; resolves to true on
+     * success, throws on failure.
+     */
+    exportCsv: async (params?: {
+      status?: import("@/lib/types").AutoPayoutStatus;
+      businessId?: string;
+      sourceType?: import("@/lib/types").AutoPayoutSourceType;
+      fromDate?: string;
+      toDate?: string;
+    }): Promise<boolean> => {
+      if (typeof window === "undefined") {
+        throw new Error("CSV export only available in the browser");
+      }
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set("status", params.status);
+      if (params?.businessId) qs.set("businessId", params.businessId);
+      if (params?.sourceType) qs.set("sourceType", params.sourceType);
+      if (params?.fromDate) qs.set("fromDate", params.fromDate);
+      if (params?.toDate) qs.set("toDate", params.toDate);
+      const q = qs.toString();
+      const url = `${API_URL}/admin/auto-payouts/export.csv${q ? `?${q}` : ""}`;
+
+      const token = getAccessToken();
+      const res = await fetch(url, {
+        method: "GET",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) {
+        throw new ApiClientError(
+          `CSV export failed: ${res.statusText}`,
+          "EXPORT_FAILED",
+          res.status,
+        );
+      }
+      const blob = await res.blob();
+      const filename = `auto-payouts-${new Date().toISOString().slice(0, 10)}.csv`;
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+      return true;
+    },
+    /**
      * One-time bulk operation that pays out every merchant's existing
      * positive wallet balance to their bank. Used during switchover
      * from manual withdrawal to auto-payout. Idempotent.
@@ -1360,6 +1419,47 @@ export const api = {
       request<import("@/lib/types").SwitchoverSweepResult>(
         "/admin/auto-payouts/switchover-sweep",
         { method: "POST" },
+      ),
+  },
+
+  // ─────────────────────────────────────────────────────────────────
+  // Home sections (admin-managed customer-app home layout)
+  // ─────────────────────────────────────────────────────────────────
+  homeSections: {
+    list: (params?: {
+      type?: import("@/lib/types").HomeSectionType;
+      locationId?: string;
+      isActive?: boolean;
+    }) =>
+      request<import("@/lib/types").HomeSection[]>("/admin/home-sections", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    get: (id: string) =>
+      request<import("@/lib/types").HomeSection>(`/admin/home-sections/${id}`),
+    create: (data: import("@/lib/types").CreateHomeSectionRequest) =>
+      request<import("@/lib/types").HomeSection>("/admin/home-sections", {
+        method: "POST",
+        body: data,
+      }),
+    update: (id: string, data: import("@/lib/types").UpdateHomeSectionRequest) =>
+      request<import("@/lib/types").HomeSection>(`/admin/home-sections/${id}`, {
+        method: "PATCH",
+        body: data,
+      }),
+    delete: (id: string) =>
+      request<{ deleted: true }>(`/admin/home-sections/${id}`, {
+        method: "DELETE",
+      }),
+    reorder: (data: import("@/lib/types").ReorderHomeSectionsRequest) =>
+      request<{ updated: number }>("/admin/home-sections/reorder", {
+        method: "PATCH",
+        body: data,
+      }),
+    /** Public feed (no auth) — used to preview what customers see. */
+    publicFeed: (locationId?: string) =>
+      request<import("@/lib/types").HomeSectionFeedItem[]>(
+        "/public/home-sections",
+        { params: { locationId } },
       ),
   },
 };

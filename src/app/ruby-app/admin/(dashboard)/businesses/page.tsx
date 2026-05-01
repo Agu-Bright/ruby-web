@@ -2548,7 +2548,9 @@ function PandagoBadge({
       >
         {labels[status] || status}
       </span>
-      {/* TEMP: register button hidden — will be re-enabled later.
+      {/* Manual register / re-register link. Visible for legacy + unclaimed
+          businesses (auto-register only fires for claimed merchants). Lets
+          ops repair FAILED outlets after fixing the underlying data. */}
       {showRegisterButton && (
         <button
           onClick={(e) => {
@@ -2561,7 +2563,6 @@ function PandagoBadge({
           {registering ? 'Registering…' : status === 'NOT_REGISTERED' ? 'Register' : 'Re-register'}
         </button>
       )}
-      */}
       {status === 'FAILED' && outlet?.lastError && (
         <div className="text-[10px] text-red-600 truncate max-w-[140px]" title={outlet.lastError}>
           {outlet.lastError}

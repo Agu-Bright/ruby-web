@@ -353,7 +353,7 @@ export default function TermsContent() {
                       rubyaggregators.com
                     </a>
                   </li>
-                  <li>Address: Port Harcourt, Rivers State, Nigeria</li>
+                  <li>Address: E1B Gat Oboh Drive, Victoria Island, Oniru, Lagos, Nigeria</li>
                 </ul>
               </div>
             </Section>

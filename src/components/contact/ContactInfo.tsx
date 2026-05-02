@@ -39,7 +39,7 @@ const contactCards = [
     ),
     title: "Phone",
     desc: "We are available Monday-Friday from 8 AM until 5 PM",
-    detail: "(+234) 816-903-8184,\n(+1) 647-451-8728",
+    detail: "(+234) 813-664-7819,\n(+1) 647-451-8728",
   },
   {
     icon: (
@@ -65,7 +65,7 @@ const contactCards = [
     title: "HQ Office",
     desc: "Visit us in our office",
     detail:
-      "Nigeria Address:\nE1B Gat Oboh drive, VI, Lagos.\n\nCanada address:\n308 Jarvis Street, Toronto,\nOntario, Canada. M5B 0E3.",
+      "Nigeria Address:\nE1B Gat Oboh Drive, Victoria Island, Oniru, Lagos.\n\nCanada address:\n308 Jarvis Street, Toronto,\nOntario, Canada. M5B 0E3.",
   },
 ];
 

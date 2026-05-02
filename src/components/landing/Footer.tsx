@@ -176,7 +176,9 @@ export default function Footer() {
                     />
                   </svg>
                   <span className="text-xs text-white/50 leading-relaxed">
-                    E1B Gat Oboh Drive, VI, Lagos.
+                    E1B Gat Oboh Drive, Victoria Island,
+                    <br />
+                    Oniru, Lagos.
                     <br />
                     308 Jarvis Street, Toronto,
                     <br />
@@ -198,7 +200,7 @@ export default function Footer() {
                     />
                   </svg>
                   <span className="text-xs text-white/50 leading-relaxed">
-                    +234-816-903-8184,
+                    +234-813-664-7819,
                     <br />
                     +1-647-461-8728
                   </span>

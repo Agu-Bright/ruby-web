@@ -2105,3 +2105,112 @@ export interface AttributionFilterParams {
   status?: ReferralAttributionStatus;
   type?: ReferralAttributionType;
 }
+
+// ============================================================
+// Events (Phase 6 ticketing). Mirrors backend
+// ruby-plus-backend/src/modules/events/schemas/*.
+// ============================================================
+
+export type EventStatus =
+  | "DRAFT"
+  | "PUBLISHED"
+  | "SOLD_OUT"
+  | "CANCELLED"
+  | "COMPLETED";
+
+export interface EventTicketTier {
+  name: string;
+  description?: string;
+  priceNgn: number;
+  quantityAvailable: number;
+  quantitySold: number;
+  perks: string[];
+}
+
+export interface RubyEvent {
+  _id: string;
+  title: string;
+  description: string;
+  /** Populated by /admin/events when an organiser is set. */
+  organizerBusinessId?:
+    | string
+    | { _id: string; name: string; slug: string; logoUrl?: string };
+  venueName: string;
+  venueAddress: string;
+  locationId:
+    | string
+    | { _id: string; name: string; slug: string };
+  geoPoint?: { type: "Point"; coordinates: [number, number] };
+  startsAt: string;
+  endsAt: string;
+  coverImageUrl: string;
+  galleryUrls: string[];
+  ticketTiers: EventTicketTier[];
+  status: EventStatus;
+  askRubyTags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEventRequest {
+  title: string;
+  description: string;
+  organizerBusinessId?: string;
+  venueName: string;
+  venueAddress: string;
+  locationId: string;
+  geoCoordinates?: [number, number];
+  startsAt: string;
+  endsAt: string;
+  coverImageUrl: string;
+  galleryUrls?: string[];
+  ticketTiers: {
+    name: string;
+    description?: string;
+    priceNgn: number;
+    quantityAvailable: number;
+    perks?: string[];
+  }[];
+}
+
+export interface UpdateEventRequest extends Partial<CreateEventRequest> {
+  status?: EventStatus;
+  askRubyTags?: string[];
+}
+
+// ============================================================
+// Deolu admin health dashboard (renamed from "Ask Ruby" in Phase 12a).
+// Mirrors the response of GET /admin/ask-ruby/health (route preserved
+// for backward compat).
+// ============================================================
+
+export interface DeoluHealthMetrics {
+  window: { hours: number; since: string };
+  usage: {
+    dauToday: number;
+    conversationsToday: number;
+    conversationsInWindow: number;
+    messagesInWindow: number;
+    avgTurnsPerConvo: number;
+    usersAtCapToday: number;
+    freeTierDailyLimit: number;
+  };
+  quality: {
+    successfulConversations: number;
+    successRatePct: number;
+    totalAssistantMessages: number;
+    avgLatencyMs: number;
+    maxLatencyMs: number;
+  };
+  cost: {
+    todayKobo: number;
+    todayNgn: number;
+    monthToDateKobo: number;
+    monthToDateNgn: number;
+    monthlyBudgetKobo: number;
+    monthlyBudgetNgn: number;
+    budgetUsedPct: number;
+    circuitBreakerState: "HEALTHY" | "WARNING" | "HALTED";
+  };
+  rollout: { percent: number };
+}

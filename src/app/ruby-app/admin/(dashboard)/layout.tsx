@@ -18,6 +18,7 @@ import {
   Wallet,
   ScrollText,
   LogOut,
+  KeyRound,
   Menu,
   X,
   ChevronRight,
@@ -31,10 +32,14 @@ import {
   Star,
   Smartphone,
   ArrowRight,
+  LayoutGrid,
+  Ticket,
+  Sparkles,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
 import { NotificationDropdown } from "@/components/ui/notification-dropdown";
+import { ChangePasswordModal } from "@/components/admin/change-password-modal";
 import { getInitials } from "@/lib/utils";
 
 interface NavItem {
@@ -64,6 +69,7 @@ const navGroups: NavGroup[] = [
       { label: "Admin Users", href: "/ruby-app/admin/users", icon: Users, superOnly: true },
       { label: "Taxonomy", href: "/ruby-app/admin/taxonomy", icon: FolderTree, hiddenForRoles: ["location_admin"] },
       { label: "Templates", href: "/ruby-app/admin/templates", icon: FileText, hiddenForRoles: ["location_admin"] },
+      { label: "Home Sections", href: "/ruby-app/admin/home-sections", icon: LayoutGrid, hiddenForRoles: ["location_admin"] },
       { label: "Legal", href: "/ruby-app/admin/legal", icon: Scale, hiddenForRoles: ["location_admin"] },
     ],
   },
@@ -77,6 +83,7 @@ const navGroups: NavGroup[] = [
       { label: "Orders", href: "/ruby-app/admin/orders", icon: ShoppingCart },
       { label: "Delivery", href: "/ruby-app/admin/delivery", icon: Truck },
       { label: "Bookings", href: "/ruby-app/admin/bookings", icon: CalendarCheck },
+      { label: "Events", href: "/ruby-app/admin/events", icon: Ticket },
       { label: "Disputes", href: "/ruby-app/admin/disputes", icon: AlertTriangle },
       { label: "Campaigns", href: "/ruby-app/admin/campaigns", icon: Megaphone },
       { label: "Promos", href: "/ruby-app/admin/promos", icon: Tag },
@@ -91,6 +98,7 @@ const navGroups: NavGroup[] = [
       { label: "Auto-payouts", href: "/ruby-app/admin/auto-payouts", icon: ArrowRight },
       { label: "App Versions", href: "/ruby-app/admin/app-versions", icon: Smartphone },
       { label: "Audit Logs", href: "/ruby-app/admin/audit-logs", icon: ScrollText },
+      { label: "Deolu health", href: "/ruby-app/admin/deolu", icon: Sparkles },
     ],
   },
 ];
@@ -101,6 +109,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -225,6 +234,16 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="py-1">
                       <button
+                        onClick={() => {
+                          setProfileOpen(false);
+                          setChangePasswordOpen(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <KeyRound className="w-4 h-4 text-gray-400" />
+                        Change password
+                      </button>
+                      <button
                         onClick={logout}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                       >
@@ -242,6 +261,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         {/* Page content */}
         <main className="p-4 lg:p-6">{children}</main>
       </div>
+
+      {/* Self-service password change. Available to every authenticated
+          admin regardless of role — every admin owns their own credential. */}
+      <ChangePasswordModal
+        isOpen={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+        mode="self"
+      />
     </div>
   );
 }

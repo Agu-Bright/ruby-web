@@ -423,6 +423,30 @@ export const api = {
       }),
     delete: (id: string) =>
       request<void>(`/admin/users/${id}`, { method: "DELETE" }),
+
+    /**
+     * Self-service password change for the currently authenticated admin.
+     * Requires the current password (security boundary so a stolen access
+     * token alone can't rotate it). Backend rejects with 401 +
+     * `INVALID_CURRENT_PASSWORD` if the current is wrong, 400 +
+     * `SAME_PASSWORD` if new === current.
+     */
+    changeMyPassword: (data: { currentPassword: string; newPassword: string }) =>
+      request<import("@/lib/types").AdminUser>(
+        "/admin/users/me/password",
+        { method: "PATCH", body: data },
+      ),
+
+    /**
+     * Super-admin override: reset another admin's password without
+     * knowing their current one. Audit-logged loudly. Refuses to reset
+     * a peer super admin (use changeMyPassword for self).
+     */
+    resetPassword: (id: string, data: { newPassword: string }) =>
+      request<import("@/lib/types").AdminUser>(
+        `/admin/users/${id}/password`,
+        { method: "PUT", body: data },
+      ),
   },
 
   // Locations — backend controller is @Controller('locations')
@@ -1460,6 +1484,75 @@ export const api = {
       request<import("@/lib/types").HomeSectionFeedItem[]>(
         "/public/home-sections",
         { params: { locationId } },
+      ),
+  },
+
+  // ─────────────────────────────────────────────────────────────────
+  // Events — Phase 6 ticketing. Admin CRUD + publish/cancel.
+  // The customer-facing read paths live under /public/events; this
+  // section is the admin surface only.
+  // ─────────────────────────────────────────────────────────────────
+  events: {
+    list: (params?: {
+      locationId?: string;
+      startsAfter?: string;
+      startsBefore?: string;
+      limit?: number;
+      skip?: number;
+    }) =>
+      request<{ items: import("@/lib/types").RubyEvent[]; total: number }>(
+        "/admin/events",
+        {
+          params: params as Record<
+            string,
+            string | number | boolean | undefined
+          >,
+        },
+      ),
+    get: (id: string) =>
+      request<import("@/lib/types").RubyEvent>(`/admin/events/${id}`),
+    create: (data: import("@/lib/types").CreateEventRequest) =>
+      request<import("@/lib/types").RubyEvent>("/admin/events", {
+        method: "POST",
+        body: data,
+      }),
+    update: (
+      id: string,
+      data: import("@/lib/types").UpdateEventRequest,
+    ) =>
+      request<import("@/lib/types").RubyEvent>(`/admin/events/${id}`, {
+        method: "PUT",
+        body: data,
+      }),
+    publish: (id: string) =>
+      request<import("@/lib/types").RubyEvent>(`/admin/events/${id}/publish`, {
+        method: "POST",
+      }),
+    cancel: (id: string) =>
+      request<import("@/lib/types").RubyEvent>(`/admin/events/${id}/cancel`, {
+        method: "POST",
+      }),
+    refundAllTickets: (id: string) =>
+      request<{
+        refunded: number;
+        skipped: number;
+        totalNgnRefunded: number;
+        failures: number;
+      }>(`/admin/events/${id}/refund-all-tickets`, { method: "POST" }),
+    delete: (id: string) =>
+      request<void>(`/admin/events/${id}`, { method: "DELETE" }),
+  },
+
+  // ─────────────────────────────────────────────────────────────────
+  // Deolu admin — Phase 7 (renamed from "Ask Ruby" in Phase 12a).
+  // Health dashboard + tag review queue. Backend route still
+  // `/admin/ask-ruby/health` for backward compat.
+  // ─────────────────────────────────────────────────────────────────
+  deolu: {
+    health: (hours = 24) =>
+      request<import("@/lib/types").DeoluHealthMetrics>(
+        "/admin/ask-ruby/health",
+        { params: { hours } },
       ),
   },
 };

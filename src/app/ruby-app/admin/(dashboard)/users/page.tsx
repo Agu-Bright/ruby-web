@@ -12,6 +12,7 @@ import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { Modal, StatusBadge, StatCard, SearchableSelect, DataTable } from '@/components/ui';
 import type { SelectOption, Column } from '@/components/ui';
+import { ChangePasswordModal } from '@/components/admin/change-password-modal';
 import { formatDate, formatDateTime, getInitials } from '@/lib/utils';
 import type {
   AdminUser, AdminRole, AdminScope, CreateAdminRequest, UpdateAdminRequest,
@@ -209,6 +210,7 @@ export default function AdminUsersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewAdmin, setViewAdmin] = useState<AdminUser | null>(null);
   const [editAdmin, setEditAdmin] = useState<AdminUser | null>(null);
+  const [resetPwAdmin, setResetPwAdmin] = useState<AdminUser | null>(null);
   const [adminCreds, setAdminCreds] = useState<{ firstName: string; lastName: string; email: string; password: string; roles: AdminRole[] } | null>(null);
 
   const { data: users, meta, isLoading, error, refetch } = useApi<AdminUser[]>(
@@ -359,6 +361,16 @@ export default function AdminUsersPage() {
                   tooltip="Edit"
                   onClick={(e) => { e.stopPropagation(); setEditAdmin(user); }}
                   variant="blue"
+                />
+                {/* Reset password — backend refuses if target is a peer
+                    super_admin, but we still surface the button so the
+                    super_admin knows the action exists. If a colleague
+                    forgot their password, this is the recovery path. */}
+                <ActionButton
+                  icon={KeyRound}
+                  tooltip="Reset password"
+                  onClick={(e) => { e.stopPropagation(); setResetPwAdmin(user); }}
+                  variant="amber"
                 />
                 {isActive ? (
                   <ActionButton
@@ -538,6 +550,23 @@ export default function AdminUsersPage() {
           onClose={() => setAdminCreds(null)}
         />
       )}
+
+      {/* Super-admin reset of another admin's password. Backend refuses
+          if the target is also a super_admin — we let the request go
+          and surface the 403 message inside the modal rather than
+          gating in the UI, because the rule lives server-side. */}
+      <ChangePasswordModal
+        isOpen={!!resetPwAdmin}
+        onClose={() => setResetPwAdmin(null)}
+        mode="reset"
+        targetAdminId={resetPwAdmin?._id}
+        targetAdminName={
+          resetPwAdmin
+            ? `${resetPwAdmin.firstName} ${resetPwAdmin.lastName}`.trim() ||
+              resetPwAdmin.email
+            : undefined
+        }
+      />
     </div>
   );
 }

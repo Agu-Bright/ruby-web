@@ -683,6 +683,22 @@ export const api = {
         `/admin/businesses/${id}/verify-cac`,
         { method: "POST", body: data },
       ),
+    /**
+     * Phase 13.2/13.10: flip `isVerified=true` so the business becomes
+     * eligible for Deolu AI recommendations ("Ruby Verified" gate).
+     * Distinct from CAC verification — a business can be CAC-verified
+     * but not yet promoted to Deolu's surface.
+     */
+    verify: (id: string) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/verify`,
+        { method: "POST" },
+      ),
+    unverify: (id: string, reason: string) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/unverify`,
+        { method: "POST", body: { reason } },
+      ),
     delete: (id: string) =>
       request<null>(`/admin/businesses/${id}`, { method: "DELETE" }),
     adminCreate: (data: import("@/lib/types").AdminCreateBusinessRequest) =>

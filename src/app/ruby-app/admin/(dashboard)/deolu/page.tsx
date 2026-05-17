@@ -219,6 +219,98 @@ export default function DeoluHealthPage() {
               </div>
             </div>
           </div>
+
+          {/* Phase 13.9 — quality-gate panel */}
+          {data.qualityGates && (
+            <div className="card p-6">
+              <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                <Lock size={18} /> Quality gates (Voice Filter + Hallucination Guard)
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <QualityRow
+                  label="Voice Filter pass rate"
+                  value={`${data.qualityGates.voiceFilter.firstTryPassRatePct}%`}
+                  hint={`${data.qualityGates.voiceFilter.totalAssistantMessages} messages scanned`}
+                  good={data.qualityGates.voiceFilter.firstTryPassRatePct >= 90}
+                />
+                <QualityRow
+                  label="Voice Filter rewrites"
+                  value={String(data.qualityGates.voiceFilter.rewriteCount)}
+                  hint="Claude needed a meta-prompt rewrite"
+                />
+                <QualityRow
+                  label="Scripted fallbacks"
+                  value={String(data.qualityGates.voiceFilter.scriptedFallbackCount)}
+                  hint="2 retries exhausted; template used"
+                  good={data.qualityGates.voiceFilter.scriptedFallbackCount === 0}
+                />
+                <QualityRow
+                  label="Hallucination flags"
+                  value={String(data.qualityGates.hallucinationGuard.flaggedAssistantMessages)}
+                  hint="Merchant names not in tool results"
+                  good={data.qualityGates.hallucinationGuard.flaggedAssistantMessages === 0}
+                />
+              </div>
+              {Object.keys(data.qualityGates.fallbackTemplatesByName).length > 0 && (
+                <div className="mt-4 text-xs text-gray-600">
+                  <div className="font-semibold mb-1 uppercase tracking-wider text-[10px] text-gray-500">
+                    Fallback templates used
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(data.qualityGates.fallbackTemplatesByName).map(
+                      ([name, count]) => (
+                        <span
+                          key={name}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 border border-gray-200"
+                        >
+                          <code className="text-gray-700">{name}</code>
+                          <span className="text-gray-500">×{count}</span>
+                        </span>
+                      ),
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Phase 13.9 — Atlas Vector Search index status */}
+          {data.atlasVectorIndex && (
+            <div className="card p-6">
+              <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                <Activity size={18} /> Atlas Vector Search index
+              </h2>
+              {data.atlasVectorIndex.error ? (
+                <div className="text-sm text-red-700 bg-red-50 p-3 rounded">
+                  Error: {data.atlasVectorIndex.error}
+                </div>
+              ) : data.atlasVectorIndex.present ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <QualityRow
+                    label="Name"
+                    value={data.atlasVectorIndex.name ?? '—'}
+                  />
+                  <QualityRow
+                    label="Status"
+                    value={data.atlasVectorIndex.status ?? '—'}
+                    good={data.atlasVectorIndex.queryable === true}
+                  />
+                  <QualityRow
+                    label="Queryable"
+                    value={data.atlasVectorIndex.queryable ? 'Yes' : 'No'}
+                    good={data.atlasVectorIndex.queryable === true}
+                  />
+                </div>
+              ) : (
+                <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded">
+                  ⚠ Vector index <code>{data.atlasVectorIndex.name}</code> is
+                  not present. Deolu searches will return empty. Set{' '}
+                  <code>DEOLU_AUTO_BOOTSTRAP_INDEXES=true</code> and restart
+                  to auto-create, or create it manually in Atlas.
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

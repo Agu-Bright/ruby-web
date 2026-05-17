@@ -2213,4 +2213,24 @@ export interface DeoluHealthMetrics {
     circuitBreakerState: "HEALTHY" | "WARNING" | "HALTED";
   };
   rollout: { percent: number };
+  // Phase 13.9 — quality-gate telemetry
+  qualityGates?: {
+    voiceFilter: {
+      totalAssistantMessages: number;
+      firstTryPassRatePct: number;
+      rewriteCount: number;
+      scriptedFallbackCount: number;
+    };
+    hallucinationGuard: {
+      flaggedAssistantMessages: number;
+    };
+    fallbackTemplatesByName: Record<string, number>;
+  };
+  atlasVectorIndex?: {
+    name?: string;
+    present?: boolean;
+    queryable?: boolean;
+    status?: string;
+    error?: string;
+  } | null;
 }

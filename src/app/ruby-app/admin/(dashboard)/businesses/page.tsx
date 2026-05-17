@@ -41,7 +41,7 @@ const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED',
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status' | 'edit';
+type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status' | 'edit' | 'verify-deolu' | 'unverify-deolu';
 
 // ─── Action Dropdown Component ───
 function ActionDropdown({ business, onAction, onView }: {
@@ -79,6 +79,27 @@ function ActionDropdown({ business, onAction, onView }: {
   }
   if (business.status === 'SUSPENDED') {
     items.push({ label: 'Reinstate', icon: RotateCcw, action: () => { onAction(business, 'reinstate'); setOpen(false); }, variant: 'success' });
+  }
+
+  // Phase 13.10 — Deolu verification (separate from CAC verification).
+  // `isVerified=true` is the gate that lets the AI surface this business
+  // in recommendations. Only available for LIVE businesses.
+  if (business.status === 'LIVE') {
+    if (business.isVerified) {
+      items.push({
+        label: 'Remove Deolu Verified',
+        icon: XCircle,
+        action: () => { onAction(business, 'unverify-deolu'); setOpen(false); },
+        variant: 'warning',
+      });
+    } else {
+      items.push({
+        label: 'Mark Deolu Verified',
+        icon: CheckCircle,
+        action: () => { onAction(business, 'verify-deolu'); setOpen(false); },
+        variant: 'success',
+      });
+    }
   }
 
   items.push({
@@ -236,6 +257,15 @@ export default function BusinessesPage() {
   const { mutate: deleteBusiness, isLoading: deleting } = useMutation(
     ({ id }: { id: string }) => api.businesses.delete(id), mutationOpts
   );
+  // Phase 13.10: Deolu Ruby-Verified flip — separate from CAC verification.
+  const { mutate: verifyDeolu, isLoading: verifyingDeolu } = useMutation(
+    ({ id }: { id: string }) => api.businesses.verify(id), mutationOpts
+  );
+  const { mutate: unverifyDeolu, isLoading: unverifyingDeolu } = useMutation(
+    ({ id, reason }: { id: string; reason: string }) =>
+      api.businesses.unverify(id, reason),
+    mutationOpts
+  );
 
   const { mutate: createBusiness, isLoading: creating } = useMutation(
     (data: AdminCreateBusinessRequest) => api.businesses.adminCreate(data), mutationOpts
@@ -244,7 +274,16 @@ export default function BusinessesPage() {
     ({ id }: { id: string }) => api.businesses.regenerateClaimCode(id), mutationOpts
   );
 
-  const isProcessing = approving || rejecting || suspending || reinstating || verifyingCac || featuring || deleting;
+  const isProcessing =
+    approving ||
+    rejecting ||
+    suspending ||
+    reinstating ||
+    verifyingCac ||
+    featuring ||
+    deleting ||
+    verifyingDeolu ||
+    unverifyingDeolu;
 
   // Hierarchical: toggle parent expand and fetch branches
   const toggleParent = useCallback(async (parentId: string) => {
@@ -397,6 +436,18 @@ export default function BusinessesPage() {
       case 'delete':
         result = await deleteBusiness({ id: business._id });
         successMsg = `"${business.name}" has been deleted`;
+        break;
+      case 'verify-deolu':
+        result = await verifyDeolu({ id: business._id });
+        successMsg = `"${business.name}" is now Ruby Verified — eligible for Deolu recommendations`;
+        break;
+      case 'unverify-deolu':
+        if (!reason) {
+          toast.error('Reason is required when removing Ruby Verified status');
+          return;
+        }
+        result = await unverifyDeolu({ id: business._id, reason });
+        successMsg = `"${business.name}" is no longer Ruby Verified`;
         break;
       case 'update-status':
         switch (selectedStatus) {
@@ -584,11 +635,32 @@ export default function BusinessesPage() {
         variant: 'primary',
         icon: Edit2,
       },
+      'verify-deolu': {
+        title: 'Mark Ruby Verified',
+        description: (name) =>
+          `Mark "${name}" as Ruby Verified? They'll become eligible for ` +
+          `Deolu AI recommendations. The change is reflected after the next ` +
+          `merchant embedding refresh (auto via post-save hook).`,
+        label: 'Verify',
+        variant: 'primary',
+        icon: CheckCircle,
+      },
+      'unverify-deolu': {
+        title: 'Remove Ruby Verified',
+        description: (name) =>
+          `Remove "${name}" from Ruby Verified merchants? Deolu will stop ` +
+          `recommending them immediately. Provide a reason for the audit ` +
+          `trail.`,
+        label: 'Remove Verified',
+        variant: 'danger',
+        icon: XCircle,
+      },
     };
     return configs[action];
   };
 
-  const needsReason = (action: ActionType) => ['reject', 'suspend', 'reject-cac'].includes(action);
+  const needsReason = (action: ActionType) =>
+    ['reject', 'suspend', 'reject-cac', 'unverify-deolu'].includes(action);
 
   // ─── Table column headers ───
   const tableHeaders = ['Business', 'Status', 'Owner', 'Location', 'Pandago', 'Created', ''];

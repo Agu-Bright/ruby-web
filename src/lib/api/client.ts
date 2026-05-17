@@ -966,6 +966,33 @@ export const api = {
       }),
   },
 
+  // Dispute notification recipients (Phase 14) — admin-managed email
+  // list for dispute event alerts. Co-located with disputes.* because
+  // the Recipients tab lives on the disputes page.
+  disputeRecipients: {
+    list: () =>
+      request<import("@/lib/types").DisputeNotificationRecipient[]>(
+        "/admin/disputes/notification-recipients",
+      ),
+    create: (data: import("@/lib/types").CreateDisputeRecipientRequest) =>
+      request<import("@/lib/types").DisputeNotificationRecipient>(
+        "/admin/disputes/notification-recipients",
+        { method: "POST", body: data },
+      ),
+    update: (
+      id: string,
+      data: import("@/lib/types").UpdateDisputeRecipientRequest,
+    ) =>
+      request<import("@/lib/types").DisputeNotificationRecipient>(
+        `/admin/disputes/notification-recipients/${id}`,
+        { method: "PATCH", body: data },
+      ),
+    delete: (id: string) =>
+      request<void>(`/admin/disputes/notification-recipients/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
   // Finance
   wallets: {
     list: (

@@ -1185,6 +1185,57 @@ export interface AddDisputeMessageRequest {
 }
 
 // ============================================================
+// Dispute notification recipients (Phase 14)
+// ============================================================
+/**
+ * Which lifecycle event a recipient is subscribed to. Mirrors the
+ * `events` sub-object on the backend `DisputeNotificationRecipient`
+ * schema — keep keys in sync verbatim.
+ */
+export type DisputeNotificationEvent =
+  | 'filed'
+  | 'messageAdded'
+  | 'statusChanged'
+  | 'resolved';
+
+/** Display labels for the 4 events, in the order admins typically read them. */
+export const DISPUTE_NOTIFICATION_EVENT_LABELS: Record<
+  DisputeNotificationEvent,
+  string
+> = {
+  filed: 'New dispute filed',
+  messageAdded: 'New message added',
+  statusChanged: 'Status changed',
+  resolved: 'Resolved',
+};
+
+export interface DisputeNotificationRecipient {
+  _id: string;
+  email: string;
+  label?: string;
+  isActive: boolean;
+  events: Record<DisputeNotificationEvent, boolean>;
+  createdByAdminId?: string;
+  updatedByAdminId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDisputeRecipientRequest {
+  email: string;
+  label?: string;
+  /** Partial — any omitted flag defaults to true server-side. */
+  events?: Partial<Record<DisputeNotificationEvent, boolean>>;
+}
+
+export interface UpdateDisputeRecipientRequest {
+  label?: string;
+  isActive?: boolean;
+  /** Partial — only provided flags are updated server-side. */
+  events?: Partial<Record<DisputeNotificationEvent, boolean>>;
+}
+
+// ============================================================
 // Finance: Wallet, Payouts, Ledger
 // ============================================================
 export type PayoutStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'REJECTED' | 'FAILED' | 'CANCELLED';

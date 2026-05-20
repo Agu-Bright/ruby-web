@@ -1,6 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { businessLink } from "@/lib/subdomain-links";
 
 export default function PartnerHero() {
   return (
@@ -34,15 +34,17 @@ export default function PartnerHero() {
             reach more customers—both nearby and beyond.
           </p>
 
-          {/* Primary CTA */}
+          {/* Primary CTA — cross-origin in production (business subdomain),
+              same-origin in dev. Plain <a> because Next.js <Link> can't
+              navigate cross-origin. */}
           <div className="mb-8">
-            <Link
-              href="/business/register"
+            <a
+              href={businessLink('/register')}
               className="inline-flex items-center gap-2 bg-ruby-red text-white px-8 py-4 rounded-lg font-semibold text-base hover:bg-ruby-red/90 transition-colors shadow-lg shadow-ruby-red/30"
             >
               Register Your Business
               <ArrowRight className="w-5 h-5" />
-            </Link>
+            </a>
             <p className="text-white/70 text-sm mt-3">
               Free to register. Get set up in minutes.
             </p>

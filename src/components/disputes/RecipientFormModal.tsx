@@ -148,7 +148,7 @@ export function RecipientFormModal({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isEdit}
-              placeholder="ops-oncall@rubyplus.com"
+              placeholder="ops-oncall@rubyplus.net"
               className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ruby-200 focus:border-ruby-300 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
             />
           </div>

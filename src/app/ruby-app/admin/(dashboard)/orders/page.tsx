@@ -347,6 +347,13 @@ function OrderDetailContent({ order, isSuperAdmin, onAction }: { order: Order; i
           {getOrderDeliveryFee(order) > 0 && <FeeRow label="Delivery Fee" amount={getOrderDeliveryFee(order)} currency={order.currency} />}
           {getOrderPlatformFee(order) > 0 && <FeeRow label="Platform Fee" amount={getOrderPlatformFee(order)} currency={order.currency} />}
           {(order.fees?.serviceFee ?? 0) > 0 && <FeeRow label="Service Fee" amount={order.fees!.serviceFee!} currency={order.currency} />}
+          {(order.fees?.vat ?? 0) > 0 && (
+            <FeeRow
+              label={`VAT (${order.fees?.vatRate ?? 7.5}%)`}
+              amount={order.fees!.vat!}
+              currency={order.currency}
+            />
+          )}
           {(order.fees?.tax ?? 0) > 0 && <FeeRow label="Tax" amount={order.fees!.tax!} currency={order.currency} />}
           {getOrderDiscount(order) > 0 && <div className="flex justify-between text-green-600"><span>Discount</span><span>-{formatCurrency(getOrderDiscount(order), order.currency)}</span></div>}
           {(order.fees?.tip ?? 0) > 0 && <FeeRow label="Tip" amount={order.fees!.tip!} currency={order.currency} />}

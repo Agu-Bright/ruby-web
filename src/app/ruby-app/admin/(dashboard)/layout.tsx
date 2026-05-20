@@ -35,6 +35,7 @@ import {
   LayoutGrid,
   Ticket,
   Sparkles,
+  Receipt,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -95,6 +96,7 @@ const navGroups: NavGroup[] = [
     title: "Finance & System",
     items: [
       { label: "Finance", href: "/ruby-app/admin/finance", icon: Wallet },
+      { label: "VAT Report", href: "/ruby-app/admin/finance/vat-report", icon: Receipt },
       { label: "Auto-payouts", href: "/ruby-app/admin/auto-payouts", icon: ArrowRight },
       { label: "App Versions", href: "/ruby-app/admin/app-versions", icon: Smartphone },
       { label: "Audit Logs", href: "/ruby-app/admin/audit-logs", icon: ScrollText },

@@ -486,6 +486,13 @@ function BookingDetailContent({ booking }: { booking: Booking }) {
             <FeeRow label="Service Fee" amount={fb.serviceFee} currency={booking.currency} />
             {fb.travelFee > 0 && <FeeRow label="Travel Fee" amount={fb.travelFee} currency={booking.currency} />}
             <FeeRow label="Platform Fee" amount={fb.platformFee} currency={booking.currency} />
+            {(fb.vat ?? 0) > 0 && (
+              <FeeRow
+                label={`VAT (${fb.vatRate ?? 7.5}%)`}
+                amount={fb.vat!}
+                currency={booking.currency}
+              />
+            )}
             {fb.discount > 0 && <FeeRow label="Discount" amount={-fb.discount} currency={booking.currency} className="text-emerald-600" />}
             {fb.tax > 0 && <FeeRow label="Tax" amount={fb.tax} currency={booking.currency} />}
             <div className="border-t border-gray-200 pt-2 mt-2">

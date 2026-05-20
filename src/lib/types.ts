@@ -935,7 +935,12 @@ export interface OrderFees {
   deliveryFee?: number;
   platformFee?: number;
   serviceFee?: number;
+  /** @deprecated — legacy placeholder, always 0. Use `vat` instead. */
   tax?: number;
+  /** Phase 16: VAT (7.5%) on Ruby+ platform fees. */
+  vat?: number;
+  /** Snapshot of the VAT rate applied (%). */
+  vatRate?: number;
   discount?: number;
   tip?: number;
   total?: number;
@@ -1046,7 +1051,12 @@ export interface BookingFeeBreakdown {
   platformFee: number;
   discount: number;
   deposit: number;
+  /** @deprecated — legacy placeholder, always 0. Use `vat` instead. */
   tax: number;
+  /** Phase 16: VAT (7.5%) on the booking's platformFee. */
+  vat?: number;
+  /** Snapshot of the VAT rate applied (%). */
+  vatRate?: number;
   total: number;
   amountPaid: number;
   balanceDue: number;
@@ -1320,7 +1330,33 @@ export type FeeType =
   | 'ORDER_PLATFORM_FEE'
   | 'BOOKING_PLATFORM_FEE'
   | 'PAYMENT_PROCESSING_FEE'
-  | 'DELIVERY_PLATFORM_FEE';
+  | 'DELIVERY_PLATFORM_FEE'
+  | 'PLATFORM_DISCOUNT'
+  // Phase 16: Nigerian VAT (7.5%) on Ruby+ platform fees
+  | 'VAT';
+
+// ============================================================
+// VAT report (Phase 16)
+// ============================================================
+export interface VatReportRow {
+  type: 'ORDER' | 'BOOKING' | 'EVENT_TICKET';
+  count: number;
+  collected: number;
+  refunded: number;
+  net: number;
+}
+
+export interface VatReport {
+  totalCollected: number;
+  totalRefunded: number;
+  netVat: number;
+  currency: string;
+  transactionCount: number;
+  byType: VatReportRow[];
+  startDate: string;
+  endDate: string;
+  locationId: string | null;
+}
 
 export interface FeeConfig {
   _id: string;

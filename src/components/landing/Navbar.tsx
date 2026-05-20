@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { adminLink } from '@/lib/subdomain-links';
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -61,17 +62,19 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* CTA */}
+          {/* CTA — cross-origin in production (admin subdomain), same-origin
+              in dev (where adminLink returns a relative path). Plain <a> is
+              correct here because Next.js <Link> can't navigate cross-origin. */}
           <div className="hidden md:block">
-            <Link
-              href="/ruby-app/admin/login"
+            <a
+              href={adminLink('/login')}
               className="btn-ruby inline-flex items-center gap-2 px-6 py-2.5 bg-ruby-red text-white text-sm font-semibold rounded-lg"
             >
               Get Started
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
-            </Link>
+            </a>
           </div>
 
           {/* Mobile toggle */}
@@ -111,13 +114,13 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Link
-              href="/ruby-app/admin/login"
+            <a
+              href={adminLink('/login')}
               onClick={() => setMobileOpen(false)}
               className="block mt-3 text-center px-6 py-2.5 bg-ruby-red text-white text-sm font-semibold rounded-lg"
             >
               Get Started →
-            </Link>
+            </a>
           </div>
         </div>
       )}

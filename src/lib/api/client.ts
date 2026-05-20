@@ -993,6 +993,21 @@ export const api = {
       }),
   },
 
+  // Phase 16 — VAT report (FIRS-remittance aggregation)
+  vat: {
+    report: (params: {
+      startDate: string;
+      endDate: string;
+      locationId?: string;
+    }) =>
+      request<import("@/lib/types").VatReport>(
+        "/admin/finance/vat-report",
+        {
+          params: params as Record<string, string | number | boolean | undefined>,
+        },
+      ),
+  },
+
   // Finance
   wallets: {
     list: (

@@ -189,6 +189,10 @@ body {
   from { transform: translateX(-100%); }
   to { transform: translateX(0); }
 }
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
@@ -200,6 +204,9 @@ body {
 }
 .animate-slide-in-left {
   animation: slideInLeft 0.25s ease-out;
+}
+.animate-slide-in-right {
+  animation: slideInRight 0.25s ease-out;
 }
 
 /* Hide scrollbar for horizontal scroll containers */

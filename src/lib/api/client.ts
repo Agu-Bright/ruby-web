@@ -1573,6 +1573,16 @@ export const api = {
         "/public/home-sections",
         { params: { locationId } },
       ),
+    /**
+     * Re-run the default-section seed. Idempotent server-side (skips
+     * when the collection already has rows). Surfaced via the empty
+     * state's "Seed defaults" button so admins can recover from an
+     * empty collection without a redeploy.
+     */
+    seed: () =>
+      request<{ created: number }>("/admin/home-sections/seed", {
+        method: "POST",
+      }),
   },
 
   // ─────────────────────────────────────────────────────────────────

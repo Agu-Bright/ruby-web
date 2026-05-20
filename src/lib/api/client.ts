@@ -1282,6 +1282,25 @@ export const api = {
         method: "POST",
         body: data,
       }),
+    /**
+     * Dry-run preview of how many users / devices a broadcast WOULD
+     * reach. Surfaced near the Send button so admins can spot empty-
+     * audience problems (the silent-delivery-failure mode) BEFORE
+     * clicking. A value of 0 here is the alarm bell.
+     */
+    broadcastPreview: (params: {
+      targetAudience: import("@/lib/types").BroadcastTargetAudience;
+      locationIds?: string[];
+    }) => {
+      const searchParams = new URLSearchParams();
+      searchParams.set("targetAudience", params.targetAudience);
+      (params.locationIds || []).forEach((id) =>
+        searchParams.append("locationIds", id),
+      );
+      return request<import("@/lib/types").BroadcastPreviewResponse>(
+        `/admin/notifications/broadcast/preview?${searchParams.toString()}`,
+      );
+    },
     broadcastHistory: (params?: { page?: number; limit?: number }) => {
       const searchParams = new URLSearchParams();
       if (params?.page) searchParams.set("page", String(params.page));

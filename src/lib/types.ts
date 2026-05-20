@@ -1743,6 +1743,21 @@ export interface AdminNotificationListResponse {
 export type BroadcastTargetAudience = 'ALL' | 'USERS' | 'BUSINESS_OWNERS';
 export type BroadcastStatus = 'PENDING' | 'SENDING' | 'COMPLETED' | 'FAILED';
 
+/**
+ * One photo OR one video attached to a broadcast. Stored on the
+ * broadcast doc and on each recipient's in-app notification so the
+ * mobile feed can render it inline. URLs point at our own R2 bucket
+ * (uploaded via `POST /admin/media/upload`).
+ */
+export interface BroadcastAttachment {
+  url: string;
+  type: 'image' | 'video';
+  mimeType?: string;
+  fileName?: string;
+  sizeBytes?: number;
+  thumbnailUrl?: string;
+}
+
 export interface BroadcastNotification {
   _id: string;
   title: string;
@@ -1755,6 +1770,7 @@ export interface BroadcastNotification {
   totalFailed: number;
   status: BroadcastStatus;
   data?: Record<string, unknown>;
+  attachment?: BroadcastAttachment;
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -1766,6 +1782,24 @@ export interface BroadcastNotificationRequest {
   targetAudience: BroadcastTargetAudience;
   locationIds?: string[];
   data?: Record<string, unknown>;
+  // Optional — single photo OR single video. Build the object after
+  // uploading the file to `/admin/media/upload` so this carries a URL.
+  attachment?: BroadcastAttachment;
+}
+
+/**
+ * Dry-run audience preview — `GET /admin/notifications/broadcast/preview`.
+ * Returns how many users/devices a real send would actually reach,
+ * without sending anything. Surfaced near the Send button so admins
+ * can spot empty-audience problems before clicking.
+ */
+export interface BroadcastPreviewResponse {
+  recipientCount: number;
+  activeDeviceTokenCount: number;
+  audienceBreakdown: {
+    users: number;
+    businessOwners: number;
+  };
 }
 
 export interface BroadcastHistoryResponse {

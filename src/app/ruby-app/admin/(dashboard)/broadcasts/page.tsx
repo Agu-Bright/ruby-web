@@ -16,6 +16,11 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  ImagePlus,
+  Film,
+  Trash2,
+  AlertCircle,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -25,6 +30,8 @@ import type {
   BroadcastTargetAudience,
   BroadcastNotification,
   BroadcastHistoryResponse,
+  BroadcastAttachment,
+  BroadcastPreviewResponse,
   Location,
 } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -67,6 +74,27 @@ export default function BroadcastsPage() {
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // ── Phase 22 — attachment + audience preview state ──
+  // Single optional attachment (one image OR one video per broadcast).
+  // Lifecycle: user picks file → we upload to /admin/media/upload →
+  // build BroadcastAttachment object → send with broadcast. Removing
+  // the file just clears local state; the orphaned R2 object will be
+  // GC'd by the media module's cleanup job (out of scope here).
+  const [attachment, setAttachment] = useState<BroadcastAttachment | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Audience preview — fetched whenever the audience/location filter
+  // changes. Surfaces "Will reach X devices" near the Send button so
+  // admins can spot empty-audience problems (the silent-failure mode
+  // that prompted this whole phase) BEFORE pressing Send.
+  const [preview, setPreview] = useState<BroadcastPreviewResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Last-send result panel — shown inline after the send completes so
+  // admins see the actual delivery numbers, not just a toast. Cleared
+  // when the admin starts composing a new broadcast.
+  const [lastResult, setLastResult] = useState<BroadcastNotification | null>(null);
 
   // Locations for selector
   const [locations, setLocations] = useState<Location[]>([]);
@@ -135,10 +163,79 @@ export default function BroadcastsPage() {
     fetchHistory();
   }, [fetchHistory]);
 
+  // Fetch the audience preview whenever the targeting changes. Debounced
+  // by 250ms so rapidly toggling between audience options doesn't fire
+  // a request per tick. The request is read-only — safe to spam if it
+  // somehow does.
+  useEffect(() => {
+    let cancelled = false;
+    setPreviewLoading(true);
+    const handle = setTimeout(async () => {
+      try {
+        const res = await api.notifications.broadcastPreview({
+          targetAudience,
+          locationIds:
+            isGlobalScope && selectedLocationIds.length === 0
+              ? undefined
+              : selectedLocationIds,
+        });
+        if (cancelled) return;
+        setPreview((res.data || res) as BroadcastPreviewResponse);
+      } catch {
+        if (!cancelled) setPreview(null);
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [targetAudience, selectedLocationIds, isGlobalScope]);
+
+  /**
+   * File picker handler — uploads to `/admin/media/upload` first, then
+   * builds the BroadcastAttachment object. Single attachment per
+   * broadcast (image OR video), so any existing attachment is replaced.
+   * Size cap matches the backend's media module (100 MB hard limit).
+   */
+  const handleFileSelected = async (file: File) => {
+    if (!file) return;
+    const MAX_SIZE = 100 * 1024 * 1024; // 100 MB
+    if (file.size > MAX_SIZE) {
+      toast.error("File too large — maximum 100 MB.");
+      return;
+    }
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      toast.error("Only photos and videos are supported.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const res = await api.media.upload(file, "broadcasts");
+      const url = (res?.data?.url || (res as any)?.data?.publicUrl) as
+        | string
+        | undefined;
+      if (!url) throw new Error("Upload succeeded but no URL was returned");
+      setAttachment({
+        url,
+        type: file.type.startsWith("video/") ? "video" : "image",
+        mimeType: file.type,
+        fileName: file.name,
+        sizeBytes: file.size,
+      });
+      toast.success("Attachment uploaded");
+    } catch (err: any) {
+      toast.error(err?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSend = async () => {
     setIsSending(true);
     try {
-      await api.notifications.broadcast({
+      const res = await api.notifications.broadcast({
         title,
         body,
         targetAudience,
@@ -146,11 +243,32 @@ export default function BroadcastsPage() {
           isGlobalScope && selectedLocationIds.length === 0
             ? undefined
             : selectedLocationIds,
+        attachment: attachment || undefined,
       });
-      toast.success("Broadcast sent successfully");
+      // Surface the actual delivery numbers — recipients, sent, failed.
+      // No more silent "Sent successfully" toast when 0 actually went out.
+      const result = (res?.data || res) as BroadcastNotification;
+      setLastResult(result);
+      if (result.status === "FAILED") {
+        toast.error(
+          result.totalRecipients === 0
+            ? "Broadcast failed — no users in the audience received it. Check the audience preview before sending."
+            : `Broadcast failed — ${result.totalFailed} of ${result.totalRecipients} push deliveries failed.`,
+        );
+      } else if (result.totalFailed > 0) {
+        toast.warning(
+          `Broadcast partially delivered — ${result.totalPushSent} sent, ${result.totalFailed} failed.`,
+        );
+      } else {
+        toast.success(
+          `Broadcast sent to ${result.totalPushSent} recipient${result.totalPushSent === 1 ? "" : "s"}.`,
+        );
+      }
+
       setTitle("");
       setBody("");
       setTargetAudience("ALL");
+      setAttachment(null);
       if (isGlobalScope) setSelectedLocationIds([]);
       setShowConfirm(false);
       fetchHistory();
@@ -404,6 +522,92 @@ export default function BroadcastsPage() {
             </p>
           </div>
 
+          {/* Attachment — one photo OR one video per broadcast */}
+          <div>
+            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
+              Attachment (optional)
+            </label>
+            {attachment ? (
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 bg-gray-50">
+                {/* Thumbnail / video preview */}
+                {attachment.type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={attachment.url}
+                    alt={attachment.fileName || "attachment"}
+                    className="w-20 h-20 rounded-lg object-cover border border-gray-200"
+                  />
+                ) : (
+                  <video
+                    src={attachment.url}
+                    className="w-20 h-20 rounded-lg object-cover border border-gray-200 bg-gray-900"
+                    muted
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-gray-900">
+                    {attachment.type === "image" ? (
+                      <ImagePlus className="w-3.5 h-3.5 text-gray-500" />
+                    ) : (
+                      <Film className="w-3.5 h-3.5 text-gray-500" />
+                    )}
+                    <span className="truncate">{attachment.fileName || attachment.url}</span>
+                  </div>
+                  {attachment.sizeBytes ? (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {(attachment.sizeBytes / 1024 / 1024).toFixed(2)} MB · {attachment.mimeType}
+                    </p>
+                  ) : null}
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Will appear in the in-app feed
+                    {attachment.type === "image" ? " + Android push" : ""}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAttachment(null)}
+                  className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600"
+                  title="Remove attachment"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <label
+                className={`flex items-center gap-3 p-3 rounded-lg border border-dashed cursor-pointer transition-colors ${
+                  uploading
+                    ? "border-gray-200 bg-gray-50 cursor-wait"
+                    : "border-gray-300 hover:border-ruby-300 hover:bg-ruby-50/30"
+                }`}
+              >
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileSelected(file);
+                    e.target.value = "";
+                  }}
+                />
+                {uploading ? (
+                  <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                ) : (
+                  <ImagePlus className="w-5 h-5 text-gray-400" />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700">
+                    {uploading ? "Uploading…" : "Add photo or video"}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    One attachment per broadcast · 100 MB max · JPG / PNG / MP4 / MOV
+                  </p>
+                </div>
+              </label>
+            )}
+          </div>
+
           {/* Target Audience */}
           <div>
             <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 block">
@@ -525,8 +729,41 @@ export default function BroadcastsPage() {
             )}
           </div>
 
-          {/* Send Button */}
-          <div className="flex justify-end pt-2">
+          {/* Send Button + Audience preview chip
+              Shows admin "will reach X devices" BEFORE clicking Send.
+              A value of 0 is the alarm bell — means no one in the
+              targeted segment has registered push tokens, so an actual
+              send would deliver nothing. */}
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-2">
+              {previewLoading ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Calculating audience…
+                </span>
+              ) : preview ? (
+                preview.activeDeviceTokenCount === 0 ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-xs font-medium border border-red-200"
+                    title="No users in this audience have registered for push notifications. The broadcast won't be delivered."
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Will reach 0 devices
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200"
+                    title={`Recipients: ${preview.recipientCount} users · ${preview.activeDeviceTokenCount} devices`}
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    Will reach {preview.activeDeviceTokenCount} device
+                    {preview.activeDeviceTokenCount === 1 ? "" : "s"}
+                    {preview.recipientCount !== preview.activeDeviceTokenCount &&
+                      ` · ${preview.recipientCount} user${preview.recipientCount === 1 ? "" : "s"}`}
+                  </span>
+                )
+              ) : null}
+            </div>
             <button
               onClick={() => setShowConfirm(true)}
               disabled={!canSend}
@@ -538,6 +775,75 @@ export default function BroadcastsPage() {
           </div>
         </div>
       </div>
+
+      {/* Last delivery result — appears after a send completes. Shows
+          real numbers (recipients, sent, failed) instead of the old
+          opaque "Sent successfully" toast. Auto-clears when admin
+          starts composing a new broadcast. */}
+      {lastResult && (
+        <div
+          className={`rounded-xl border shadow-sm p-4 mb-6 ${
+            lastResult.status === "FAILED"
+              ? "bg-red-50 border-red-200"
+              : lastResult.totalFailed > 0
+                ? "bg-amber-50 border-amber-200"
+                : "bg-emerald-50 border-emerald-200"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {lastResult.status === "FAILED" ? (
+              <XCircle className="w-5 h-5 text-red-600 mt-0.5" />
+            ) : lastResult.totalFailed > 0 ? (
+              <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+            ) : (
+              <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5" />
+            )}
+            <div className="flex-1">
+              <p
+                className={`text-sm font-semibold ${
+                  lastResult.status === "FAILED"
+                    ? "text-red-900"
+                    : lastResult.totalFailed > 0
+                      ? "text-amber-900"
+                      : "text-emerald-900"
+                }`}
+              >
+                {lastResult.status === "FAILED"
+                  ? "Broadcast failed"
+                  : lastResult.totalFailed > 0
+                    ? "Broadcast partially delivered"
+                    : "Broadcast delivered"}
+              </p>
+              <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-700">
+                <span>
+                  <strong className="text-gray-900">{lastResult.totalRecipients}</strong>{" "}
+                  recipients
+                </span>
+                <span className="text-emerald-700">
+                  ✓ <strong>{lastResult.totalPushSent}</strong> sent
+                </span>
+                {lastResult.totalFailed > 0 && (
+                  <span className="text-red-700">
+                    ✗ <strong>{lastResult.totalFailed}</strong> failed
+                  </span>
+                )}
+              </div>
+              {lastResult.totalRecipients === 0 && (
+                <p className="text-xs text-red-700 mt-2">
+                  No users matched the target audience. Check that customers /
+                  business owners have opted into push notifications.
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => setLastResult(null)}
+              className="p-1 rounded-md hover:bg-white/50 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation Modal */}
       <Modal
@@ -589,6 +895,58 @@ export default function BroadcastsPage() {
                 </p>
               </div>
             </div>
+            {/* Attachment preview — small reminder of what's going out */}
+            {attachment && (
+              <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
+                {attachment.type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={attachment.url}
+                    alt=""
+                    className="w-14 h-14 rounded-md object-cover border border-gray-200"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-md bg-gray-900 flex items-center justify-center">
+                    <Film className="w-6 h-6 text-white" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                    Attachment
+                  </p>
+                  <p className="text-sm font-medium text-gray-900 truncate mt-0.5">
+                    {attachment.fileName || attachment.url}
+                  </p>
+                </div>
+              </div>
+            )}
+            {/* Audience preview — gives admin one last chance to bail
+                if they're about to broadcast into the void. */}
+            {preview && (
+              <div
+                className={`rounded-lg p-3 text-xs ${
+                  preview.activeDeviceTokenCount === 0
+                    ? "bg-red-50 border border-red-200 text-red-800"
+                    : "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                }`}
+              >
+                {preview.activeDeviceTokenCount === 0 ? (
+                  <span>
+                    ⚠️ <strong>Heads up:</strong> No active devices match this
+                    audience. The broadcast will be marked as failed because no
+                    one will actually receive it.
+                  </span>
+                ) : (
+                  <span>
+                    Will reach{" "}
+                    <strong>{preview.activeDeviceTokenCount}</strong> device
+                    {preview.activeDeviceTokenCount === 1 ? "" : "s"} (
+                    {preview.recipientCount} user
+                    {preview.recipientCount === 1 ? "" : "s"}).
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-2">

@@ -47,6 +47,25 @@ const SUBDOMAIN_TO_PREFIX: Record<string, string> = {
   business: '/business',
 };
 
+/**
+ * Per-subdomain URL aliases users instinctively type, even though the
+ * clean URL has no prefix at all. Example: an admin on
+ * `xyzadmin.rubyplus.net` types `/admin/home-sections` because their
+ * muscle memory says "I'm on the admin site, paths start with /admin".
+ *
+ * Without this list, `/admin/home-sections` would fall through to the
+ * rewrite below and become `/ruby-app/admin/admin/home-sections` —
+ * which doesn't exist and 404s.
+ *
+ * With this list, we 301-redirect the alias prefix away so the user
+ * lands on the canonical clean URL (`/home-sections`) which then
+ * rewrites correctly.
+ */
+const SUBDOMAIN_ALIAS_PREFIXES: Record<string, string[]> = {
+  xyzadmin: ['/admin'],
+  business: [],
+};
+
 // Apex / www host that serves the public marketing site
 const PRIMARY_HOSTS = ['rubyplus.net', 'www.rubyplus.net'];
 
@@ -147,6 +166,20 @@ export function middleware(request: NextRequest) {
       `https://${subdomain}.rubyplus.net${cleanPath}${search}`,
     );
     return NextResponse.redirect(target, 301);
+  }
+
+  // Forgiveness redirect: if someone types an alias prefix (e.g.
+  // `/admin/home-sections` on the xyzadmin subdomain), 301 to the
+  // clean URL so they don't hit a 404 just for adding an instinctive
+  // `/admin/` segment.
+  for (const alias of SUBDOMAIN_ALIAS_PREFIXES[subdomain] ?? []) {
+    if (pathname === alias || pathname.startsWith(`${alias}/`)) {
+      const cleanPath = pathname.replace(alias, '') || '/';
+      const target = new URL(
+        `https://${subdomain}.rubyplus.net${cleanPath}${search}`,
+      );
+      return NextResponse.redirect(target, 301);
+    }
   }
 
   // The hot path: clean URL on the subdomain. Rewrite internally to

@@ -156,10 +156,11 @@ export function DisputeChatThread({
     if (result) {
       setDispute({ ...result });
       onUpdated?.(result);
+      // The resolve modal is now purely for "resolve" — escalate + close
+      // each have their own dedicated modal / handler. So one toast copy
+      // is enough; we surface the chosen outcome for ops context.
       toast.success(
-        data.status === 'RESOLVED'
-          ? 'Dispute resolved'
-          : `Dispute ${data.status.toLowerCase()}`,
+        `Dispute resolved — ${data.resolution.replace(/_/g, ' ').toLowerCase()}`,
       );
       setResolveOpen(false);
     }

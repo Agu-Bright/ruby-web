@@ -1182,9 +1182,37 @@ export interface Dispute {
   updatedAt: string;
 }
 
+/**
+ * Resolution outcome enum — mirrors the backend `DisputeResolution`
+ * enum in `dispute.schema.ts`. The 8 values cover every way ops can
+ * close a ticket: financial (refund / credit / replacement), neutral
+ * (no_action), and judgement-based (business_favor / customer_favor /
+ * mutual_agreement).
+ */
+export type DisputeResolution =
+  | 'FULL_REFUND'
+  | 'PARTIAL_REFUND'
+  | 'REPLACEMENT'
+  | 'CREDIT_ISSUED'
+  | 'NO_ACTION'
+  | 'BUSINESS_FAVOR'
+  | 'CUSTOMER_FAVOR'
+  | 'MUTUAL_AGREEMENT';
+
+/**
+ * Body for `POST /admin/disputes/:id/resolve`. Keep field names + types
+ * in sync with the backend `ResolveDisputeDto` — the API uses
+ * `whitelist: true`, so any extra keys you send will be silently
+ * stripped (or rejected, depending on the ValidationPipe config).
+ *
+ * NOTE: there used to be a `status` field here that conflated resolve
+ * with escalate/close — but those have their own dedicated endpoints
+ * (`/escalate`, `/close`). The resolve endpoint is for the 8 resolution
+ * outcomes only.
+ */
 export interface DisputeResolutionRequest {
-  status: DisputeStatus;
-  resolution: string;
+  resolution: DisputeResolution;
+  resolutionNotes: string;
   refundAmount?: number;
 }
 

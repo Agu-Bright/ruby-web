@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Mail, Check, Minus, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Mail, Check, Minus, Loader2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useApi, useMutation } from '@/lib/hooks';
@@ -57,6 +57,19 @@ export function RecipientList() {
 
   const { mutate: deleteMutation, isLoading: deleting } = useMutation(
     (id: string) => api.disputeRecipients.delete(id),
+  );
+
+  // Self-service "Send test email to me" mutation. Hits the backend
+  // endpoint that fires a sample messageAdded email to the calling
+  // admin's own address — lets ops verify SMTP + template render
+  // without filing a real dispute.
+  const { mutate: sendTestMutation, isLoading: sendingTest } = useMutation(
+    () => api.disputeRecipients.sendTest(),
+    {
+      onSuccess: (data) => {
+        toast.success(`Test email sent to ${data.sentTo}`);
+      },
+    },
   );
 
   const handleCreate = async (data: CreateDisputeRecipientRequest) => {
@@ -118,17 +131,36 @@ export function RecipientList() {
               admin-team defaults.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setEditing(null);
-              setModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 bg-ruby-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg hover:bg-ruby-600 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add recipient
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Self-service test — sends sample messageAdded email to
+                the admin's own address so they can verify SMTP +
+                template render without filing a real dispute. */}
+            <button
+              type="button"
+              onClick={() => sendTestMutation()}
+              disabled={sendingTest}
+              className="inline-flex items-center gap-1.5 bg-white text-gray-700 text-xs font-semibold px-3.5 py-2 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              title="Send a sample dispute-message email to your own address"
+            >
+              {sendingTest ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+              Send test email
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 bg-ruby-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg hover:bg-ruby-600 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add recipient
+            </button>
+          </div>
         </div>
 
         {/* List body */}

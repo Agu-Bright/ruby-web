@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { toast } from 'sonner';
 import type { ApiResponse, ApiMeta } from '@/lib/types';
 import { ApiClientError } from '@/lib/api';
 
@@ -66,14 +67,39 @@ export function useApi<T>(
   return { data, meta, isLoading, error, refetch: fetchData };
 }
 
+/**
+ * Project-local mutation hook.
+ *
+ * Returns `{ mutate, isLoading, error }` where `mutate(input)` resolves
+ * to `TData | null` (null = the request failed; check `error` state).
+ *
+ * Default behaviour on failure: show a toast with the error message.
+ * This is intentional — a long-standing class of bugs in this codebase
+ * came from callers writing `const r = await mutate(x); if (r) { ... }`
+ * and not handling the falsy branch, which silently swallowed real
+ * failures (Phase 23 — see `gentle-humming-fairy.md` for the dispute
+ * resolve / send-message bug it caused in prod).
+ *
+ * To opt OUT of the default toast (e.g. when the caller handles errors
+ * inline in the UI), pass `{ onError: () => {} }`. The hook only fires
+ * the default toast when `options.onError` is NOT provided.
+ *
+ * Optional `onSuccess(data)` runs after a successful mutation — handy
+ * for cache invalidation, navigation, etc.
+ */
 export function useMutation<TData, TInput = void>(
   mutator: (input: TInput) => Promise<ApiResponse<TData>>,
-  options?: { onError?: (message: string) => void }
+  options?: {
+    onError?: (message: string) => void;
+    onSuccess?: (data: TData) => void;
+  }
 ) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const onErrorRef = useRef(options?.onError);
+  const onSuccessRef = useRef(options?.onSuccess);
   onErrorRef.current = options?.onError;
+  onSuccessRef.current = options?.onSuccess;
 
   const mutate = useCallback(
     async (input: TInput): Promise<TData | null> => {
@@ -81,13 +107,23 @@ export function useMutation<TData, TInput = void>(
       setError(null);
       try {
         const res = await mutator(input);
+        onSuccessRef.current?.(res.data);
         return res.data;
       } catch (err) {
         const message = err instanceof ApiClientError
           ? err.message
           : 'An unexpected error occurred';
         setError(message);
-        onErrorRef.current?.(message);
+        if (onErrorRef.current) {
+          // Caller provided custom handler — they own the UX.
+          onErrorRef.current(message);
+        } else {
+          // No custom handler — show a toast so the failure is loud.
+          // This catches the entire class of "user clicks button, nothing
+          // happens" bugs that previously came from callers checking
+          // `if (result)` without an else branch.
+          toast.error(message);
+        }
         return null;
       } finally {
         setIsLoading(false);

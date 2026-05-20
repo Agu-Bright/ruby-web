@@ -991,6 +991,17 @@ export const api = {
       request<void>(`/admin/disputes/notification-recipients/${id}`, {
         method: "DELETE",
       }),
+    /**
+     * Self-service "Send test email to me" — backend looks up the
+     * calling admin's own email and fires a sample dispute messageAdded
+     * email. Lets ops verify SMTP + template render without filing a
+     * real dispute. Returns the address the test was sent to.
+     */
+    sendTest: () =>
+      request<{ sentTo: string; message: string }>(
+        "/admin/disputes/notification-recipients/test",
+        { method: "POST" },
+      ),
   },
 
   // Phase 16 — VAT report (FIRS-remittance aggregation)

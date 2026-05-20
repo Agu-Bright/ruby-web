@@ -141,9 +141,32 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     }),
   })).filter((group) => group.items.length > 0);
 
+  // Highlights the sidebar entry matching the current route.
+  //
+  // Subtlety: when we run on the `xyzadmin.rubyplus.net` subdomain,
+  // middleware rewrites the browser URL to a clean form — so
+  // `/home-sections` is what `usePathname()` returns, NOT the
+  // internal `/ruby-app/admin/home-sections` that the sidebar hrefs
+  // point at. We compare against BOTH forms so the highlight works
+  // identically on the subdomain and on the legacy main-domain path.
+  //
+  // We also use `===` or `startsWith(href + '/')` instead of a bare
+  // `startsWith(href)` — otherwise `/business` would falsely match
+  // when we're on `/businesses`.
   const isActive = (href: string) => {
-    if (href === "/ruby-app/admin") return pathname === href;
-    return pathname.startsWith(href);
+    const cleanHref = href.replace(/^\/ruby-app\/admin/, "") || "/";
+
+    // Dashboard root needs strict equality — every other href starts
+    // with it and would otherwise greedy-match every page.
+    if (href === "/ruby-app/admin") {
+      return pathname === href || pathname === "/";
+    }
+
+    const matchesInternal =
+      pathname === href || pathname.startsWith(href + "/");
+    const matchesClean =
+      pathname === cleanHref || pathname.startsWith(cleanHref + "/");
+    return matchesInternal || matchesClean;
   };
 
   return (

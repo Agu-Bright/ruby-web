@@ -59,31 +59,22 @@ export default function AppShowcase() {
                 <div className="relative w-[220px] sm:w-[200px] lg:w-[240px] aspect-[9/19] rounded-[2.5rem] bg-gray-900 p-2.5 shadow-2xl shadow-gray-300/50">
                   {/* Notch */}
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-5 bg-gray-900 rounded-b-2xl z-10" />
-                  {/* Screen */}
-                  <div className="relative w-full h-full rounded-[2rem] overflow-hidden bg-white">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={s.img}
-                      alt={`Business app ${s.label} screen`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        // If the real screenshot isn't in /public yet,
-                        // hide the broken img and let the gradient
-                        // placeholder behind show through.
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                    {/* Gradient placeholder — sits behind the img.
-                        Visible only when the img fails to load. */}
-                    <div
-                      className={`absolute inset-0 -z-10 bg-gradient-to-br ${s.accent} flex flex-col items-center justify-center text-white`}
-                    >
-                      <div className="text-3xl font-playfair font-bold italic">
-                        {s.label}
-                      </div>
-                      <div className="text-[10px] mt-2 px-3 opacity-70 text-center">
-                        Screenshot coming soon
-                      </div>
+                  {/* Screen — gradient placeholder while real screenshots
+                      are pending. When the real PNG files land in
+                      `public/images/partner/`, drop in a `<Image>` from
+                      next/image referencing `s.img` and wrap this
+                      component with `'use client'` if an onError
+                      fallback is desired. Until then, the placeholder
+                      IS the design — server-renderable, no event
+                      handlers, ships clean through static export. */}
+                  <div
+                    className={`relative w-full h-full rounded-[2rem] overflow-hidden bg-gradient-to-br ${s.accent} flex flex-col items-center justify-center text-white`}
+                  >
+                    <div className="text-3xl font-playfair font-bold italic">
+                      {s.label}
+                    </div>
+                    <div className="text-[10px] mt-2 px-3 opacity-70 text-center">
+                      Screenshot coming soon
                     </div>
                   </div>
                 </div>

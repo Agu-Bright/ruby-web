@@ -1,22 +1,75 @@
-import { redirect } from 'next/navigation';
+import Navbar from '@/components/landing/Navbar';
+import Footer from '@/components/landing/Footer';
+import PartnerHero from '@/components/partner/PartnerHero';
+import PartnerTrustStrip from '@/components/partner/PartnerTrustStrip';
+import HowItWorks from '@/components/partner/HowItWorks';
+import CoreFeatures from '@/components/partner/CoreFeatures';
+import AppShowcase from '@/components/partner/AppShowcase';
+import CategoriesSupported from '@/components/partner/CategoriesSupported';
+import PricingPromise from '@/components/partner/PricingPromise';
+import MerchantTestimonials from '@/components/partner/MerchantTestimonials';
+import PartnerFAQ from '@/components/partner/PartnerFAQ';
+import FinalCTA from '@/components/partner/FinalCTA';
 
 /**
- * Root landing for `business.rubyplus.net` (which the middleware
- * rewrites to `/business`). Without this file, hitting the bare
- * subdomain 404'd because Next had nowhere to render for the
- * `/business` path — the existing pages all live one level deeper
- * (`register/`, `verify-otp/`, `success/`).
+ * Business landing page — rendered AT `business.rubyplus.net` (the
+ * middleware rewrites that host's root to `/business`, which this file
+ * serves).
  *
- * Merchants who land here are almost always starting a new
- * registration, so we send them straight to the form. Once they're
- * mid-flow, deep links like `business.rubyplus.net/verify-otp`
- * continue to work via the existing middleware rewrite.
+ * Previously this `redirect('/register')`d, dumping first-time merchants
+ * onto a bare signup form with no context. Now the business subdomain
+ * shows the full landing: hero, trust strip, how-it-works, feature grid,
+ * app showcase, supported categories, pricing promise, testimonials,
+ * FAQ, and a closing CTA. The "Register your business" CTAs (inside
+ * PartnerHero + FinalCTA) use `businessLink('/register')`, which keeps
+ * the merchant on `business.rubyplus.net/register`.
  *
- * The redirect is server-side (no client JS round-trip) and the
- * browser URL becomes `business.rubyplus.net/register` — which the
- * middleware then rewrites internally to `/business/register` and
- * renders the form. One redirect, then the user is in the flow.
+ * This reuses the EXACT same section components as `rubyplus.net/partner`
+ * — one set of marketing sections, two hosts that surface them. The only
+ * difference is `crossDomain` on the shared Navbar + Footer: on this
+ * subdomain their marketing nav items (Home / About / Partner / Contact /
+ * Quick Links) point at the apex `rubyplus.net` with absolute URLs,
+ * because a relative `/about` here would 404 under the business
+ * subdomain's middleware rewrite (`/business/about`).
+ *
+ * Architecture:
+ *   rubyplus.net           → consumer landing  (app/page.tsx)
+ *   rubyplus.net/partner   → business landing  (app/partner/page.tsx)
+ *   business.rubyplus.net  → business landing  (THIS file — same sections)
+ *
+ * Keeping `/partner` alive means in-site links from the consumer nav
+ * ("Partner") still work, and SEO / existing backlinks to /partner are
+ * preserved. Both surfaces render identical content.
  */
-export default function BusinessRootPage() {
-  redirect('/register');
+export const metadata = {
+  title: 'Sell on Ruby+ | Grow Your Business in Nigeria',
+  description:
+    'Sell more, manage less. Daily auto-payout, multi-branch support, live order management, paid promotion via Ruby Ads. No setup fees. No monthly fees.',
+  openGraph: {
+    title: 'Sell on Ruby+ | Grow Your Business in Nigeria',
+    description:
+      'Sell more, manage less. Daily auto-payout, multi-branch support, live order management, paid promotion via Ruby Ads.',
+    type: 'website',
+  },
+};
+
+export default function BusinessLandingPage() {
+  return (
+    <>
+      <Navbar crossDomain />
+      <main>
+        <PartnerHero />
+        <PartnerTrustStrip />
+        <HowItWorks />
+        <CoreFeatures />
+        <AppShowcase />
+        <CategoriesSupported />
+        <PricingPromise />
+        <MerchantTestimonials />
+        <PartnerFAQ />
+        <FinalCTA />
+      </main>
+      <Footer crossDomain />
+    </>
+  );
 }

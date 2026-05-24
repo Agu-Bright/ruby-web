@@ -29,6 +29,10 @@ const BUSINESS_HOST =
     ? 'https://business.rubyplus.net'
     : '');
 
+const MARKETING_HOST =
+  process.env.NEXT_PUBLIC_MARKETING_HOST ||
+  (process.env.NODE_ENV === 'production' ? 'https://rubyplus.net' : '');
+
 /**
  * Returns the URL for an admin route. In production this is a full
  * cross-origin URL; in dev it falls back to the relative path the
@@ -51,6 +55,26 @@ export function businessLink(path: string = '/register'): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   if (BUSINESS_HOST) return `${BUSINESS_HOST}${cleanPath}`;
   return `/business${cleanPath === '/' ? '' : cleanPath}`;
+}
+
+/**
+ * Returns the URL for a MARKETING-site route (the apex `rubyplus.net`).
+ *
+ * Used when a shared component (Navbar / Footer) is rendered on a
+ * NON-marketing subdomain — e.g. the business landing page that lives
+ * at `business.rubyplus.net`. There the marketing nav items
+ * (Home / About / Partner / Contact) must point at the apex with an
+ * absolute URL, otherwise a relative `/about` would resolve to
+ * `business.rubyplus.net/about` → the middleware rewrites it to
+ * `/business/about` → 404.
+ *
+ * In dev this returns the relative path (everything is same-origin on
+ * localhost so the App Router serves the marketing pages directly).
+ */
+export function marketingLink(path: string = '/'): string {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (MARKETING_HOST) return `${MARKETING_HOST}${cleanPath}`;
+  return cleanPath;
 }
 
 /**

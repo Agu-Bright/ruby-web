@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { adminLink } from '@/lib/subdomain-links';
+import { adminLink, marketingLink } from '@/lib/subdomain-links';
 
 const navLinks = [
   { label: 'Home', href: '/' },
@@ -13,7 +13,21 @@ const navLinks = [
   { label: 'Contact Us', href: '/contact' },
 ];
 
-export default function Navbar() {
+interface NavbarProps {
+  /**
+   * Set to `true` when this Navbar renders on a NON-marketing subdomain
+   * (e.g. the business landing at `business.rubyplus.net`). The marketing
+   * nav items + logo then point at the apex marketing host via absolute
+   * URLs (`marketingLink`) rendered as plain `<a>` tags, because Next.js
+   * `<Link>` can't navigate cross-origin and a relative `/about` would
+   * 404 under the business subdomain's middleware rewrite. Default
+   * `false` keeps the fast same-origin `<Link>` behaviour on the
+   * marketing site itself.
+   */
+  crossDomain?: boolean;
+}
+
+export default function Navbar({ crossDomain = false }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
@@ -22,44 +36,66 @@ export default function Navbar() {
     return pathname.startsWith(href);
   }
 
+  // Resolve a marketing nav href + the element to render it with.
+  // crossDomain → absolute apex URL via <a>; else relative via <Link>.
+  const logoHref = crossDomain ? marketingLink('/') : '/';
+
   return (
     <nav className="navbar-animate fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center">
-            <Image
-              src="/images/logo.png"
-              alt="Ruby+"
-              width={120}
-              height={40}
-              className="h-9 w-auto object-contain"
-              priority
-            />
-          </Link>
+          {crossDomain ? (
+            <a href={logoHref} className="flex items-center">
+              <Image
+                src="/images/logo.png"
+                alt="Ruby+"
+                width={120}
+                height={40}
+                className="h-9 w-auto object-contain"
+                priority
+              />
+            </a>
+          ) : (
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/images/logo.png"
+                alt="Ruby+"
+                width={120}
+                height={40}
+                className="h-9 w-auto object-contain"
+                priority
+              />
+            </Link>
+          )}
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`relative text-sm font-medium transition-colors duration-200 py-1 group ${
-                  isActive(link.href)
-                    ? 'text-ruby-red'
-                    : 'text-gray-600 hover:text-ruby-red'
-                }`}
-              >
-                {link.label}
+            {navLinks.map((link) => {
+              const cls = `relative text-sm font-medium transition-colors duration-200 py-1 group ${
+                isActive(link.href)
+                  ? 'text-ruby-red'
+                  : 'text-gray-600 hover:text-ruby-red'
+              }`;
+              const underline = (
                 <span
                   className={`absolute bottom-0 left-0 h-[2px] bg-ruby-red rounded-full transition-all duration-300 ${
-                    isActive(link.href)
-                      ? 'w-full'
-                      : 'w-0 group-hover:w-full'
+                    isActive(link.href) ? 'w-full' : 'w-0 group-hover:w-full'
                   }`}
                 />
-              </Link>
-            ))}
+              );
+              return crossDomain ? (
+                <a key={link.label} href={marketingLink(link.href)} className={cls}>
+                  {link.label}
+                  {underline}
+                </a>
+              ) : (
+                <Link key={link.label} href={link.href} className={cls}>
+                  {link.label}
+                  {underline}
+                </Link>
+              );
+            })}
           </div>
 
           {/* CTA — cross-origin in production (admin subdomain), same-origin
@@ -100,20 +136,32 @@ export default function Navbar() {
       {mobileOpen && (
         <div className="md:hidden bg-white border-t border-gray-100 shadow-lg">
           <div className="px-4 py-4 space-y-3">
-            {navLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className={`block text-sm font-medium ${
-                  isActive(link.href)
-                    ? 'text-ruby-red border-l-2 border-ruby-red pl-3'
-                    : 'text-gray-700 hover:text-ruby-red pl-3'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const cls = `block text-sm font-medium ${
+                isActive(link.href)
+                  ? 'text-ruby-red border-l-2 border-ruby-red pl-3'
+                  : 'text-gray-700 hover:text-ruby-red pl-3'
+              }`;
+              return crossDomain ? (
+                <a
+                  key={link.label}
+                  href={marketingLink(link.href)}
+                  onClick={() => setMobileOpen(false)}
+                  className={cls}
+                >
+                  {link.label}
+                </a>
+              ) : (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cls}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
             <a
               href={adminLink('/login')}
               onClick={() => setMobileOpen(false)}

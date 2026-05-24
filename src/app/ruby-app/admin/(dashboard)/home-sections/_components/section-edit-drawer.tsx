@@ -102,13 +102,19 @@ export function SectionEditDrawer({
     () => api.categories.list(),
     [],
   );
+  // Subcategories for the picked category. We deliberately do NOT
+  // pass `isActive: true` here — admins need to be able to pin a
+  // subcategory row even if the subcategory itself is currently
+  // inactive (e.g. seasonal categories, pre-staged launches). The
+  // inactive ones surface in the dropdown labelled "(inactive)" so
+  // the admin makes an informed choice. Backend default limit is
+  // 500 — plenty for the typical 10–15 subs per category.
   const { data: subcategories } = useApi<any[]>(
     () =>
       categoryIdState
         ? api.subcategories.list({
             categoryId: categoryIdState,
-            isActive: true,
-            limit: 100,
+            limit: 500,
           })
         : Promise.resolve({ success: true, data: [] }),
     [categoryIdState],
@@ -293,6 +299,7 @@ export function SectionEditDrawer({
                 {(categories || []).map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.name}
+                    {c.isActive === false ? ' (inactive)' : ''}
                   </option>
                 ))}
               </select>
@@ -315,6 +322,7 @@ export function SectionEditDrawer({
                 {(subcategories || []).map((s) => (
                   <option key={s._id} value={s._id}>
                     {s.name}
+                    {s.isActive === false ? ' (inactive)' : ''}
                   </option>
                 ))}
               </select>

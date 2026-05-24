@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import {
   Ticket, Eye, Plus, Search, Calendar, MapPin, MoreHorizontal,
-  CheckCircle2, XCircle, Trash2, Edit3, RotateCcw,
+  CheckCircle2, XCircle, Trash2, Edit3, RotateCcw, ShieldCheck, AlertCircle,
 } from 'lucide-react';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
@@ -15,6 +15,9 @@ import type {
   EventTicketTier,
 } from '@/lib/types';
 import { formatDateTime, formatCurrency } from '@/lib/utils';
+// Phase 42 — venue pin picker. Backend now REQUIRES geoCoordinates on
+// every new / updated event so the customer events map can pin them.
+import { VenueMapPicker } from '@/components/events/VenueMapPicker';
 
 /**
  * Events admin page. Mirrors the look of /admin/bookings: search +
@@ -30,8 +33,11 @@ import { formatDateTime, formatCurrency } from '@/lib/utils';
  * the simplest thing that works and iterate.
  */
 
+// Phase 40 — PENDING_REVIEW + REJECTED added to support the merchant-side
+// approval workflow. The "Pending review" tab is the operational FIFO
+// queue for admins; everything else lives under "All".
 const STATUS_OPTIONS: (EventStatus | 'ALL')[] = [
-  'ALL', 'DRAFT', 'PUBLISHED', 'SOLD_OUT', 'CANCELLED', 'COMPLETED',
+  'ALL', 'DRAFT', 'PENDING_REVIEW', 'REJECTED', 'PUBLISHED', 'SOLD_OUT', 'CANCELLED', 'COMPLETED',
 ];
 
 export default function EventsAdminPage() {
@@ -40,6 +46,14 @@ export default function EventsAdminPage() {
   const [editingEvent, setEditingEvent] = useState<RubyEvent | null>(null);
   const [creating, setCreating] = useState(false);
   const [actionMenu, setActionMenu] = useState<string | null>(null);
+  // Phase 40 (P-Review) — replaced the prior window.prompt() for reject
+  // reason with a proper modal. Lives at the page level so the form
+  // state persists if the kebab is re-opened mid-typing.
+  const [rejecting, setRejecting] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const { data, isLoading, refetch } = useApi(() => api.events.list({ limit: 100 }));
 
@@ -67,10 +81,43 @@ export default function EventsAdminPage() {
   const refundMutation = useMutation((id: string) =>
     api.events.refundAllTickets(id),
   );
+  // Phase 40 — approval workflow mutations.
+  const approveMutation = useMutation((id: string) => api.events.approve(id));
+  const rejectMutation = useMutation((args: { id: string; reason: string }) =>
+    api.events.reject(args.id, args.reason),
+  );
 
   const handlePublish = async (id: string) => {
     setActionMenu(null);
     await publishMutation.mutate(id);
+    refetch();
+  };
+
+  // Phase 40 — approve a PENDING_REVIEW event. Backend bumps status to
+  // PUBLISHED + fires admin + business owner notifications.
+  const handleApprove = async (id: string) => {
+    setActionMenu(null);
+    await approveMutation.mutate(id);
+    refetch();
+  };
+
+  // Phase 40 — reject a PENDING_REVIEW event. Reason is shown verbatim to
+  // the merchant in their app so they know what to fix. Uses a proper
+  // modal (window.prompt was an anti-pattern + impossible to style).
+  const openReject = (id: string, title: string) => {
+    setActionMenu(null);
+    setRejectReason('');
+    setRejecting({ id, title });
+  };
+  const confirmReject = async () => {
+    if (!rejecting) return;
+    if (rejectReason.trim().length < 10) return;
+    await rejectMutation.mutate({
+      id: rejecting.id,
+      reason: rejectReason.trim(),
+    });
+    setRejecting(null);
+    setRejectReason('');
     refetch();
   };
 
@@ -92,13 +139,34 @@ export default function EventsAdminPage() {
     refetch();
   };
 
-  const handleRefundAll = async (id: string, title: string) => {
+  const handleRefundAll = async (id: string, title: string, event?: RubyEvent) => {
+    // Phase 40 — count Paystack-paid tickets so we can WARN the admin that
+    // refundAll only handles wallet payments. Without this warning the
+    // admin sees "0 skipped" and assumes everything was refunded —
+    // Paystack customers get nothing and call support.
+    let paystackCount = 0;
+    if (event) {
+      // We don't have the per-ticket breakdown without a fetch, but we
+      // can approximate from "tickets sold vs wallet ledger" later. For
+      // now, surface that PAYSTACK isn't handled at all so admin can
+      // proactively reach out.
+      const totalSold = event.ticketTiers.reduce(
+        (s, t) => s + t.quantitySold,
+        0,
+      );
+      paystackCount = totalSold; // upper-bound — actual split unknown until backend reports it
+    }
+    const warning =
+      paystackCount > 0
+        ? `\n\n⚠️  Up to ${paystackCount} card-paid tickets will NOT be auto-refunded — those customers need a manual Paystack refund. ` +
+          `Treat the wallet refund summary as a starting point and reconcile card sales separately.`
+        : '';
     if (
       !confirm(
         `Refund every wallet-paid ticket for "${title}"?\n\n` +
           'This credits each attendee\'s Ruby+ wallet by what they paid. ' +
-          'Action is idempotent — already-refunded tickets are skipped. ' +
-          'Card (Paystack) payments are NOT refunded here — those need a separate Paystack refund.',
+          'Action is idempotent — already-refunded tickets are skipped.' +
+          warning,
       )
     ) {
       return;
@@ -109,8 +177,9 @@ export default function EventsAdminPage() {
       alert(
         `Refund complete:\n` +
           `  ${result.refunded} tickets refunded (₦${result.totalNgnRefunded.toLocaleString()})\n` +
-          `  ${result.skipped} skipped (already refunded / free)\n` +
-          `  ${result.failures} failures`,
+          `  ${result.skipped} skipped (already refunded / free / card payments)\n` +
+          `  ${result.failures} failures\n\n` +
+          `Card (Paystack) tickets need a manual refund via the Paystack dashboard until V1.1.`,
       );
     }
     refetch();
@@ -194,6 +263,23 @@ export default function EventsAdminPage() {
                   <CheckCircle2 size={14} /> Publish
                 </button>
               )}
+              {/* Phase 40 — approve / reject for PENDING_REVIEW events */}
+              {e.status === 'PENDING_REVIEW' && (
+                <>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-green-50 text-green-700 flex items-center gap-2"
+                    onClick={() => handleApprove(e._id)}
+                  >
+                    <ShieldCheck size={14} /> Approve
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 text-amber-700 flex items-center gap-2"
+                    onClick={() => openReject(e._id, e.title)}
+                  >
+                    <AlertCircle size={14} /> Reject…
+                  </button>
+                </>
+              )}
               {(e.status === 'PUBLISHED' || e.status === 'SOLD_OUT') && (
                 <button
                   className="w-full text-left px-4 py-2 text-sm hover:bg-amber-50 text-amber-700 flex items-center gap-2"
@@ -209,7 +295,7 @@ export default function EventsAdminPage() {
               {e.ticketTiers.some((t) => t.quantitySold > 0) && (
                 <button
                   className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 text-blue-700 flex items-center gap-2"
-                  onClick={() => handleRefundAll(e._id, e.title)}
+                  onClick={() => handleRefundAll(e._id, e.title, e)}
                 >
                   <RotateCcw size={14} /> Refund all tickets
                 </button>
@@ -303,6 +389,58 @@ export default function EventsAdminPage() {
           }}
         />
       )}
+
+      {/* Phase 40 — reject reason modal. Replaces the prior window.prompt()
+          anti-pattern with a styled form + live char count + min-length gate. */}
+      {rejecting && (
+        <Modal
+          isOpen
+          onClose={() => setRejecting(null)}
+          size="md"
+          title={`Reject "${rejecting.title}"`}
+        >
+          <div className="space-y-3 p-4">
+            <p className="text-sm text-gray-600">
+              Tell the organiser what needs to change. Minimum 10 characters —
+              this message is shown verbatim in their business app, so be specific.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g. Venue address is incorrect — please update before resubmitting"
+              rows={4}
+              autoFocus
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-ruby-400 resize-none"
+            />
+            <div className="flex justify-between text-xs">
+              <span
+                className={
+                  rejectReason.trim().length < 10
+                    ? 'text-red-600'
+                    : 'text-gray-500'
+                }
+              >
+                {rejectReason.trim().length} / 10 min
+              </span>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 p-4 border-t border-gray-200">
+            <button
+              onClick={() => setRejecting(null)}
+              className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmReject}
+              disabled={rejectReason.trim().length < 10}
+              className="px-4 py-2 text-sm bg-amber-600 hover:bg-amber-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Send rejection
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -327,6 +465,7 @@ function EventFormModal({
     description: string;
     venueName: string;
     venueAddress: string;
+    geoCoordinates: [number, number] | null;
     locationId: string;
     startsAt: string;
     endsAt: string;
@@ -345,6 +484,7 @@ function EventFormModal({
     description: event?.description || '',
     venueName: event?.venueName || '',
     venueAddress: event?.venueAddress || '',
+    geoCoordinates: (event?.geoPoint?.coordinates as [number, number]) || null,
     locationId:
       typeof event?.locationId === 'object'
         ? event.locationId._id
@@ -372,6 +512,12 @@ function EventFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Phase 42 — guard against submitting without a venue pin. Backend
+    // DTO would reject anyway but a clear inline message is better UX.
+    if (!form.geoCoordinates) {
+      alert('Please drop a pin on the venue map (latitude + longitude required).');
+      return;
+    }
     setSaving(true);
     try {
       const payload: CreateEventRequest = {
@@ -379,6 +525,7 @@ function EventFormModal({
         description: form.description,
         venueName: form.venueName,
         venueAddress: form.venueAddress,
+        geoCoordinates: form.geoCoordinates,
         locationId: form.locationId,
         startsAt: new Date(form.startsAt).toISOString(),
         endsAt: new Date(form.endsAt).toISOString(),
@@ -487,6 +634,16 @@ function EventFormModal({
             />
           </Field>
         </div>
+
+        {/* Phase 42 — venue pin (required). VenueMapPicker is a lightweight
+            lat/lng + Google-Maps-helper component; for an interactive embedded
+            map admins use the business mobile app's create flow instead. */}
+        <VenueMapPicker
+          value={form.geoCoordinates}
+          onChange={(coords) => setForm({ ...form, geoCoordinates: coords })}
+          venueAddress={form.venueAddress}
+          venueName={form.venueName}
+        />
 
         <Field label="Location ID (Mongo ObjectId)">
           <input

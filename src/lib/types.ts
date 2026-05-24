@@ -707,7 +707,14 @@ export interface AdminCreateBusinessRequest {
 // ============================================================
 // Home sections (admin-managed customer-app home layout)
 // ============================================================
-export type HomeSectionType = 'REVIEWS' | 'WHATS_HOT' | 'CATEGORY' | 'CURATED';
+export type HomeSectionType =
+  | 'REVIEWS'
+  | 'WHATS_HOT'
+  | 'CATEGORY'
+  | 'CURATED'
+  // Phase 40 — "Events near you" admin-controllable section. Backend
+  // hydrates items from the public events feed.
+  | 'EVENTS';
 
 export interface HomeSection {
   _id: string;
@@ -1485,6 +1492,10 @@ export interface BusinessFilterParams extends PaginationParams {
   status?: BusinessStatus;
   categoryId?: string;
   search?: string;
+  // Phase 44 — filter to a single owner. Used by the admin customers
+  // page when an admin clicks "View businesses" on a customer who owns
+  // multiple, AND by the new ?ownerId= URL param on the businesses page.
+  ownerId?: string;
 }
 
 export interface OrderFilterParams extends PaginationParams {
@@ -1575,8 +1586,43 @@ export interface Customer {
     email?: string;
   }[];
   favouriteBusinesses?: string[];
+  // Phase 44 — surfaced from the customers list / detail endpoints via
+  // a $lookup against the businesses collection. Lets the admin
+  // identify customers who are ALSO business owners at-a-glance and
+  // jump straight to their business detail from a customer row.
+  hasBusiness?: boolean;
+  businessCount?: number;
+  /**
+   * The owner's "primary" business — parent if they own a multi-branch
+   * brand, else the most recently created. Used to deep-link the row's
+   * "Business owner" badge into the right business detail modal.
+   */
+  primaryBusiness?: SlimBusiness;
+  /** All businesses this customer owns. Populated on both the list and
+   *  detail responses so the Businesses tab in the detail modal renders
+   *  without a second round-trip. */
+  ownedBusinesses?: SlimBusiness[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Phase 44 — slim projection of a Business returned alongside Customer
+ * records. Only the fields the customers page needs to render the badge
+ * + Businesses tab. Full Business detail still fetched separately when
+ * the admin opens a business in the businesses page modal.
+ */
+export interface SlimBusiness {
+  _id: string;
+  name: string;
+  slug?: string;
+  logoUrl?: string;
+  status?: string;
+  isParent?: boolean;
+  parentBusinessId?: string;
+  branchLabel?: string;
+  locationId?: string | { _id: string; name?: string };
+  createdAt?: string;
 }
 
 export interface CustomerFilterParams extends PaginationParams {
@@ -2260,8 +2306,13 @@ export interface AttributionFilterParams {
 // ruby-plus-backend/src/modules/events/schemas/*.
 // ============================================================
 
+// Phase 40: PENDING_REVIEW + REJECTED added for the business-side approval
+// workflow. Admin-created events skip PENDING_REVIEW and go straight from
+// DRAFT → PUBLISHED via the admin direct-publish endpoint.
 export type EventStatus =
   | "DRAFT"
+  | "PENDING_REVIEW"
+  | "REJECTED"
   | "PUBLISHED"
   | "SOLD_OUT"
   | "CANCELLED"
@@ -2297,8 +2348,95 @@ export interface RubyEvent {
   ticketTiers: EventTicketTier[];
   status: EventStatus;
   askRubyTags: string[];
+  // Phase 40 — approval workflow fields. Set when an event passes through
+  // the admin queue. Always present for business-created events; null/undefined
+  // for admin-direct-published events.
+  submittedAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectionReason?: string;
+  createdByBusinessOwnerId?:
+    | string
+    | { _id: string; firstName?: string; lastName?: string; email?: string };
+  // Phase 42 — popularity signals from the events map. Returned by the
+  // public + admin endpoints.
+  viewCount?: number;
+  interestedCount?: number;
+  lastViewedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Phase 40 — Notification recipient shape exposed by
+// /admin/events/notification-recipients. Mirrors the dispute pattern.
+export interface EventNotificationRecipient {
+  _id: string;
+  email: string;
+  label?: string;
+  isActive: boolean;
+  events: {
+    submitted: boolean;
+    approved: boolean;
+    rejected: boolean;
+    salesMilestone: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEventRecipientRequest {
+  email: string;
+  label?: string;
+  events?: Partial<EventNotificationRecipient["events"]>;
+}
+
+export interface UpdateEventRecipientRequest {
+  label?: string;
+  isActive?: boolean;
+  events?: Partial<EventNotificationRecipient["events"]>;
+}
+
+// Phase 40 P7 — analytics shapes
+export interface EventAnalytics {
+  event: { id: string; title: string; status: string; startsAt: string };
+  sales: {
+    totalTicketsSold: number;
+    totalRevenueNgn: number;
+    totalFeesNgn: number;
+    totalVatNgn: number;
+    netToOrganizerNgn: number;
+    scannedCount: number;
+    refundedCount: number;
+    tierBreakdown: Array<{
+      name: string;
+      sold: number;
+      available: number;
+      revenueNgn: number;
+    }>;
+    paymentMethodBreakdown: { wallet: number; paystack: number };
+  };
+  timeSeries: Array<{ date: string; ticketsSold: number; revenueNgn: number }>;
+}
+
+export interface AdminEventsSalesReport {
+  totals: {
+    totalTicketsSold: number;
+    totalRevenueNgn: number;
+    totalFeesNgn: number;
+    totalVatNgn: number;
+    eventCount: number;
+  };
+  events: Array<{
+    id: string;
+    title: string;
+    startsAt: string;
+    status: string;
+    ticketsSold: number;
+    revenueNgn: number;
+    feesNgn: number;
+  }>;
 }
 
 export interface CreateEventRequest {
@@ -2308,7 +2446,10 @@ export interface CreateEventRequest {
   venueName: string;
   venueAddress: string;
   locationId: string;
-  geoCoordinates?: [number, number];
+  // Phase 42 — REQUIRED. Customer events map needs every event to have a
+  // pinpoint. Admin form collects via VenueMapPicker (lat/lng inputs +
+  // Google Maps helper); business mobile uses a proper interactive map.
+  geoCoordinates: [number, number];
   startsAt: string;
   endsAt: string;
   coverImageUrl: string;

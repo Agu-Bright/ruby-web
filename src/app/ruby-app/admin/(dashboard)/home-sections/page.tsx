@@ -204,7 +204,23 @@ export default function HomeSectionsPage() {
 
   const handleAddClick = () => setDrawer({ kind: 'pick-type' });
 
-  const handleTypePicked = (kind: 'subcategory' | 'curated') => {
+  const handleTypePicked = async (kind: 'subcategory' | 'curated' | 'events') => {
+    if (kind === 'events') {
+      // Phase 40 — EVENTS sections have no per-section config; create
+      // directly via API with sensible defaults.
+      try {
+        await api.homeSections.create({
+          type: 'EVENTS' as any,
+          title: 'Events in {locationName}',
+          displayOrder: 100,
+          isActive: true,
+        } as any);
+        afterSaved();
+      } catch (e: any) {
+        alert(e?.message || 'Failed to create Events section');
+      }
+      return;
+    }
     setDrawer(kind === 'subcategory' ? { kind: 'add-subcategory' } : { kind: 'create-curated' });
   };
 

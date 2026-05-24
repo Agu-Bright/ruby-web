@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Search, UserCircle, Users, UserCheck, UserX, UserPlus,
   Eye, Power, Trash2, Mail, Phone, Calendar, Clock,
   Shield, MapPin, Heart, AlertCircle, ChevronDown, ChevronLeft, ChevronRight,
   RefreshCw, Wallet, ArrowUpRight, ArrowDownLeft,
   Plus, X, DollarSign, BadgeCheck, PhoneCall,
+  // Phase 44 — icons for the "Business owner" badge + Businesses tab.
+  Briefcase, ExternalLink, Building2, GitBranch,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
@@ -14,7 +17,7 @@ import { api } from '@/lib/api';
 import { useApi, useMutation } from '@/lib/hooks';
 import { StatCard, Modal, DataTable, type Column } from '@/components/ui';
 import { formatDate, formatDateTime, formatCurrency, getInitials } from '@/lib/utils';
-import type { Customer, CustomerFilterParams, CustomerStats, Wallet as WalletType, LedgerEntry } from '@/lib/types';
+import type { Customer, CustomerFilterParams, CustomerStats, Wallet as WalletType, LedgerEntry, SlimBusiness } from '@/lib/types';
 
 // ─── Inline UI Components ───────────────────────────────────
 
@@ -68,11 +71,14 @@ type CustomerAction = 'activate' | 'deactivate' | 'delete';
 // ─── Main Page ──────────────────────────────────────────────
 
 export default function CustomersPage() {
+  const router = useRouter();
   const { isSuperAdmin } = useAuth();
   const [filters, setFilters] = useState<CustomerFilterParams>({ page: 1, limit: 20 });
   const [search, setSearch] = useState('');
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
-  const [detailTab, setDetailTab] = useState<'profile' | 'wallet' | 'addresses' | 'activity'>('profile');
+  // Phase 44 — extended tab union with 'businesses' (rendered only when
+  // the customer has at least one owned business; see CustomerDetailView).
+  const [detailTab, setDetailTab] = useState<'profile' | 'wallet' | 'addresses' | 'activity' | 'businesses'>('profile');
   const [actionModal, setActionModal] = useState<{ customer: Customer; action: CustomerAction } | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
@@ -146,6 +152,26 @@ export default function CustomersPage() {
     setDeleteConfirmText('');
   };
 
+  // Phase 44 — jump from a customer row to their business detail page.
+  //   - 1 business: deep-link to /admin/businesses?openId=BUSINESS_ID
+  //     which auto-opens the detail modal on that businesses page.
+  //   - >1 businesses: open the customer's detail modal directly on the
+  //     new "Businesses" tab so the admin picks which one to inspect.
+  // The button calling this sits inside the row click area so we MUST
+  // stopPropagation in the caller — row click already opens the customer
+  // profile modal, but we want this button to jump to the business
+  // instead.
+  const handleViewBusiness = useCallback((customer: Customer) => {
+    if (!customer.hasBusiness || (customer.businessCount ?? 0) === 0) return;
+    if ((customer.businessCount ?? 0) === 1 && customer.primaryBusiness?._id) {
+      router.push(`/ruby-app/admin/businesses?openId=${customer.primaryBusiness._id}`);
+      return;
+    }
+    // Multi-business: open the customer detail modal on the Businesses tab.
+    setDetailCustomer(customer);
+    setDetailTab('businesses');
+  }, [router]);
+
   // Column definitions
   const columns: Column<Customer>[] = [
     {
@@ -160,11 +186,31 @@ export default function CustomersPage() {
               {getInitials(c.firstName, c.lastName)}
             </div>
           )}
-          <div>
-            <div className="flex items-center gap-1">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1 flex-wrap">
               <span className="font-semibold text-gray-900 text-sm">{c.firstName} {c.lastName}</span>
               {c.isEmailVerified && <span title="Email verified"><BadgeCheck className="w-3.5 h-3.5 text-emerald-500" /></span>}
               {c.isPhoneVerified && <span title="Phone verified"><PhoneCall className="w-3.5 h-3.5 text-blue-500" /></span>}
+              {/* Phase 44 — business-owner badge. Click → jumps to the
+                  business detail page (single) or the customer's
+                  Businesses tab (multi). Violet keeps it visually distinct
+                  from auth-provider + verification badges. */}
+              {c.hasBusiness && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleViewBusiness(c); }}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 ml-1 text-[10px] font-semibold
+                             rounded-md bg-violet-50 text-violet-700 border border-violet-200
+                             hover:bg-violet-100 hover:border-violet-300 transition-colors"
+                  title={`${c.businessCount} business${(c.businessCount ?? 0) > 1 ? 'es' : ''} — click to view`}
+                >
+                  <Briefcase className="w-3 h-3" />
+                  {(c.businessCount ?? 0) > 1
+                    ? `${c.businessCount} Businesses`
+                    : 'Business owner'}
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
             </div>
             <div className="text-xs text-gray-400">{c.email}</div>
           </div>
@@ -417,12 +463,18 @@ export default function CustomersPage() {
 
 // ─── Customer Detail View ───────────────────────────────────
 
+// Phase 44 — single source of truth for the detail tab union. Adding
+// `businesses` here flows through to the page-level state + the props
+// passed down here. The pill is conditionally rendered (see tab strip
+// below) so non-business-owners never see it.
+type DetailTab = 'profile' | 'wallet' | 'addresses' | 'activity' | 'businesses';
+
 function CustomerDetailView({
   customer, detailTab, setDetailTab, isSuperAdmin, onOpenAction,
 }: {
   customer: Customer;
-  detailTab: 'profile' | 'wallet' | 'addresses' | 'activity';
-  setDetailTab: (tab: 'profile' | 'wallet' | 'addresses' | 'activity') => void;
+  detailTab: DetailTab;
+  setDetailTab: (tab: DetailTab) => void;
   isSuperAdmin: boolean;
   onOpenAction: (action: CustomerAction) => void;
 }) {
@@ -535,12 +587,20 @@ function CustomerDetailView({
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
-        {(['profile', 'wallet', 'addresses', 'activity'] as const).map(tab => (
+      {/* Tabs — Phase 44: Businesses tab is conditionally appended for
+          customers who own at least one business. Keeps the modal lean
+          for the 90%+ non-business-owner population. */}
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+        {([
+          'profile',
+          'wallet',
+          'addresses',
+          'activity',
+          ...(customer.hasBusiness ? (['businesses'] as const) : []),
+        ] as const).map(tab => (
           <button
             key={tab}
-            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors capitalize whitespace-nowrap ${
               detailTab === tab ? 'border-ruby-600 text-ruby-600' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
             onClick={() => setDetailTab(tab)}
@@ -549,6 +609,11 @@ function CustomerDetailView({
             {tab === 'wallet' && wallet && (
               <span className="ml-1.5 text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full border border-emerald-200">
                 {formatCurrency(wallet.balance, wallet.currency)}
+              </span>
+            )}
+            {tab === 'businesses' && customer.businessCount !== undefined && (
+              <span className="ml-1.5 text-[10px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded-full border border-violet-200">
+                {customer.businessCount}
               </span>
             )}
           </button>
@@ -856,6 +921,20 @@ function CustomerDetailView({
         </div>
       )}
 
+      {/* Phase 44 — Tab: Businesses. Conditionally rendered (tab pill is
+          hidden when customer has none). Lists every business this user
+          owns. Multi-branch brands group child branches under their
+          parent visually (parent row + indented branch rows below). Each
+          row has a "View business →" deep-link that opens the admin
+          businesses page with the detail modal pre-opened on that
+          business (via the ?openId= query param read on mount there). */}
+      {detailTab === 'businesses' && (
+        <BusinessesTab
+          businesses={customer.ownedBusinesses || []}
+          customerName={`${customer.firstName} ${customer.lastName}`}
+        />
+      )}
+
       {/* Actions Footer */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
         <div>
@@ -902,6 +981,132 @@ function CustomerDetailView({
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Phase 44 — Businesses Tab ──────────────────────────────
+//
+// Renders the customer's owned businesses with multi-branch grouping:
+// parent businesses come first with their child branches indented
+// below; standalone businesses (neither parent nor child) render flat.
+// Each row has a "View business →" CTA that deep-links to the admin
+// businesses page (?openId=) which auto-opens the detail modal on
+// that business.
+
+function BusinessesTab({
+  businesses,
+  customerName,
+}: {
+  businesses: SlimBusiness[];
+  customerName: string;
+}) {
+  const router = useRouter();
+
+  if (businesses.length === 0) {
+    return (
+      <div className="text-center py-12 text-sm text-gray-400">
+        {customerName} doesn't own any businesses on Ruby+ yet.
+      </div>
+    );
+  }
+
+  // Group: parents + their branches, then standalones. A "branch" is a
+  // business whose parentBusinessId points to another business that's
+  // also in this list (i.e. owned by the same user).
+  const parentIds = new Set(businesses.filter((b) => b.isParent).map((b) => b._id));
+  const branchesByParent = new Map<string, SlimBusiness[]>();
+  const standalones: SlimBusiness[] = [];
+  const parents: SlimBusiness[] = [];
+
+  for (const b of businesses) {
+    if (b.parentBusinessId && parentIds.has(b.parentBusinessId)) {
+      const arr = branchesByParent.get(b.parentBusinessId) || [];
+      arr.push(b);
+      branchesByParent.set(b.parentBusinessId, arr);
+    } else if (b.isParent) {
+      parents.push(b);
+    } else {
+      standalones.push(b);
+    }
+  }
+
+  const handleOpen = (id: string) => {
+    router.push(`/ruby-app/admin/businesses?openId=${id}`);
+  };
+
+  const renderRow = (b: SlimBusiness, isBranch = false) => (
+    <button
+      key={b._id}
+      type="button"
+      onClick={() => handleOpen(b._id)}
+      className={`w-full text-left flex items-center gap-3 p-3 rounded-lg border border-gray-100
+                 bg-white hover:border-violet-200 hover:bg-violet-50/30 transition-colors group
+                 ${isBranch ? 'ml-6' : ''}`}
+    >
+      {b.logoUrl ? (
+        <img src={b.logoUrl} alt="" className="w-10 h-10 rounded-lg object-cover" />
+      ) : (
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-100 to-violet-200 flex items-center justify-center">
+          {isBranch ? (
+            <GitBranch className="w-4 h-4 text-violet-700" />
+          ) : (
+            <Building2 className="w-4 h-4 text-violet-700" />
+          )}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm text-gray-900 truncate">{b.name}</span>
+          {b.branchLabel && (
+            <span className="text-[10px] font-medium text-gray-400 px-1.5 py-0.5 rounded bg-gray-50 border border-gray-100">
+              {b.branchLabel}
+            </span>
+          )}
+          {b.isParent && !isBranch && (
+            <span className="text-[10px] font-semibold text-violet-700 px-1.5 py-0.5 rounded bg-violet-50 border border-violet-200">
+              Parent
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5">
+          {b.status && (
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+              b.status === 'LIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+              b.status === 'APPROVED' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+              b.status === 'PENDING_REVIEW' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+              b.status === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-200' :
+              b.status === 'SUSPENDED' ? 'bg-red-50 text-red-700 border-red-200' :
+              'bg-gray-50 text-gray-600 border-gray-200'
+            }`}>
+              {b.status.replace(/_/g, ' ')}
+            </span>
+          )}
+        </div>
+      </div>
+      <span className="flex items-center gap-1 text-xs font-semibold text-violet-700 opacity-0 group-hover:opacity-100 transition-opacity">
+        View business
+        <ExternalLink className="w-3.5 h-3.5" />
+      </span>
+    </button>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="text-xs text-gray-500">
+        {businesses.length} business{businesses.length > 1 ? 'es' : ''} owned by this customer.
+        Click any row to open its detail page.
+      </div>
+
+      <div className="space-y-2">
+        {parents.map((p) => (
+          <div key={p._id} className="space-y-1.5">
+            {renderRow(p, false)}
+            {(branchesByParent.get(p._id) || []).map((branch) => renderRow(branch, true))}
+          </div>
+        ))}
+        {standalones.map((b) => renderRow(b, false))}
+      </div>
     </div>
   );
 }

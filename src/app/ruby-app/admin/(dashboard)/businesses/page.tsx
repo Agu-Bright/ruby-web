@@ -1,6 +1,11 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, Fragment } from 'react';
+// Phase 44 — read query params for the cross-page deep-link from the
+// admin customers page: `?openId=X` auto-opens the detail modal on the
+// matching business; `?ownerId=X` pre-fills the owner filter so the
+// list shows only that user's businesses.
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import {
   Store, Search, CheckCircle, XCircle, Ban, Eye, MapPin, Clock,
   Phone, Mail, Globe, Star, ShieldCheck, ShieldX, RotateCcw, RefreshCw,
@@ -168,10 +173,27 @@ function ActionDropdown({ business, onAction, onView }: {
 
 export default function BusinessesPage() {
   const { admin } = useAuth();
+  // Phase 44 — cross-page deep-link support.
+  // `?openId=X` → auto-open the detail modal on that business.
+  // `?ownerId=X` → pre-fill filters so the list shows only that user's
+  //                businesses. Both are set when the admin clicks the
+  //                "Business owner" badge / "View business →" in the
+  //                customers page.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const deepLinkOpenId = searchParams?.get('openId') || null;
+  const deepLinkOwnerId = searchParams?.get('ownerId') || null;
+  // Guard so we only auto-open once per URL state — without this, the
+  // detail modal would re-open every render when the user closes it.
+  const consumedOpenIdRef = useRef<string | null>(null);
+
   const [filters, setFilters] = useState<BusinessFilterParams>({
     page: 1,
     limit: 20,
     ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: toLocationId(admin.locationIds[0]) } : {}),
+    // Phase 44 — apply the URL filter at mount.
+    ...(deepLinkOwnerId ? { ownerId: deepLinkOwnerId } : {}),
   });
   const [search, setSearch] = useState('');
   const [branchTypeFilter, setBranchTypeFilter] = useState<'all' | 'brands' | 'branches' | 'standalone'>('all');
@@ -216,6 +238,39 @@ export default function BusinessesPage() {
   // Hierarchical branch tree state
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [branchCache, setBranchCache] = useState<Record<string, { data: Business[]; loading: boolean }>>({});
+
+  // Phase 44 — auto-open the detail modal when arriving here from the
+  // customers page with a ?openId= query param. Fetches the business
+  // directly (don't wait for the list query — the openId might point to
+  // a business outside the current page / filter scope) and seeds the
+  // modal state. Strips the param from the URL afterwards so refreshing
+  // the page doesn't keep re-opening.
+  useEffect(() => {
+    if (!deepLinkOpenId) return;
+    if (consumedOpenIdRef.current === deepLinkOpenId) return;
+    consumedOpenIdRef.current = deepLinkOpenId;
+    (async () => {
+      try {
+        const res = await api.businesses.get(deepLinkOpenId);
+        if (res?.data) {
+          setDetailBusiness(res.data as Business);
+          setDetailTab('info');
+        } else {
+          toast.error('Business not found');
+        }
+      } catch {
+        toast.error('Could not load business');
+      } finally {
+        // Remove the openId param so refresh doesn't re-trigger. Keep
+        // ownerId (filter) if present.
+        const remainingParams = new URLSearchParams(searchParams?.toString() || '');
+        remainingParams.delete('openId');
+        const next = remainingParams.toString();
+        router.replace(next ? `${pathname}?${next}` : pathname || '/ruby-app/admin/businesses');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkOpenId]);
 
   // Fetch businesses list
   const { data: businesses, meta, isLoading, refetch } = useApi<Business[]>(

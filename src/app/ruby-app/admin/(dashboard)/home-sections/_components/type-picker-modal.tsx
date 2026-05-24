@@ -9,7 +9,7 @@ interface TypePickerModalProps {
   onClose: () => void;
   /** Types that already exist and should be greyed out (system types are single-row). */
   existingTypes: HomeSectionType[];
-  onPick: (kind: 'subcategory' | 'curated') => void;
+  onPick: (kind: 'subcategory' | 'curated' | 'events') => void;
 }
 
 /**
@@ -54,6 +54,16 @@ export function TypePickerModal({
           description="Hand-pick the businesses to feature. Add a banner image, set the order."
           actionable
           onClick={() => onPick('curated')}
+        />
+
+        {/* Phase 40 — Events section. Backend auto-hydrates upcoming events
+            for the user's location; admin only sets title + display order. */}
+        <PickerCard
+          type="EVENTS"
+          label="Events"
+          description="Upcoming events in the user's city, auto-populated. Great near the top of the feed."
+          actionable
+          onClick={() => onPick('events')}
         />
 
         {/* Reviews — teaching card only */}

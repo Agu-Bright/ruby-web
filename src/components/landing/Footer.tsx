@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { marketingLink } from "@/lib/subdomain-links";
 
 const quickLinks = [
   { label: "Home", href: "/" },
@@ -14,6 +15,27 @@ const utilityPages = [
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Cookie Policy", href: "/privacy#cookies" },
 ];
+
+interface FooterProps {
+  /**
+   * Set to `true` when rendered on a NON-marketing subdomain (e.g. the
+   * business landing at `business.rubyplus.net`). The internal link
+   * lists (Quick Links, Utility Pages) then resolve to the apex
+   * marketing host via absolute URLs so they don't 404 under the
+   * business subdomain's middleware rewrite. `#` anchors and the
+   * download badges are left untouched. Default `false` keeps relative
+   * hrefs on the marketing site itself.
+   */
+  crossDomain?: boolean;
+}
+
+/** Resolve an internal footer href, honouring cross-domain rendering.
+ *  Leaves `#` placeholder anchors as-is. */
+function resolveHref(href: string, crossDomain: boolean): string {
+  if (!crossDomain) return href;
+  if (href === "#" || href.startsWith("http")) return href;
+  return marketingLink(href);
+}
 
 function SocialIcon({ d }: { d: string }) {
   return (
@@ -61,7 +83,7 @@ function SocialLinks() {
   );
 }
 
-export default function Footer() {
+export default function Footer({ crossDomain = false }: FooterProps) {
   return (
     <footer className="relative">
       <div className="absolute inset-0 bg-cover bg-center" />
@@ -121,7 +143,7 @@ export default function Footer() {
                 {quickLinks.map((link) => (
                   <li key={link.label}>
                     <a
-                      href={link.href}
+                      href={resolveHref(link.href, crossDomain)}
                       className="text-xs text-white/50 hover:text-ruby-red transition-colors"
                     >
                       {link.label}
@@ -140,7 +162,7 @@ export default function Footer() {
                 {utilityPages.map((link) => (
                   <li key={link.label}>
                     <a
-                      href={link.href}
+                      href={resolveHref(link.href, crossDomain)}
                       className="text-xs text-white/50 hover:text-ruby-red transition-colors"
                     >
                       {link.label}

@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Check, Loader2 } from 'lucide-react';
+import { Search, Check, Loader2, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Drawer } from '@/components/ui/drawer';
 import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import type {
   Subcategory,
+  Category,
   Location,
   CreateHomeSectionRequest,
 } from '@/lib/types';
@@ -29,14 +30,28 @@ export function AddSubcategoryDrawer({
 }) {
   const [search, setSearch] = useState('');
   const [pickedSubId, setPickedSubId] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [title, setTitle] = useState('');
   const [locationId, setLocationId] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [dirty, setDirty] = useState(false);
 
+  // Fetch EVERY subcategory in the system (active and inactive). The
+  // earlier version sent `isActive: true` which silently dropped any
+  // subcategory that ops had toggled off — admins reported seeing
+  // only a few options here. Inactive ones are shown with a muted
+  // badge so the admin can still see them but knows they're disabled.
+  // Backend default limit is 500; we pass it explicitly for clarity.
   const { data: subs } = useApi<Subcategory[]>(
-    () => api.subcategories.list({ isActive: true, limit: 200 }),
+    () => api.subcategories.list({ limit: 500 }),
+    [],
+  );
+  // Categories (active + inactive) for the chip filter at the top.
+  // No filter param → returns everything; admin can group/narrow by
+  // category to make a 100+-row list scannable.
+  const { data: categories } = useApi<Category[]>(
+    () => api.categories.list(),
     [],
   );
   const { data: locations } = useApi<Location[]>(
@@ -54,19 +69,6 @@ export function AddSubcategoryDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picked?._id]);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return subs || [];
-    return (subs || []).filter((s) => {
-      const name = s.name?.toLowerCase() || '';
-      const catName =
-        typeof s.categoryId === 'object'
-          ? s.categoryId.name?.toLowerCase() || ''
-          : '';
-      return name.includes(term) || catName.includes(term);
-    });
-  }, [subs, search]);
-
   const getCategoryIdFromSubcategory = (s: Subcategory): string | null => {
     if (!s.categoryId) return null;
     return typeof s.categoryId === 'object' ? s.categoryId._id : s.categoryId;
@@ -76,6 +78,67 @@ export function AddSubcategoryDrawer({
     if (!s.categoryId) return '';
     return typeof s.categoryId === 'object' ? s.categoryId.name : '';
   };
+
+  // Apply search + category-chip filter together. Search matches the
+  // subcategory name, slug, OR parent category name — admin's gut-
+  // typing of either should surface the row.
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const all = subs || [];
+    return all.filter((s) => {
+      if (categoryFilter) {
+        const parentId = getCategoryIdFromSubcategory(s);
+        if (parentId !== categoryFilter) return false;
+      }
+      if (!term) return true;
+      const name = s.name?.toLowerCase() || '';
+      const slug = s.slug?.toLowerCase() || '';
+      const catName = getCategoryName(s).toLowerCase();
+      return (
+        name.includes(term) || slug.includes(term) || catName.includes(term)
+      );
+    });
+  }, [subs, search, categoryFilter]);
+
+  // Group the filtered list by parent category so the admin gets a
+  // browseable structure instead of a flat 100-row scroll. Sort
+  // categories by name (matches the rest of the admin), and within a
+  // category sort by displayOrder then name (the canonical order
+  // used everywhere the taxonomy is rendered).
+  const grouped = useMemo(() => {
+    const buckets = new Map<
+      string,
+      { categoryId: string; categoryName: string; items: Subcategory[] }
+    >();
+    filtered.forEach((s) => {
+      const parentId = getCategoryIdFromSubcategory(s) || '__uncategorised__';
+      const parentName = getCategoryName(s) || '— Uncategorised —';
+      if (!buckets.has(parentId)) {
+        buckets.set(parentId, {
+          categoryId: parentId,
+          categoryName: parentName,
+          items: [],
+        });
+      }
+      buckets.get(parentId)!.items.push(s);
+    });
+    return Array.from(buckets.values()).sort((a, b) =>
+      a.categoryName.localeCompare(b.categoryName),
+    );
+  }, [filtered]);
+
+  // Subcategories-per-category map for the chip count badges. Counted
+  // against the FULL (unfiltered) list so admins see "Restaurants (3)"
+  // even when their search has narrowed the visible rows to zero.
+  const countsByCategory = useMemo(() => {
+    const m = new Map<string, number>();
+    (subs || []).forEach((s) => {
+      const id = getCategoryIdFromSubcategory(s);
+      if (!id) return;
+      m.set(id, (m.get(id) || 0) + 1);
+    });
+    return m;
+  }, [subs]);
 
   const markDirty = () => {
     if (!dirty) setDirty(true);
@@ -155,54 +218,131 @@ export function AddSubcategoryDrawer({
     >
       <div className="space-y-5">
         <div>
-          <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-            Subcategory *
-          </label>
-          <div className="relative mt-1">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Subcategory *
+            </label>
+            <span className="text-[11px] text-gray-400">
+              {filtered.length} of {subs?.length ?? 0}
+            </span>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search subcategories…"
+              placeholder="Search by subcategory or category name…"
               className="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
             />
           </div>
-          <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden max-h-72 overflow-y-auto divide-y divide-gray-100 bg-white">
-            {filtered.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-gray-400">
-                {search ? 'No matches' : 'Loading…'}
+
+          {/* Category chip filter — horizontal scrolling so it works on
+              narrow drawers + maps cleanly to ~10 categories. The
+              "All" chip clears the filter. */}
+          {(categories?.length ?? 0) > 0 && (
+            <div className="mt-2 flex gap-1.5 overflow-x-auto scrollbar-hide -mx-1 px-1 py-1">
+              <CategoryChip
+                label="All"
+                count={subs?.length ?? 0}
+                active={!categoryFilter}
+                onClick={() => setCategoryFilter('')}
+              />
+              {(categories || []).map((c) => (
+                <CategoryChip
+                  key={c._id}
+                  label={c.name}
+                  count={countsByCategory.get(c._id) ?? 0}
+                  active={categoryFilter === c._id}
+                  onClick={() =>
+                    setCategoryFilter(categoryFilter === c._id ? '' : c._id)
+                  }
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Grouped subcategory list */}
+          <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden max-h-[420px] overflow-y-auto bg-white">
+            {!subs ? (
+              <div className="px-3 py-6 text-center text-xs text-gray-400">
+                Loading subcategories…
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="px-3 py-6 text-center text-xs text-gray-400">
+                {search || categoryFilter
+                  ? 'No matches. Clear filters to see everything.'
+                  : 'No subcategories in the system yet.'}
               </div>
             ) : (
-              filtered.map((s) => {
-                const sel = s._id === pickedSubId;
-                return (
-                  <button
-                    type="button"
-                    key={s._id}
-                    onClick={() => {
-                      setPickedSubId(s._id);
-                      markDirty();
-                    }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
-                      sel ? 'bg-emerald-50' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-gray-900 truncate">
-                        {s.name}
-                      </div>
-                      <div className="text-[10px] text-gray-500 truncate">
-                        {getCategoryName(s) || '— uncategorised —'}
-                      </div>
-                    </div>
-                    {sel && (
-                      <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                    )}
-                  </button>
-                );
-              })
+              grouped.map((group) => (
+                <div key={group.categoryId}>
+                  <div className="sticky top-0 z-10 bg-gray-50 border-b border-gray-100 px-3 py-1.5 flex items-center gap-1.5">
+                    <ChevronRight className="w-3 h-3 text-gray-400" />
+                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                      {group.categoryName}
+                    </span>
+                    <span className="text-[10px] text-gray-400">
+                      {group.items.length}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {group.items.map((s) => {
+                      const sel = s._id === pickedSubId;
+                      const isInactive = s.isActive === false;
+                      return (
+                        <button
+                          type="button"
+                          key={s._id}
+                          onClick={() => {
+                            setPickedSubId(s._id);
+                            markDirty();
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
+                            sel ? 'bg-emerald-50' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-sm truncate ${
+                                  isInactive ? 'text-gray-400' : 'text-gray-900'
+                                }`}
+                              >
+                                {s.name}
+                              </span>
+                              {isInactive && (
+                                <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold shrink-0">
+                                  Inactive
+                                </span>
+                              )}
+                            </div>
+                            {s.slug && (
+                              <div className="text-[10px] text-gray-400 truncate mt-0.5">
+                                {s.slug}
+                              </div>
+                            )}
+                          </div>
+                          {sel && (
+                            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
             )}
           </div>
+          {picked?.isActive === false && (
+            <p className="text-[11px] text-amber-700 mt-1.5 flex items-center gap-1">
+              <span className="font-semibold">Heads up:</span> this
+              subcategory is currently inactive. The home-screen row
+              will exist but won&rsquo;t show businesses until the
+              subcategory is reactivated.
+            </p>
+          )}
         </div>
 
         <div>
@@ -261,5 +401,44 @@ export function AddSubcategoryDrawer({
         </label>
       </div>
     </Drawer>
+  );
+}
+
+/**
+ * Small filter chip used to narrow the subcategory list by parent
+ * category. Always shows a count badge so the admin can see how many
+ * subcategories live in each category at a glance — critical when the
+ * full list spans 100+ rows.
+ */
+function CategoryChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+        active
+          ? 'bg-ruby-50 border-ruby-300 text-ruby-700'
+          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+      }`}
+    >
+      {label}
+      <span
+        className={`text-[10px] ${
+          active ? 'text-ruby-500' : 'text-gray-400'
+        }`}
+      >
+        {count}
+      </span>
+    </button>
   );
 }

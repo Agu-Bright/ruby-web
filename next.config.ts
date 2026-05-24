@@ -4,6 +4,18 @@ import path from 'path';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Strip noisy console.* calls from production bundles. Next.js's SWC
+  // compiler does this at build time when NODE_ENV === 'production'.
+  // We keep `error` and `warn` because crash-reporting tools (Sentry,
+  // Vercel Analytics, etc.) hook into those — silently dropping them
+  // would hide real problems instead of capturing them. Dev / preview
+  // builds keep all console output intact.
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === 'production'
+        ? { exclude: ['error', 'warn'] }
+        : false,
+  },
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {

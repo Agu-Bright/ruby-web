@@ -1639,6 +1639,112 @@ export const api = {
       }>(`/admin/events/${id}/refund-all-tickets`, { method: "POST" }),
     delete: (id: string) =>
       request<void>(`/admin/events/${id}`, { method: "DELETE" }),
+    // Phase 40 — approval workflow.
+    listPending: (params?: {
+      locationId?: string;
+      limit?: number;
+      skip?: number;
+      sortOldestFirst?: boolean;
+    }) =>
+      request<{ items: import("@/lib/types").RubyEvent[]; total: number }>(
+        "/admin/events/pending",
+        {
+          params: params as Record<
+            string,
+            string | number | boolean | undefined
+          >,
+        },
+      ),
+    approve: (id: string) =>
+      request<import("@/lib/types").RubyEvent>(`/admin/events/${id}/approve`, {
+        method: "POST",
+      }),
+    reject: (id: string, reason: string) =>
+      request<import("@/lib/types").RubyEvent>(`/admin/events/${id}/reject`, {
+        method: "POST",
+        body: { reason },
+      }),
+    // Phase 40 P7 — per-event analytics + cross-event sales report.
+    analytics: (id: string) =>
+      request<import("@/lib/types").EventAnalytics>(
+        `/admin/events/${id}/analytics`,
+      ),
+    salesReport: (params?: {
+      fromDate?: string;
+      toDate?: string;
+      locationId?: string;
+      organizerBusinessId?: string;
+    }) =>
+      request<import("@/lib/types").AdminEventsSalesReport>(
+        "/admin/events/reports/sales",
+        {
+          params: params as Record<
+            string,
+            string | number | boolean | undefined
+          >,
+        },
+      ),
+    salesReportCsv: (params?: {
+      fromDate?: string;
+      toDate?: string;
+      locationId?: string;
+      organizerBusinessId?: string;
+    }) =>
+      request<{
+        filename: string;
+        contentType: string;
+        contentBase64: string;
+      }>("/admin/events/reports/sales/csv", {
+        params: params as Record<
+          string,
+          string | number | boolean | undefined
+        >,
+      }),
+    // Phase 40 P9 — admin browser-camera scanner.
+    scan: (id: string, qrCode: string) =>
+      request<{
+        kind:
+          | "success"
+          | "already_used"
+          | "invalid_qr"
+          | "wrong_event"
+          | "event_not_today";
+        message?: string;
+        ticket?: { _id: string; tierName: string; usedAt?: string };
+        usedAt?: string;
+      }>(`/admin/events/${id}/scan`, {
+        method: "POST",
+        body: { qrCode },
+      }),
+  },
+  // Phase 40 — event notification recipients (clone of dispute pattern).
+  eventRecipients: {
+    list: () =>
+      request<import("@/lib/types").EventNotificationRecipient[]>(
+        "/admin/events/notification-recipients",
+      ),
+    create: (data: import("@/lib/types").CreateEventRecipientRequest) =>
+      request<import("@/lib/types").EventNotificationRecipient>(
+        "/admin/events/notification-recipients",
+        { method: "POST", body: data },
+      ),
+    update: (
+      id: string,
+      data: import("@/lib/types").UpdateEventRecipientRequest,
+    ) =>
+      request<import("@/lib/types").EventNotificationRecipient>(
+        `/admin/events/notification-recipients/${id}`,
+        { method: "PATCH", body: data },
+      ),
+    delete: (id: string) =>
+      request<void>(`/admin/events/notification-recipients/${id}`, {
+        method: "DELETE",
+      }),
+    sendTest: () =>
+      request<{ sentTo: string; message: string }>(
+        "/admin/events/notification-recipients/test",
+        { method: "POST" },
+      ),
   },
 
   // ─────────────────────────────────────────────────────────────────

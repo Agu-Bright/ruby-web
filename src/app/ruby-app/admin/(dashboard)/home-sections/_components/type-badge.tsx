@@ -1,5 +1,5 @@
 import type { HomeSectionType } from '@/lib/types';
-import { Star, Flame, Folder, Sparkles } from 'lucide-react';
+import { Star, Flame, Folder, Sparkles, Ticket } from 'lucide-react';
 
 /**
  * Visual identity for each of the four section types. Used in the
@@ -54,6 +54,15 @@ export const TYPE_INFO: Record<
     pill: 'bg-green-50 text-green-700 border-green-200',
     iconBg: 'bg-green-50',
     iconColor: 'text-green-600',
+  },
+  EVENTS: {
+    label: 'Events',
+    short: 'Events',
+    description: 'Upcoming events for the user’s city, auto-populated.',
+    icon: Ticket,
+    pill: 'bg-ruby-50 text-ruby-700 border-ruby-200',
+    iconBg: 'bg-ruby-50',
+    iconColor: 'text-ruby-600',
   },
 };
 

@@ -15,6 +15,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@hookform/resolvers": "^3.9.0",
+    "@yudiel/react-qr-scanner": "^2.6.0",
     "clsx": "^2.1.0",
     "country-state-city": "^3.2.1",
     "js-cookie": "^3.0.5",
@@ -26,6 +27,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.0",
     "react-leaflet": "^5.0.0",
+    "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "sonner": "^1.7.0",
     "zod": "^3.24.0"

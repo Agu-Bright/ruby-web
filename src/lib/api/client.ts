@@ -1225,6 +1225,42 @@ export const api = {
       request<any>(`/admin/reviews/${id}/verify`, { method: "PATCH" }),
     delete: (id: string) =>
       request<null>(`/admin/reviews/${id}`, { method: "DELETE" }),
+
+    // P51 §7 — moderation queue + trust dashboard.
+    listQuarantined: (params?: {
+      businessId?: string;
+      page?: number;
+      limit?: number;
+      state?: "QUARANTINED" | "AUTO_REJECTED";
+    }) =>
+      request<any[]>("/admin/reviews/moderation/quarantined", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    clear: (id: string, notes?: string) =>
+      request<any>(`/admin/reviews/${id}/clear`, {
+        method: "POST",
+        body: notes ? { notes } : undefined,
+      }),
+    remove: (id: string, reason: string) =>
+      request<any>(`/admin/reviews/${id}/remove`, {
+        method: "POST",
+        body: { reason },
+      }),
+    trustDashboard: (sinceDays?: number) =>
+      request<{
+        sinceDays: number;
+        byState: Record<string, number>;
+        byTier: Record<string, number>;
+        fraudScoreStats: {
+          avgScore: number;
+          maxScore: number;
+          quarantineRate: number;
+          autoRejectRate: number;
+          verifiedVisitRate: number;
+        } | null;
+      }>("/admin/reviews/trust/dashboard", {
+        params: sinceDays ? { sinceDays } : undefined,
+      }),
   },
 
   adProducts: {
@@ -1758,6 +1794,44 @@ export const api = {
         "/admin/ask-ruby/health",
         { params: { hours } },
       ),
+  },
+
+  // ──────────────── Phase 50: Ruby+ Select 🤩 ────────────────
+  rubySelect: {
+    list: (params?: { status?: string; locationId?: string; page?: number; limit?: number }) => {
+      const search = new URLSearchParams();
+      if (params?.status) search.set("status", params.status);
+      if (params?.locationId) search.set("locationId", params.locationId);
+      if (params?.page) search.set("page", String(params.page));
+      if (params?.limit) search.set("limit", String(params.limit));
+      const qs = search.toString();
+      return request<{
+        items: import("@/lib/types").RubySelectPost[];
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+      }>(`/admin/ruby-select${qs ? `?${qs}` : ""}`);
+    },
+    get: (id: string) =>
+      request<import("@/lib/types").RubySelectPost>(`/admin/ruby-select/${id}`),
+    create: (data: import("@/lib/types").CreateRubySelectPostRequest) =>
+      request<import("@/lib/types").RubySelectPost>("/admin/ruby-select", {
+        method: "POST",
+        body: data,
+      }),
+    update: (id: string, data: import("@/lib/types").UpdateRubySelectPostRequest) =>
+      request<import("@/lib/types").RubySelectPost>(`/admin/ruby-select/${id}`, {
+        method: "PATCH",
+        body: data,
+      }),
+    publish: (id: string) =>
+      request<import("@/lib/types").RubySelectPost>(`/admin/ruby-select/${id}/publish`, {
+        method: "POST",
+      }),
+    archive: (id: string) =>
+      request<import("@/lib/types").RubySelectPost>(`/admin/ruby-select/${id}/archive`, {
+        method: "POST",
+      }),
+    delete: (id: string) =>
+      request<void>(`/admin/ruby-select/${id}`, { method: "DELETE" }),
   },
 };
 

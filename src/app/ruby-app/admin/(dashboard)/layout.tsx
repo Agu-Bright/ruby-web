@@ -71,6 +71,10 @@ const navGroups: NavGroup[] = [
       { label: "Taxonomy", href: "/ruby-app/admin/taxonomy", icon: FolderTree, hiddenForRoles: ["location_admin"] },
       { label: "Templates", href: "/ruby-app/admin/templates", icon: FileText, hiddenForRoles: ["location_admin"] },
       { label: "Home Sections", href: "/ruby-app/admin/home-sections", icon: LayoutGrid, hiddenForRoles: ["location_admin"] },
+      // Phase 50 — Ruby+ Select 🤩 admin-curated notice-board posts.
+      // Distinct surface from Home Sections (which configures the rows
+      // BELOW the carousel); this controls the carousel ITSELF.
+      { label: "Ruby+ Select", href: "/ruby-app/admin/ruby-select", icon: Sparkles, hiddenForRoles: ["location_admin"] },
       { label: "Legal", href: "/ruby-app/admin/legal", icon: Scale, hiddenForRoles: ["location_admin"] },
     ],
   },
@@ -81,18 +85,29 @@ const navGroups: NavGroup[] = [
       { label: "Customers", href: "/ruby-app/admin/customers", icon: UserCircle },
       { label: "Businesses", href: "/ruby-app/admin/businesses", icon: Store },
       { label: "Reviews", href: "/ruby-app/admin/reviews", icon: Star },
+      { label: "Review moderation", href: "/ruby-app/admin/reviews/moderation", icon: Star },
+      { label: "Trust dashboard", href: "/ruby-app/admin/reviews/trust", icon: Star },
       { label: "Orders", href: "/ruby-app/admin/orders", icon: ShoppingCart },
       { label: "Delivery", href: "/ruby-app/admin/delivery", icon: Truck },
       { label: "Bookings", href: "/ruby-app/admin/bookings", icon: CalendarCheck },
-      { label: "Events", href: "/ruby-app/admin/events", icon: Ticket },
-      { label: "Events: sales report", href: "/ruby-app/admin/events/analytics", icon: Ticket },
-      { label: "Events: recipients", href: "/ruby-app/admin/events/recipients", icon: Ticket },
-      { label: "Events: scanner", href: "/ruby-app/admin/events/scanner", icon: Ticket },
       { label: "Disputes", href: "/ruby-app/admin/disputes", icon: AlertTriangle },
       { label: "Campaigns", href: "/ruby-app/admin/campaigns", icon: Megaphone },
       { label: "Promos", href: "/ruby-app/admin/promos", icon: Tag },
       { label: "Marketers", href: "/ruby-app/admin/marketers", icon: Users },
       { label: "Broadcasts", href: "/ruby-app/admin/broadcasts", icon: Radio },
+    ],
+  },
+  {
+    // Phase 46 — Events promoted to its own top-level group so the four
+    // related screens (browse, sales report, recipients, scanner) stop
+    // being crammed into Operations with an awkward "Events:" label
+    // prefix. Matches the convention used by every other admin section.
+    title: "Events",
+    items: [
+      { label: "All events", href: "/ruby-app/admin/events", icon: Ticket },
+      { label: "Sales report", href: "/ruby-app/admin/events/analytics", icon: Ticket },
+      { label: "Recipients", href: "/ruby-app/admin/events/recipients", icon: Ticket },
+      { label: "Scanner", href: "/ruby-app/admin/events/scanner", icon: Ticket },
     ],
   },
   {

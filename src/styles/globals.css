@@ -127,7 +127,13 @@ body {
 }
 
 /* ===== Admin Dashboard Styles (untouched) ===== */
-.input-field {
+.input-field,
+/* Shorter alias — the events page (and a few newer admin forms) uses
+   `className="input"`. Without this rule the fields render as un-styled
+   browser inputs with no border, which is the "I can't see the input
+   fields" bug in the create-event modal. Keep both class names mapped
+   to the same styling so existing forms stay consistent. */
+.input {
   @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent;
 }
 

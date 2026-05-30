@@ -2524,3 +2524,79 @@ export interface DeoluHealthMetrics {
     error?: string;
   } | null;
 }
+
+// ──────────────────── Phase 50: Ruby+ Select 🤩 ────────────────────
+
+export type RubySelectPostStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+
+export interface RubySelectPost {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  imageUrl: string;
+  ctaUrl?: string;
+  ctaLabel?: string;
+  /** Empty array = global; non-empty = scoped to these cities */
+  locationIds: string[];
+  startsAt: string;
+  endsAt?: string;
+  displayPriority: number;
+  status: RubySelectPostStatus;
+  createdByAdminId: string;
+  updatedByAdminId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRubySelectPostRequest {
+  title: string;
+  subtitle?: string;
+  imageUrl: string;
+  ctaUrl?: string;
+  ctaLabel?: string;
+  locationIds?: string[];
+  startsAt?: string;
+  endsAt?: string;
+  displayPriority?: number;
+  status?: RubySelectPostStatus;
+}
+
+export interface UpdateRubySelectPostRequest extends Partial<CreateRubySelectPostRequest> {}
+
+/**
+ * Public aggregator feed item (POST | AD | BUSINESS). Same shape the
+ * mobile carousel consumes — keep in sync with the backend
+ * `RubySelectFeedItem` discriminated union.
+ */
+export type RubySelectFeedItem =
+  | {
+      kind: 'POST';
+      id: string;
+      title: string;
+      subtitle?: string;
+      imageUrl: string;
+      ctaUrl?: string;
+      ctaLabel?: string;
+      badge: 'announcement';
+    }
+  | {
+      kind: 'AD';
+      id: string;
+      campaignId: string;
+      businessId: string;
+      title: string;
+      subtitle?: string;
+      imageUrl: string;
+      deepLink: string;
+      badge: 'sponsored';
+    }
+  | {
+      kind: 'BUSINESS';
+      id: string;
+      businessId: string;
+      title: string;
+      subtitle?: string;
+      imageUrl: string;
+      distanceKm?: number;
+      deepLink: string;
+    };

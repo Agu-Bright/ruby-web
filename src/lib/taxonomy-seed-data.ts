@@ -418,9 +418,27 @@ export const SEED_SUBCATEGORIES: SeedSubcategory[] = [
       multi('add_ons', 'Add-Ons', ['Waxing', 'Polishing', 'Tyre Shine', 'Air Freshener', 'Upholstery Clean'], { order: 2 }),
     ],
   },
+  // Phase 49.C1 — Auto Repair subcategory. Distinct from generic
+  // "Repairs" (which covers appliances/electronics/HVAC) — this is
+  // vehicle maintenance + breakdown service. Reuses the existing
+  // car_services template; serviceFields are vehicle-repair-specific.
+  // BOOKING_VISIT because most jobs need an inspection / appointment.
+  {
+    _categorySeedKey: 'local-services', _templatePresetId: 'car_services',
+    name: 'Auto Repair', slug: 'auto-repair', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 4, riskTier: 'MEDIUM',
+    serviceFields: [
+      sel('repair_category', 'Repair Category', ['General Service', 'Engine Repair', 'Transmission', 'Brakes & Suspension', 'Electrical', 'AC & Cooling', 'Tyres & Wheels', 'Body Work', 'Diagnostics'], { order: 0, required: true }),
+      multi('vehicle_type', 'Vehicle Type', ['Sedan', 'SUV', 'Truck', 'Van', 'Bus', 'Motorcycle'], { order: 1, required: true }),
+      text('brand_model', 'Vehicle Brand / Model', 'e.g. Toyota Camry 2018', { order: 2 }),
+      textarea('issue_description', 'Issue Description', 'Describe the problem the customer is reporting', { order: 3 }),
+      bool('mobile_service_available', 'Mobile / On-Site Service Available', { order: 4 }),
+      bool('emergency_available', 'Emergency Roadside Available', { order: 5 }),
+      bool('parts_included', 'Replacement Parts Included in Quote', { order: 6 }),
+    ],
+  },
   {
     _categorySeedKey: 'local-services', _templatePresetId: 'repairs',
-    name: 'Repairs', slug: 'repairs', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 4, riskTier: 'MEDIUM',
+    name: 'Repairs', slug: 'repairs', businessModel: 'BOOKING_VISIT' as BusinessModel, displayOrder: 5, riskTier: 'MEDIUM',
     serviceFields: [
       sel('repair_type', 'Repair Type', ['Appliance', 'Furniture', 'Electronics', 'Phone/Laptop', 'AC/HVAC', 'Generator', 'Other'], { order: 0, required: true }),
       text('brand_model', 'Brand / Model', 'e.g. Samsung, LG Inverter AC', { order: 1 }),
@@ -534,5 +552,6 @@ export const TEMPLATE_SUBCATEGORY_MAP: Record<string, string[]> = {
   repairs: ['repairs'],
   professional: ['legal', 'financial-accounting', 'consulting'],
   nightlife: ['clubs-lounges', 'beach-bars', 'live-music-venues', 'live-shows-concerts'],
-  car_services: ['car-wash'],
+  // Phase 49.C1 — auto-repair shares the car_services template with car-wash.
+  car_services: ['car-wash', 'auto-repair'],
 };

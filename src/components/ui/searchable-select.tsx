@@ -159,9 +159,13 @@ export function SearchableSelect({
         />
       )}
 
-      {/* Dropdown */}
+      {/* Dropdown.
+          Phase 62 — z-[1000] (not z-50) so the popover renders ABOVE
+          Leaflet map panes. Leaflet uses up to z-700 for marker pane;
+          z-50 was getting clipped under any map rendered below this
+          select on the admin event-create drawer. */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg animate-fade-in overflow-hidden">
+        <div className="absolute z-[1000] left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg animate-fade-in overflow-hidden">
           {/* Search */}
           <div className="p-2 border-b border-gray-100">
             <div className="relative">

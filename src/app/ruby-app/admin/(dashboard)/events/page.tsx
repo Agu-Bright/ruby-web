@@ -8,7 +8,7 @@ import {
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import {
-  DataTable, StatusBadge, Modal, SearchableSelect, type Column,
+  DataTable, StatusBadge, Modal, SearchableSelect, ImageUpload, type Column,
 } from '@/components/ui';
 import type {
   RubyEvent, EventStatus, CreateEventRequest, UpdateEventRequest,
@@ -479,7 +479,7 @@ function EventFormModal({
     startsAt: string;
     endsAt: string;
     coverImageUrl: string;
-    galleryUrls: string;
+    galleryUrls: string[];
     askRubyTags: string;
     tiers: {
       name: string;
@@ -505,7 +505,7 @@ function EventFormModal({
       ? new Date(event.endsAt).toISOString().slice(0, 16)
       : '',
     coverImageUrl: event?.coverImageUrl || '',
-    galleryUrls: event?.galleryUrls?.join('\n') || '',
+    galleryUrls: event?.galleryUrls ?? [],
     askRubyTags: event?.askRubyTags?.join(', ') || '',
     tiers: event?.ticketTiers?.map((t) => ({
       name: t.name,
@@ -539,10 +539,7 @@ function EventFormModal({
         startsAt: new Date(form.startsAt).toISOString(),
         endsAt: new Date(form.endsAt).toISOString(),
         coverImageUrl: form.coverImageUrl,
-        galleryUrls: form.galleryUrls
-          .split('\n')
-          .map((u) => u.trim())
-          .filter(Boolean),
+        galleryUrls: form.galleryUrls.filter(Boolean),
         ticketTiers: form.tiers.map((t) => ({
           name: t.name,
           description: t.description,
@@ -703,25 +700,50 @@ function EventFormModal({
           </Field>
         </div>
 
-        <Field label="Cover image URL">
-          <input
-            required
-            value={form.coverImageUrl}
-            onChange={(e) =>
-              setForm({ ...form, coverImageUrl: e.target.value })
+        {/* Phase 62 — proper image uploads. ImageUpload handles compression,
+            drag-and-drop, validation, and posts to /admin/media/upload. We
+            wrap each spot with a Field for layout consistency with the
+            rest of the form. */}
+        <Field label="Cover image">
+          <ImageUpload
+            value={form.coverImageUrl || undefined}
+            onChange={(url) =>
+              setForm({ ...form, coverImageUrl: url ?? '' })
             }
-            placeholder="https://..."
-            className="input"
+            folder="events"
+            helpText="Required. JPEG / PNG / WebP, max 5MB. Used as the hero image on the customer event detail screen."
           />
         </Field>
 
-        <Field label="Gallery URLs (one per line, optional)">
-          <textarea
-            rows={3}
-            value={form.galleryUrls}
-            onChange={(e) => setForm({ ...form, galleryUrls: e.target.value })}
-            className="input"
-          />
+        <Field label="Gallery images (optional)">
+          <div className="space-y-2">
+            {form.galleryUrls.map((url, idx) => (
+              <ImageUpload
+                key={`${idx}-${url}`}
+                value={url || undefined}
+                folder="events"
+                onChange={(newUrl) => {
+                  const next = [...form.galleryUrls];
+                  if (newUrl) {
+                    next[idx] = newUrl;
+                  } else {
+                    // Removed — drop this slot entirely
+                    next.splice(idx, 1);
+                  }
+                  setForm({ ...form, galleryUrls: next });
+                }}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setForm({ ...form, galleryUrls: [...form.galleryUrls, ''] })
+              }
+              className="text-xs font-semibold text-ruby-600 hover:text-ruby-700"
+            >
+              + Add another gallery image
+            </button>
+          </div>
         </Field>
 
         {mode === 'edit' && (

@@ -1263,6 +1263,75 @@ export const api = {
       }),
   },
 
+  // Phase 59 — Review Rewards Engine admin endpoints.
+  rewards: {
+    stats: () =>
+      request<{
+        totalPointsOutstanding: number;
+        ngnLiabilityIfFullRedemption: number;
+        usersWithPoints: number;
+        conversionRate: number;
+        minRedemption: number;
+        redemptionsLast30d: {
+          count: number;
+          totalPoints: number;
+          totalNgn: number;
+        };
+        topEarnersLast30d: Array<{
+          userId: string;
+          totalEarned: number;
+          reviewsCount: number;
+          firstName?: string;
+          lastName?: string;
+          email?: string;
+        }>;
+      }>("/admin/rewards/stats"),
+
+    getUser: (userId: string) =>
+      request<{
+        status: {
+          points: number;
+          lifetimeEarned: number;
+          lifetimeRedeemed: number;
+          minRedemption: number;
+          conversionRate: number;
+          cashValueNgn: number;
+          canRedeem: boolean;
+          pointsToUnlock: number;
+        };
+        ledger: {
+          items: Array<{
+            _id: string;
+            userId: string;
+            type:
+              | "REVIEW_PUBLISHED"
+              | "CLAWBACK"
+              | "REDEMPTION"
+              | "ADMIN_ADJUSTMENT";
+            pointsDelta: number;
+            balanceAfter: number;
+            description: string;
+            createdAt: string;
+            reason?: string;
+            reviewId?: string;
+            adminId?: string;
+          }>;
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+          };
+        };
+      }>(`/admin/rewards/users/${userId}`),
+
+    adjust: (userId: string, pointsDelta: number, reason: string) =>
+      request<{ newBalance: number; pointsDelta: number }>(
+        `/admin/rewards/users/${userId}/adjust`,
+        { method: "POST", body: { pointsDelta, reason } },
+      ),
+  },
+
   adProducts: {
     list: () =>
       request<import("@/lib/types").AdProduct[]>("/admin/ads/products"),

@@ -36,6 +36,7 @@ import {
   Ticket,
   Sparkles,
   Receipt,
+  Gift,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -119,6 +120,10 @@ const navGroups: NavGroup[] = [
       { label: "App Versions", href: "/ruby-app/admin/app-versions", icon: Smartphone },
       { label: "Audit Logs", href: "/ruby-app/admin/audit-logs", icon: ScrollText },
       { label: "Deolu health", href: "/ruby-app/admin/deolu", icon: Sparkles },
+      // Phase 59 — Review Rewards Engine. Sits in Finance because the
+      // outstanding-points balance is a real ₦ liability against the
+      // platform; finance reviews it during reconciliation.
+      { label: "Rewards", href: "/ruby-app/admin/rewards", icon: Gift },
     ],
   },
 ];

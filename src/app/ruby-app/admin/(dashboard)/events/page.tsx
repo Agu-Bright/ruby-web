@@ -8,7 +8,7 @@ import {
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import {
-  DataTable, StatusBadge, Modal, type Column,
+  DataTable, StatusBadge, Modal, SearchableSelect, type Column,
 } from '@/components/ui';
 import type {
   RubyEvent, EventStatus, CreateEventRequest, UpdateEventRequest,
@@ -17,6 +17,7 @@ import type {
 import { formatDateTime, formatCurrency } from '@/lib/utils';
 // Phase 42 — venue pin picker. Backend now REQUIRES geoCoordinates on
 // every new / updated event so the customer events map can pin them.
+// Phase 60 — rewritten as a real interactive Leaflet map.
 import { VenueMapPicker } from '@/components/events/VenueMapPicker';
 
 /**
@@ -460,6 +461,14 @@ function EventFormModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  // Phase 60 — load the city catalog ONCE for the SearchableSelect.
+  // We filter to CITY-type + active so the dropdown only shows cities
+  // customers will actually see events for (no countries / states).
+  const { data: cities } = useApi(
+    () => api.locations.list({ type: 'CITY' as any }),
+    [],
+  );
+
   const [form, setForm] = useState<{
     title: string;
     description: string;
@@ -635,25 +644,43 @@ function EventFormModal({
           </Field>
         </div>
 
-        {/* Phase 42 — venue pin (required). VenueMapPicker is a lightweight
-            lat/lng + Google-Maps-helper component; for an interactive embedded
-            map admins use the business mobile app's create flow instead. */}
+        {/* Phase 60 — city dropdown FIRST, then the venue map. The
+            picked city's centerPoint seeds the map's initial centre so
+            the admin lands on the right city before clicking the pin.
+            ObjectIds are an implementation detail; admins never see them. */}
+        <Field label="City">
+          <SearchableSelect
+            required
+            value={form.locationId}
+            placeholder="Search for a city…"
+            options={(cities ?? []).map((c: any) => ({
+              value: c._id,
+              label: c.name,
+              description: c.parentId?.name
+                ? `${c.parentId.name}${c.countryCode ? ` · ${c.countryCode}` : ''}`
+                : c.countryCode || c.type,
+            }))}
+            onChange={(value) => setForm({ ...form, locationId: value })}
+          />
+        </Field>
+
+        {/* Phase 60 — real interactive Leaflet map. Click to drop a pin,
+            drag to fine-tune, or search by address to recenter. The picked
+            city's centerPoint becomes the initial centre when no pin yet. */}
         <VenueMapPicker
           value={form.geoCoordinates}
           onChange={(coords) => setForm({ ...form, geoCoordinates: coords })}
           venueAddress={form.venueAddress}
           venueName={form.venueName}
+          initialCenter={(() => {
+            const sel = (cities ?? []).find(
+              (c: any) => c._id === form.locationId,
+            );
+            return sel?.centerLat && sel?.centerLng
+              ? { lat: sel.centerLat, lng: sel.centerLng }
+              : null;
+          })()}
         />
-
-        <Field label="Location ID (Mongo ObjectId)">
-          <input
-            required
-            value={form.locationId}
-            onChange={(e) => setForm({ ...form, locationId: e.target.value })}
-            placeholder="65f1a2..."
-            className="input"
-          />
-        </Field>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Starts at">

@@ -71,7 +71,7 @@ const navGroups: NavGroup[] = [
       { label: "Taxonomy", href: "/ruby-app/admin/taxonomy", icon: FolderTree, hiddenForRoles: ["location_admin"] },
       { label: "Templates", href: "/ruby-app/admin/templates", icon: FileText, hiddenForRoles: ["location_admin"] },
       { label: "Home Sections", href: "/ruby-app/admin/home-sections", icon: LayoutGrid, hiddenForRoles: ["location_admin"] },
-      // Phase 50 — Ruby+ Select 🤩 admin-curated notice-board posts.
+      // Phase 50 — Ruby+ Select admin-curated notice-board posts.
       // Distinct surface from Home Sections (which configures the rows
       // BELOW the carousel); this controls the carousel ITSELF.
       { label: "Ruby+ Select", href: "/ruby-app/admin/ruby-select", icon: Sparkles, hiddenForRoles: ["location_admin"] },

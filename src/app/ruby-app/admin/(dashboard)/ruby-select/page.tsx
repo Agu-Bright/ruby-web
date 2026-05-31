@@ -165,7 +165,7 @@ export default function RubySelectPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Ruby+ Select 🤩"
+        title="Ruby+ Select"
         description="Home-tab notice board. Post banners, fliers, promos, announcements — they surface alongside paid featured listings + what's-hot businesses on the customer mobile carousel."
         action={
           <button

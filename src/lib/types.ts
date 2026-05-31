@@ -1370,7 +1370,9 @@ export type FeeType =
   | 'DELIVERY_PLATFORM_FEE'
   | 'PLATFORM_DISCOUNT'
   // Phase 16: Nigerian VAT (7.5%) on Ruby+ platform fees
-  | 'VAT';
+  | 'VAT'
+  // Phase 40: Ruby+ commission on event ticket sales
+  | 'EVENT_TICKET_PLATFORM_FEE';
 
 // ============================================================
 // VAT report (Phase 16)
@@ -2527,7 +2529,7 @@ export interface DeoluHealthMetrics {
   } | null;
 }
 
-// ──────────────────── Phase 50: Ruby+ Select 🤩 ────────────────────
+// ──────────────────── Phase 50: Ruby+ Select ────────────────────
 
 export type RubySelectPostStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 

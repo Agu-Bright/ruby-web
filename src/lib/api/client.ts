@@ -1796,7 +1796,7 @@ export const api = {
       ),
   },
 
-  // ──────────────── Phase 50: Ruby+ Select 🤩 ────────────────
+  // ──────────────── Phase 50: Ruby+ Select ────────────────
   rubySelect: {
     list: (params?: { status?: string; locationId?: string; page?: number; limit?: number }) => {
       const search = new URLSearchParams();

@@ -45,6 +45,11 @@ const FEE_TYPES: { value: FeeType; label: string }[] = [
   { value: 'BOOKING_PLATFORM_FEE', label: 'Booking Platform Fee' },
   { value: 'PAYMENT_PROCESSING_FEE', label: 'Payment Processing Fee' },
   { value: 'DELIVERY_PLATFORM_FEE', label: 'Delivery Platform Fee' },
+  // Phase 40 — Ruby+'s per-ticket commission. percentage = X%, flatFee = ₦Y.
+  // Default (no row) = 5% + ₦200.
+  { value: 'EVENT_TICKET_PLATFORM_FEE', label: 'Event Ticket Platform Fee' },
+  // Phase 16 — Nigerian VAT (7.5% on platform fees by default).
+  { value: 'VAT', label: 'VAT (Nigerian)' },
 ];
 
 const getFeeTypeLabel = (type: string) => FEE_TYPES.find(f => f.value === type)?.label || type.replace(/_/g, ' ');

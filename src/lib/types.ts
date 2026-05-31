@@ -765,8 +765,10 @@ export interface UpdateHomeSectionRequest {
   title?: string;
   subtitle?: string;
   categoryId?: string;
-  /** Pass empty string to clear an existing subcategory drill-down. */
-  subcategoryId?: string;
+  /** Pass `null` to clear an existing subcategory drill-down. The
+   *  backend service treats null OR a valid ObjectId; empty string
+   *  was previously used but trips the DTO's IsMongoId validator. */
+  subcategoryId?: string | null;
   businessIds?: string[];
   locationId?: string | null;
   displayOrder?: number;

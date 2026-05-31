@@ -155,7 +155,12 @@ export function SectionEditDrawer({
         if (allowsBanner) payload.bannerUrl = bannerUrl || undefined;
         if (allowsCategoryEdit && categoryIdState) {
           payload.categoryId = categoryIdState;
-          payload.subcategoryId = subcategoryIdState || '';
+          // P52 — null clears the drill-down on the backend. The
+          // previous `|| ''` tripped the @IsMongoId validator on the
+          // DTO because empty string isn't a valid ObjectId. Sending
+          // explicit null lets the backend service set the field to
+          // null (its existing "falsy → null" branch).
+          payload.subcategoryId = subcategoryIdState || null;
         }
         await api.homeSections.update(section!._id, payload);
         toast.success('Section updated');

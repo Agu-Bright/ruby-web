@@ -2329,6 +2329,9 @@ export interface EventTicketTier {
   quantityAvailable: number;
   quantitySold: number;
   perks: string[];
+  /** Phase 66 — optional per-tier image; shown on the customer's tier
+   *  picker + buy review + ticket detail. */
+  imageUrl?: string;
 }
 
 export interface RubyEvent {
@@ -2464,6 +2467,7 @@ export interface CreateEventRequest {
     priceNgn: number;
     quantityAvailable: number;
     perks?: string[];
+    imageUrl?: string;
   }[];
 }
 

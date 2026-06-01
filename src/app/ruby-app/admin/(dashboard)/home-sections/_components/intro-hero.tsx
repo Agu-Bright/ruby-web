@@ -38,7 +38,7 @@ export function IntroHero() {
 
   if (dismissed) return null;
 
-  const types: HomeSectionType[] = ['REVIEWS', 'WHATS_HOT', 'CATEGORY', 'CURATED'];
+  const types: HomeSectionType[] = ['REVIEWS', 'WHATS_HOT', 'EVENTS', 'CATEGORY', 'CURATED'];
 
   return (
     <div className="relative card p-5 bg-gradient-to-br from-ruby-50 via-white to-blue-50 border-ruby-100">

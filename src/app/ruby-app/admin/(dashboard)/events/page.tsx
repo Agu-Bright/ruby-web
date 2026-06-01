@@ -45,6 +45,9 @@ export default function EventsAdminPage() {
   const [statusFilter, setStatusFilter] = useState<EventStatus | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
   const [editingEvent, setEditingEvent] = useState<RubyEvent | null>(null);
+  // Phase 65 — detail drawer with Overview + Tickets tabs. Opens on row
+  // tap OR via the kebab "View" action.
+  const [viewingEvent, setViewingEvent] = useState<RubyEvent | null>(null);
   const [creating, setCreating] = useState(false);
   const [actionMenu, setActionMenu] = useState<string | null>(null);
   // Phase 40 (P-Review) — replaced the prior window.prompt() for reject
@@ -251,6 +254,15 @@ export default function EventsAdminPage() {
                 className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
                 onClick={() => {
                   setActionMenu(null);
+                  setViewingEvent(e);
+                }}
+              >
+                <Eye size={14} /> View details & tickets
+              </button>
+              <button
+                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
+                onClick={() => {
+                  setActionMenu(null);
                   setEditingEvent(e);
                 }}
               >
@@ -367,8 +379,15 @@ export default function EventsAdminPage() {
         columns={columns}
         isLoading={isLoading}
         emptyMessage="No events yet. Create your first event to get started."
+        onRowClick={(e) => setViewingEvent(e)}
       />
 
+      {viewingEvent && (
+        <EventDetailModal
+          event={viewingEvent}
+          onClose={() => setViewingEvent(null)}
+        />
+      )}
       {creating && (
         <EventFormModal
           mode="create"
@@ -487,6 +506,8 @@ function EventFormModal({
       priceNgn: number;
       quantityAvailable: number;
       perks: string;
+      /** Phase 66 — optional per-tier image. */
+      imageUrl?: string;
     }[];
   }>({
     title: event?.title || '',
@@ -513,6 +534,7 @@ function EventFormModal({
       priceNgn: t.priceNgn,
       quantityAvailable: t.quantityAvailable,
       perks: t.perks.join(', '),
+      imageUrl: t.imageUrl,
     })) || [
       { name: 'General Admission', priceNgn: 5000, quantityAvailable: 100, perks: '' },
     ],
@@ -549,6 +571,7 @@ function EventFormModal({
             .split(',')
             .map((p) => p.trim())
             .filter(Boolean),
+          imageUrl: t.imageUrl,
         })),
       };
 
@@ -816,6 +839,17 @@ function EventFormModal({
                   className="input"
                 />
               </div>
+              {/* Phase 66 — optional per-tier image. Shown on the
+                  customer event detail, buy review, and ticket detail.
+                  Snapshotted onto each EventTicket at purchase time. */}
+              <ImageUpload
+                value={t.imageUrl || undefined}
+                onChange={(url) => updateTier(i, { imageUrl: url ?? undefined })}
+                folder="events/tiers"
+                label="Tier image (optional)"
+                helpText="Customers see this on the buy screen + on their ticket. Square 600×600 works best."
+                maxSizeMB={3}
+              />
               {form.tiers.length > 1 && (
                 <button
                   type="button"
@@ -848,6 +882,360 @@ function EventFormModal({
         </div>
       </form>
     </Modal>
+  );
+}
+
+// ============================================================
+// Phase 65 — Event detail modal (Overview + Tickets tabs)
+// ============================================================
+
+function EventDetailModal({
+  event,
+  onClose,
+}: {
+  event: RubyEvent;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<'overview' | 'tickets'>('overview');
+
+  const totalSold = event.ticketTiers.reduce((s, t) => s + t.quantitySold, 0);
+  const totalAvailable = event.ticketTiers.reduce(
+    (s, t) => s + t.quantityAvailable,
+    0,
+  );
+  const grossRevenueNgn = event.ticketTiers.reduce(
+    (s, t) => s + t.priceNgn * t.quantitySold,
+    0,
+  );
+
+  return (
+    <Modal isOpen onClose={onClose} title={event.title} size="xl">
+      <div className="space-y-4">
+        {/* Tab strip */}
+        <div className="flex gap-1 border-b border-gray-200">
+          {(['overview', 'tickets'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
+                tab === t
+                  ? 'border-ruby-500 text-ruby-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t === 'overview' ? 'Overview' : `Tickets (${totalSold})`}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'overview' ? (
+          <EventOverviewTab
+            event={event}
+            totalSold={totalSold}
+            totalAvailable={totalAvailable}
+            grossRevenueNgn={grossRevenueNgn}
+          />
+        ) : (
+          <EventTicketsTab eventId={event._id} />
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function EventOverviewTab({
+  event,
+  totalSold,
+  totalAvailable,
+  grossRevenueNgn,
+}: {
+  event: RubyEvent;
+  totalSold: number;
+  totalAvailable: number;
+  grossRevenueNgn: number;
+}) {
+  return (
+    <div className="space-y-4">
+      {event.coverImageUrl && (
+        <img
+          src={event.coverImageUrl}
+          alt={event.title}
+          className="w-full h-48 object-cover rounded-lg"
+        />
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <DetailStat label="Status" value={<StatusBadge status={event.status} />} />
+        <DetailStat
+          label="Sold"
+          value={`${totalSold} / ${totalAvailable}`}
+        />
+        <DetailStat
+          label="Gross revenue"
+          value={`₦${grossRevenueNgn.toLocaleString()}`}
+        />
+        <DetailStat
+          label="Created"
+          value={
+            event.createdAt
+              ? new Date(event.createdAt).toLocaleDateString()
+              : '—'
+          }
+        />
+      </div>
+
+      <Section label="Description">
+        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+          {event.description || '—'}
+        </p>
+      </Section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Section label="Starts">
+          <p className="text-sm text-gray-700">
+            {formatDateTime(event.startsAt)}
+          </p>
+        </Section>
+        <Section label="Ends">
+          <p className="text-sm text-gray-700">
+            {formatDateTime(event.endsAt)}
+          </p>
+        </Section>
+      </div>
+
+      <Section label="Venue">
+        <p className="text-sm font-semibold text-gray-900">{event.venueName}</p>
+        <p className="text-sm text-gray-600">{event.venueAddress}</p>
+        {event.geoPoint?.coordinates && (
+          <a
+            href={`https://www.google.com/maps?q=${event.geoPoint.coordinates[1]},${event.geoPoint.coordinates[0]}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-ruby-600 hover:underline mt-1 inline-block"
+          >
+            Open in Google Maps →
+          </a>
+        )}
+      </Section>
+
+      <Section label="Ticket tiers">
+        <div className="space-y-2">
+          {event.ticketTiers.map((t) => (
+            <div
+              key={t.name}
+              className="flex items-center gap-3 p-3 bg-gray-50 rounded-md border border-gray-200"
+            >
+              {t.imageUrl && (
+                <img
+                  src={t.imageUrl}
+                  alt={`${t.name} tier`}
+                  className="h-14 w-14 rounded object-cover border border-gray-200 shrink-0"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900">{t.name}</p>
+                {t.description && (
+                  <p className="text-xs text-gray-500">{t.description}</p>
+                )}
+                {t.perks && t.perks.length > 0 && (
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {t.perks.join(' · ')}
+                  </p>
+                )}
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-sm font-bold text-ruby-700">
+                  ₦{t.priceNgn.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {t.quantitySold} / {t.quantityAvailable} sold
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {event.galleryUrls && event.galleryUrls.length > 0 && (
+        <Section label={`Gallery (${event.galleryUrls.length})`}>
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+            {event.galleryUrls.map((url) => (
+              <img
+                key={url}
+                src={url}
+                alt=""
+                className="h-20 w-full object-cover rounded border border-gray-200"
+              />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {event.rejectionReason && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-[11px] font-semibold text-red-700 uppercase tracking-wider">
+            Rejection reason
+          </p>
+          <p className="text-sm text-red-800 mt-1">{event.rejectionReason}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventTicketsTab({ eventId }: { eventId: string }) {
+  const { data, isLoading } = useApi(
+    () => api.events.listTickets(eventId),
+    [eventId],
+  );
+  const tickets = data ?? [];
+
+  if (isLoading) {
+    return (
+      <div className="py-12 text-center text-sm text-gray-500">
+        Loading tickets…
+      </div>
+    );
+  }
+
+  if (tickets.length === 0) {
+    return (
+      <div className="py-12 text-center">
+        <Ticket size={36} className="mx-auto text-gray-300" />
+        <p className="text-sm text-gray-500 mt-2">No tickets sold yet.</p>
+      </div>
+    );
+  }
+
+  // Summary strip
+  const sold = tickets.length;
+  const used = tickets.filter((t) => t.isUsed || t.status === 'USED').length;
+  const refunded = tickets.filter((t) => t.status === 'REFUNDED').length;
+  const cancelled = tickets.filter((t) => t.status === 'CANCELLED').length;
+  const grossNgn = tickets.reduce((s, t) => s + (t.pricePaidNgn || 0), 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <DetailStat label="Total" value={sold} />
+        <DetailStat label="Used (scanned)" value={used} />
+        <DetailStat label="Refunded" value={refunded} />
+        <DetailStat label="Cancelled" value={cancelled} />
+        <DetailStat
+          label="Gross paid"
+          value={`₦${grossNgn.toLocaleString()}`}
+        />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+            <tr>
+              <th className="text-left py-2">Ticket #</th>
+              <th className="text-left py-2">Buyer</th>
+              <th className="text-left py-2">Tier</th>
+              <th className="text-right py-2">Paid</th>
+              <th className="text-left py-2">Method</th>
+              <th className="text-left py-2">Status</th>
+              <th className="text-left py-2">Purchased</th>
+              <th className="text-left py-2">Scanned</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tickets.map((t) => {
+              const buyer = typeof t.userId === 'object' ? t.userId : null;
+              const buyerName = buyer
+                ? `${buyer.firstName ?? ''} ${buyer.lastName ?? ''}`.trim() ||
+                  buyer.email ||
+                  '—'
+                : '—';
+              return (
+                <tr
+                  key={t._id}
+                  className="border-b border-gray-100 hover:bg-gray-50"
+                >
+                  <td className="py-2 font-mono text-xs text-gray-700">
+                    {t.ticketNumber}
+                  </td>
+                  <td className="py-2">
+                    <div className="text-gray-900">{buyerName}</div>
+                    {buyer?.email && (
+                      <div className="text-[11px] text-gray-500">
+                        {buyer.email}
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-2 text-gray-700">{t.tier}</td>
+                  <td className="py-2 text-right font-semibold text-gray-900">
+                    ₦{(t.pricePaidNgn ?? 0).toLocaleString()}
+                  </td>
+                  <td className="py-2">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded font-mono ${
+                        t.paymentMethod === 'PAYSTACK'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {t.paymentMethod ?? '—'}
+                    </span>
+                  </td>
+                  <td className="py-2">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                        t.status === 'ACTIVE'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : t.status === 'USED'
+                          ? 'bg-violet-50 text-violet-700'
+                          : t.status === 'REFUNDED'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {t.status}
+                    </span>
+                  </td>
+                  <td className="py-2 text-xs text-gray-600">
+                    {new Date(t.createdAt).toLocaleString()}
+                  </td>
+                  <td className="py-2 text-xs text-gray-600">
+                    {t.usedAt ? new Date(t.usedAt).toLocaleString() : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function DetailStat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="p-2.5 bg-gray-50 rounded-md border border-gray-200">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+        {label}
+      </p>
+      <div className="text-sm font-semibold text-gray-900 mt-0.5">{value}</div>
+    </div>
+  );
+}
+
+function Section({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+        {label}
+      </p>
+      {children}
+    </div>
   );
 }
 

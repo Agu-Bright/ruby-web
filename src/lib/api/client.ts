@@ -1744,6 +1744,37 @@ export const api = {
       }>(`/admin/events/${id}/refund-all-tickets`, { method: "POST" }),
     delete: (id: string) =>
       request<void>(`/admin/events/${id}`, { method: "DELETE" }),
+    // Phase 65 — admin ticket roster for the event detail drawer.
+    listTickets: (id: string) =>
+      request<
+        Array<{
+          _id: string;
+          ticketNumber: string;
+          tier: string;
+          pricePaidNgn: number;
+          paymentMethod?: "WALLET" | "PAYSTACK";
+          paystackReference?: string;
+          status:
+            | "ACTIVE"
+            | "USED"
+            | "CANCELLED"
+            | "REFUNDED"
+            | "EXPIRED";
+          isUsed?: boolean;
+          usedAt?: string;
+          createdAt: string;
+          refundedAt?: string;
+          userId?:
+            | string
+            | {
+                _id: string;
+                firstName?: string;
+                lastName?: string;
+                email?: string;
+                phone?: string;
+              };
+        }>
+      >(`/admin/events/${id}/tickets`),
     // Phase 40 — approval workflow.
     listPending: (params?: {
       locationId?: string;

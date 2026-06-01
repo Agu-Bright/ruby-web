@@ -32,7 +32,21 @@ interface Props {
   venueName?: string;
   /** Optional initial centre (e.g. the selected city's centerPoint) when no pin yet. */
   initialCenter?: { lat: number; lng: number } | null;
+  /**
+   * Optional country code (ISO-3166 alpha-2, e.g. "ng") to bias the
+   * geocoder so "Lekki" returns Lekki, Lagos instead of a Lekki street
+   * in London. Caller usually passes the country of the selected city.
+   * Defaults to "ng" (Nigeria) when not set, since all V1 locations
+   * are Nigerian — switch when we expand.
+   */
+  countryCode?: string;
 }
+
+/** ~100 km in degrees — sanity check below uses this to warn the admin
+ *  if the picked pin is far from the selected city's centre. Approximate
+ *  conversion: 1° latitude ≈ 111 km. We use 0.9° (≈100 km) as the
+ *  threshold beyond which we surface a warning. */
+const FAR_FROM_CITY_DEG = 0.9;
 
 // Lazy load the actual map so Next.js doesn't try to SSR Leaflet (which
 // would touch `window` and crash on build).
@@ -51,10 +65,20 @@ export const VenueMapPicker: React.FC<Props> = ({
   venueAddress,
   venueName,
   initialCenter,
+  countryCode,
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Normalise the country bias once. Defaults to "ng" (Nigeria) since
+  // all V1 locations are Nigerian — without this Nominatim happily
+  // returns the first global match for "Lekki" which is a road in
+  // London, producing wildly wrong coords for a Lagos event. (Real
+  // bug we hit in prod: an admin typed "Lekki" and the event landed
+  // at [-0.077, 51.539] = London. The countrycodes filter prevents
+  // that whole class of error.)
+  const cc = (countryCode || 'ng').toLowerCase();
 
   // Free-text geocoder via OpenStreetMap's Nominatim — same backend
   // Leaflet uses. No API key. Polite-use: 1 req/sec recommended; the
@@ -68,20 +92,38 @@ export const VenueMapPicker: React.FC<Props> = ({
     setSearchError(null);
     setSearching(true);
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(
-        q,
-      )}`;
+      // `countrycodes=ng` restricts results to Nigeria. Crucial: with
+      // 5 results (limit=5) we can also pick the one closest to the
+      // selected city's centre if `initialCenter` is set — handles
+      // ambiguous cases like multiple "Lekki" matches.
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=${encodeURIComponent(
+        cc,
+      )}&q=${encodeURIComponent(q)}`;
       const res = await fetch(url, {
         headers: { 'Accept-Language': 'en' },
       });
       const json = (await res.json()) as Array<{ lat: string; lon: string }>;
       if (!json[0]) {
-        setSearchError('No match found. Drop the pin manually on the map.');
+        setSearchError(
+          `No match found in ${cc.toUpperCase()}. Drop the pin manually on the map.`,
+        );
         return;
       }
-      const lat = parseFloat(json[0].lat);
-      const lng = parseFloat(json[0].lon);
-      onChange([lng, lat]);
+      // Pick the candidate closest to initialCenter (the selected
+      // city's centre) when available — best fix for "Lekki" matching
+      // multiple Nigerian places.
+      const picked = initialCenter
+        ? json
+            .map((r) => ({
+              lat: parseFloat(r.lat),
+              lng: parseFloat(r.lon),
+              d:
+                Math.abs(parseFloat(r.lat) - initialCenter.lat) +
+                Math.abs(parseFloat(r.lon) - initialCenter.lng),
+            }))
+            .sort((a, b) => a.d - b.d)[0]
+        : { lat: parseFloat(json[0].lat), lng: parseFloat(json[0].lon) };
+      onChange([picked.lng, picked.lat]);
     } catch (err: any) {
       setSearchError(
         'Geocoder unreachable. Drop the pin manually on the map.',
@@ -90,6 +132,19 @@ export const VenueMapPicker: React.FC<Props> = ({
       setSearching(false);
     }
   };
+
+  // Sanity check: warn when the currently-picked pin is wildly far
+  // from the selected city's centre. Catches cases where the geocoder
+  // returned a misleading match OR the admin dragged the pin to a
+  // different region entirely. Uses degree-distance because we don't
+  // need haversine precision for a coarse "is this even the right
+  // continent?" check.
+  const farFromCity = useMemo(() => {
+    if (!value || !initialCenter) return false;
+    const dLat = Math.abs(value[1] - initialCenter.lat);
+    const dLng = Math.abs(value[0] - initialCenter.lng);
+    return dLat > FAR_FROM_CITY_DEG || dLng > FAR_FROM_CITY_DEG;
+  }, [value, initialCenter]);
 
   // Compute the initial centre passed down to the map. Priority:
   // 1) the existing pin (so re-opening an event shows where it is)
@@ -150,6 +205,15 @@ export const VenueMapPicker: React.FC<Props> = ({
 
       {searchError && (
         <p className="text-[11px] text-red-600">{searchError}</p>
+      )}
+
+      {farFromCity && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 leading-relaxed">
+          <strong className="font-semibold">Heads up:</strong> this pin is more
+          than ~100 km from the selected city's centre. Double-check the venue
+          is in the right city before saving — common cause: the geocoder
+          matched the wrong place.
+        </div>
       )}
 
       <MapInner

@@ -248,9 +248,14 @@ export default function FinancePage() {
     setFeeLoading(true);
     try {
       if (isEdit) {
-        // Backend UpdateFeeConfigDto only accepts mutable fields — feeType/scope are immutable
+        // Backend UpdateFeeConfigDto only accepts mutable fields —
+        // feeType/scope are immutable. P58-followup: percentage is now
+        // editable (was being silently dropped on update, leaving the
+        // 5% Ruby+ commission + 7.5% VAT permanently frozen at seed
+        // values).
         await api.feeConfigs.update(selectedFee._id, {
           flatFee: data.flatFee,
+          percentage: data.percentage,
           isActive: data.isActive,
         });
         toast.success('Fee configuration updated');
@@ -633,20 +638,38 @@ function FeeConfigModal({
 
   const [feeType, setFeeType] = useState<FeeType>(fee?.feeType || 'ORDER_PLATFORM_FEE');
   const [flatFee, setFlatFee] = useState(fee?.flatFee?.toString() || '');
+  // P58-followup — previously the modal only edited flatFee and hardcoded
+  // percentage: 0. That meant the EVENT_TICKET_PLATFORM_FEE (5% + ₦200
+  // default) and VAT (7.5%) could never be tuned from the admin UI —
+  // they were stuck at whatever the seed/migration set. Now both are
+  // editable. Defaults to 0 for new configs so the existing "flat fee
+  // only" workflow keeps working without surprises.
+  const [percentage, setPercentage] = useState(
+    fee?.percentage !== undefined ? fee.percentage.toString() : '',
+  );
   const [isActive, setIsActive] = useState(fee?.isActive ?? true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const amount = parseFloat(flatFee);
-    if (isNaN(amount) || amount < 0) {
-      toast.error('Please enter a valid fee amount');
+    const flat = parseFloat(flatFee || '0');
+    const pct = parseFloat(percentage || '0');
+    if (isNaN(flat) || flat < 0) {
+      toast.error('Please enter a valid flat fee amount');
+      return;
+    }
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      toast.error('Percentage must be between 0 and 100');
+      return;
+    }
+    if (flat === 0 && pct === 0) {
+      toast.error('Set a flat fee, a percentage, or both — at least one must be > 0');
       return;
     }
     onSave({
       feeType,
       scope: 'GLOBAL',
-      flatFee: amount,
-      percentage: 0,
+      flatFee: flat,
+      percentage: pct,
       isActive,
     });
   };
@@ -678,12 +701,39 @@ function FeeConfigModal({
             </select>
           </div>
 
+          {/* Percentage — for the event ticket platform fee (5%), VAT
+              (7.5%), etc. Final fee = (transaction × percentage / 100)
+              + flatFee. Most fee types use ONE of percentage or flatFee
+              (not both), but the EVENT_TICKET_PLATFORM_FEE uses both. */}
+          <div>
+            <label className={labelCls}>Percentage (%)</label>
+            <input
+              type="number"
+              value={percentage}
+              onChange={(e) => setPercentage(e.target.value)}
+              min="0"
+              max="100"
+              step="0.5"
+              placeholder="e.g. 5 for 5%"
+              className={inputCls}
+            />
+            <p className="text-[10px] text-gray-400 mt-1">
+              Charged as a percentage of the transaction value. For
+              EVENT_TICKET_PLATFORM_FEE the default is 5%. For VAT it's
+              7.5%. Set 0 to disable the percentage component.
+            </p>
+          </div>
+
           {/* Flat Fee */}
           <div>
             <label className={labelCls}>Flat Fee Amount (NGN)</label>
             <input type="number" value={flatFee} onChange={(e) => setFlatFee(e.target.value)}
-              min="0" step="1" placeholder="e.g. 500" className={inputCls} autoFocus />
-            <p className="text-[10px] text-gray-400 mt-1">This amount will be charged on every transaction of this type</p>
+              min="0" step="1" placeholder="e.g. 200" className={inputCls} />
+            <p className="text-[10px] text-gray-400 mt-1">
+              Fixed amount added on top of the percentage. For
+              EVENT_TICKET_PLATFORM_FEE the default is ₦200. Set 0 to
+              disable the flat component.
+            </p>
           </div>
 
           {/* Active Toggle */}

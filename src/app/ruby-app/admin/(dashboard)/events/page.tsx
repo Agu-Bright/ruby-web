@@ -577,6 +577,19 @@ function EventFormModal({
   });
   const [saving, setSaving] = useState(false);
 
+  // Phase 70 — tiers lock once any ticket has sold. The backend's
+  // updateEvent rejects ANY payload that includes `ticketTiers` when
+  // sales exist (even if the tiers are bit-for-bit unchanged), so we
+  // must omit the field from the update body when tiers are locked —
+  // otherwise an admin trying to fix a typo in the title gets a
+  // "Cannot change ticket tiers after tickets have been sold" error.
+  // Also drives the read-only tier UI below.
+  const tiersLocked =
+    mode === 'edit' &&
+    !!event?.ticketTiers?.some((t) => (t.quantitySold ?? 0) > 0);
+  const totalSold =
+    event?.ticketTiers?.reduce((sum, t) => sum + (t.quantitySold ?? 0), 0) ?? 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Phase 42 — guard against submitting without a venue pin. Backend
@@ -587,6 +600,17 @@ function EventFormModal({
     }
     setSaving(true);
     try {
+      const ticketTiersPayload = form.tiers.map((t) => ({
+        name: t.name,
+        description: t.description,
+        priceNgn: Number(t.priceNgn),
+        quantityAvailable: Number(t.quantityAvailable),
+        perks: t.perks
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean),
+        imageUrl: t.imageUrl,
+      }));
       const payload: CreateEventRequest = {
         title: form.title,
         description: form.description,
@@ -598,29 +622,30 @@ function EventFormModal({
         endsAt: new Date(form.endsAt).toISOString(),
         coverImageUrl: form.coverImageUrl,
         galleryUrls: form.galleryUrls.filter(Boolean),
-        ticketTiers: form.tiers.map((t) => ({
-          name: t.name,
-          description: t.description,
-          priceNgn: Number(t.priceNgn),
-          quantityAvailable: Number(t.quantityAvailable),
-          perks: t.perks
-            .split(',')
-            .map((p) => p.trim())
-            .filter(Boolean),
-          imageUrl: t.imageUrl,
-        })),
+        ticketTiers: ticketTiersPayload,
       };
 
       if (mode === 'create') {
         await api.events.create(payload);
       } else if (event) {
-        const updatePayload: UpdateEventRequest = {
-          ...payload,
-          askRubyTags: form.askRubyTags
-            .split(',')
-            .map((t) => t.trim())
-            .filter(Boolean),
-        };
+        // Build the UPDATE-only payload. Omit `ticketTiers` when locked
+        // so the backend doesn't reject the otherwise-valid edit.
+        const { ticketTiers: _omit, ...payloadWithoutTiers } = payload;
+        const updatePayload: UpdateEventRequest = tiersLocked
+          ? {
+              ...payloadWithoutTiers,
+              askRubyTags: form.askRubyTags
+                .split(',')
+                .map((t) => t.trim())
+                .filter(Boolean),
+            }
+          : {
+              ...payload,
+              askRubyTags: form.askRubyTags
+                .split(',')
+                .map((t) => t.trim())
+                .filter(Boolean),
+            };
         await api.events.update(event._id, updatePayload);
       }
       onSuccess();
@@ -727,7 +752,10 @@ function EventFormModal({
 
         {/* Phase 60 — real interactive Leaflet map. Click to drop a pin,
             drag to fine-tune, or search by address to recenter. The picked
-            city's centerPoint becomes the initial centre when no pin yet. */}
+            city's centerPoint becomes the initial centre when no pin yet.
+            Pass `countryCode` from the selected city so the Nominatim
+            geocoder is biased to that country — prevents the "typed 'Lekki'
+            → got London" class of bug. */}
         <VenueMapPicker
           value={form.geoCoordinates}
           onChange={(coords) => setForm({ ...form, geoCoordinates: coords })}
@@ -740,6 +768,12 @@ function EventFormModal({
             return sel?.centerLat && sel?.centerLng
               ? { lat: sel.centerLat, lng: sel.centerLng }
               : null;
+          })()}
+          countryCode={(() => {
+            const sel = (cities ?? []).find(
+              (c: any) => c._id === form.locationId,
+            );
+            return sel?.countryCode || undefined;
           })()}
         />
 
@@ -827,15 +861,31 @@ function EventFormModal({
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
               Ticket tiers
+              {tiersLocked && (
+                <span className="ml-2 text-[11px] font-normal text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                  Locked · {totalSold} sold
+                </span>
+              )}
             </label>
-            <button
-              type="button"
-              onClick={addTier}
-              className="text-sm text-ruby-500 hover:text-ruby-600"
-            >
-              + Add tier
-            </button>
+            {!tiersLocked && (
+              <button
+                type="button"
+                onClick={addTier}
+                className="text-sm text-ruby-500 hover:text-ruby-600"
+              >
+                + Add tier
+              </button>
+            )}
           </div>
+          {tiersLocked && (
+            <p className="mb-3 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2 leading-relaxed">
+              Tickets have already been sold — tier name, price, quantity, perks
+              and image are read-only. Everything else on this event (title,
+              description, venue, city, pin, dates, gallery, tags) is still
+              editable. To restructure tiers, cancel the event and create a
+              new one.
+            </p>
+          )}
           {form.tiers.map((t, i) => (
             <div
               key={i}
@@ -845,19 +895,21 @@ function EventFormModal({
                 <input
                   placeholder="Name (e.g. VIP)"
                   required
+                  disabled={tiersLocked}
                   value={t.name}
                   onChange={(e) => updateTier(i, { name: e.target.value })}
-                  className="input"
+                  className="input disabled:bg-gray-50 disabled:text-gray-600"
                 />
                 <input
                   placeholder="Price ₦"
                   type="number"
                   required
+                  disabled={tiersLocked}
                   value={t.priceNgn}
                   onChange={(e) =>
                     updateTier(i, { priceNgn: Number(e.target.value) })
                   }
-                  className="input"
+                  className="input disabled:bg-gray-50 disabled:text-gray-600"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -865,33 +917,48 @@ function EventFormModal({
                   placeholder="Quantity available"
                   type="number"
                   required
+                  disabled={tiersLocked}
                   value={t.quantityAvailable}
                   onChange={(e) =>
                     updateTier(i, {
                       quantityAvailable: Number(e.target.value),
                     })
                   }
-                  className="input"
+                  className="input disabled:bg-gray-50 disabled:text-gray-600"
                 />
                 <input
                   placeholder="Perks (comma-separated)"
+                  disabled={tiersLocked}
                   value={t.perks}
                   onChange={(e) => updateTier(i, { perks: e.target.value })}
-                  className="input"
+                  className="input disabled:bg-gray-50 disabled:text-gray-600"
                 />
               </div>
               {/* Phase 66 — optional per-tier image. Shown on the
                   customer event detail, buy review, and ticket detail.
                   Snapshotted onto each EventTicket at purchase time. */}
-              <ImageUpload
-                value={t.imageUrl || undefined}
-                onChange={(url) => updateTier(i, { imageUrl: url ?? undefined })}
-                folder="events/tiers"
-                label="Tier image (optional)"
-                helpText="Customers see this on the buy screen + on their ticket. Square 600×600 works best."
-                maxSizeMB={3}
-              />
-              {form.tiers.length > 1 && (
+              {tiersLocked ? (
+                t.imageUrl ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <img
+                      src={t.imageUrl}
+                      alt={`${t.name} tier`}
+                      className="w-16 h-16 rounded object-cover border border-gray-200"
+                    />
+                    <span>Tier image (locked — tickets already sold)</span>
+                  </div>
+                ) : null
+              ) : (
+                <ImageUpload
+                  value={t.imageUrl || undefined}
+                  onChange={(url) => updateTier(i, { imageUrl: url ?? undefined })}
+                  folder="events/tiers"
+                  label="Tier image (optional)"
+                  helpText="Customers see this on the buy screen + on their ticket. Square 600×600 works best."
+                  maxSizeMB={3}
+                />
+              )}
+              {!tiersLocked && form.tiers.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeTier(i)}

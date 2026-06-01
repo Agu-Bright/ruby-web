@@ -1049,7 +1049,7 @@ function EventDetailModal({
             onEdit={onEdit}
           />
         ) : (
-          <EventTicketsTab eventId={event._id} />
+          <EventTicketsTab eventId={event._id} inventorySold={totalSold} />
         )}
       </div>
     </Modal>
@@ -1142,13 +1142,30 @@ function EventOverviewTab({
       <Section
         label="Ticket tiers"
         action={
+          // Always show an actionable edit affordance. When tiers are
+          // locked (tickets sold), the form opens in "edit details"
+          // mode — tier inputs are disabled but title, description,
+          // venue, city, pin, dates, gallery, and tags stay editable.
+          // We surface BOTH a clickable "Edit details" link AND a
+          // muted "Locked · N sold" hint so the admin understands
+          // (a) editing is still possible, (b) the tier columns will
+          // be read-only when the form opens, and (c) why.
           tiersLocked ? (
-            <span
-              className="text-[11px] text-gray-400 uppercase tracking-wider"
-              title="Tiers are locked once tickets have been sold. Cancel the event and create a new one if you need to change pricing or quantity."
-            >
-              Locked · {totalSold} sold
-            </span>
+            <div className="flex items-center gap-3">
+              <span
+                className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-wider"
+                title="Ticket tiers can't change once tickets are sold (it would break the buyer's price guarantee). Everything else on the event is still editable."
+              >
+                Tiers locked · {totalSold} sold
+              </span>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="text-[11px] font-semibold text-ruby-600 hover:text-ruby-700 uppercase tracking-wider"
+              >
+                Edit details →
+              </button>
+            </div>
           ) : (
             <button
               type="button"
@@ -1224,8 +1241,20 @@ function EventOverviewTab({
   );
 }
 
-function EventTicketsTab({ eventId }: { eventId: string }) {
-  const { data, isLoading } = useApi(
+function EventTicketsTab({
+  eventId,
+  inventorySold,
+}: {
+  eventId: string;
+  /** `event.ticketTiers[*].quantitySold` summed — the inventory-level
+   *  count from the Event doc. May exceed the actual EventTicket
+   *  record count while a Paystack purchase is mid-flight (soft
+   *  reservation incremented before tickets are minted). The 15-min
+   *  sweep cron reverts stale reservations. We surface this gap in
+   *  the empty state so the admin understands the count mismatch. */
+  inventorySold: number;
+}) {
+  const { data, isLoading, refetch } = useApi(
     () => api.events.listTickets(eventId),
     [eventId],
   );
@@ -1240,6 +1269,36 @@ function EventTicketsTab({ eventId }: { eventId: string }) {
   }
 
   if (tickets.length === 0) {
+    // Inventory shows tickets sold but no EventTicket records exist.
+    // Happens during the Paystack initialize → verify window: the
+    // `initialize-ticket-purchase` endpoint atomically increments
+    // `quantitySold` to soft-reserve inventory; the actual EventTicket
+    // rows aren't minted until `verify-ticket-purchase` succeeds. The
+    // 15-min `sweepStaleReservations` cron reverts abandoned ones.
+    if (inventorySold > 0) {
+      return (
+        <div className="py-12 px-6 text-center">
+          <div className="inline-flex w-14 h-14 items-center justify-center rounded-full bg-amber-50 border border-amber-200 mb-3">
+            <Ticket size={26} className="text-amber-600" />
+          </div>
+          <p className="text-sm font-medium text-gray-900">
+            {inventorySold} ticket{inventorySold === 1 ? '' : 's'} reserved, none completed yet
+          </p>
+          <p className="text-xs text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">
+            A purchase is in flight — Paystack checkout reserves inventory
+            before payment confirms. Completed tickets appear here. Abandoned
+            reservations are auto-cleared within 15 minutes.
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-ruby-600 hover:text-ruby-700"
+          >
+            <RotateCcw size={12} /> Refresh
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="py-12 text-center">
         <Ticket size={36} className="mx-auto text-gray-300" />

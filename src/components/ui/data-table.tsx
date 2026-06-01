@@ -74,7 +74,12 @@ export function DataTable<T>({
 
   return (
     <div className="card min-h-[400px]">
-      <div className="overflow-x-auto">
+      {/* overflow-y-visible is critical here — without it, the implicit
+          overflow-y:auto (forced by overflow-x:auto per CSS spec) clips
+          row-level kebab dropdowns that drop down past the row box.
+          The loading state above already does this; live state was the
+          outlier. Affects every admin page that uses DataTable. */}
+      <div className="overflow-x-auto overflow-y-visible">
         <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50/50">

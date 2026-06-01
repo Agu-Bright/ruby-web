@@ -5,6 +5,7 @@ import {
   Ticket, Eye, Plus, Search, Calendar, MapPin, MoreHorizontal,
   CheckCircle2, XCircle, Trash2, Edit3, RotateCcw, ShieldCheck, AlertCircle,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import {
@@ -79,30 +80,72 @@ export default function EventsAdminPage() {
     return list;
   }, [events, statusFilter, search]);
 
-  const publishMutation = useMutation((id: string) => api.events.publish(id));
-  const cancelMutation = useMutation((id: string) => api.events.cancel(id));
-  const deleteMutation = useMutation((id: string) => api.events.delete(id));
-  const refundMutation = useMutation((id: string) =>
-    api.events.refundAllTickets(id),
+  // P58-audit — wire each mutation with explicit success behavior.
+  // Errors auto-toast via useMutation's default (Phase 23). Success
+  // toasts are added so admins get positive feedback that an action
+  // landed, and refetch() is gated to only run when the action actually
+  // succeeded — the prior pattern fired refetch() on success AND
+  // failure, masking the failure with a stale-data refresh.
+  const publishMutation = useMutation((id: string) => api.events.publish(id), {
+    onSuccess: () => {
+      toast.success('Event published');
+      refetch();
+    },
+  });
+  const cancelMutation = useMutation((id: string) => api.events.cancel(id), {
+    onSuccess: () => {
+      toast.success('Event cancelled');
+      refetch();
+    },
+  });
+  const deleteMutation = useMutation((id: string) => api.events.delete(id), {
+    onSuccess: () => {
+      toast.success('Event deleted');
+      refetch();
+    },
+  });
+  const refundMutation = useMutation(
+    (id: string) => api.events.refundAllTickets(id),
+    {
+      onSuccess: (result) => {
+        toast.success(
+          `Refunded ${result.refunded} wallet tickets (₦${result.totalNgnRefunded.toLocaleString()}). ${result.skipped} skipped, ${result.failures} failed. Card payments need manual Paystack refund.`,
+          { duration: 10000 },
+        );
+        refetch();
+      },
+    },
   );
   // Phase 40 — approval workflow mutations.
-  const approveMutation = useMutation((id: string) => api.events.approve(id));
-  const rejectMutation = useMutation((args: { id: string; reason: string }) =>
-    api.events.reject(args.id, args.reason),
+  const approveMutation = useMutation((id: string) => api.events.approve(id), {
+    onSuccess: () => {
+      toast.success('Event approved and published');
+      refetch();
+    },
+  });
+  const rejectMutation = useMutation(
+    (args: { id: string; reason: string }) =>
+      api.events.reject(args.id, args.reason),
+    {
+      onSuccess: () => {
+        toast.success('Event rejected — organiser notified');
+        setRejecting(null);
+        setRejectReason('');
+        refetch();
+      },
+    },
   );
 
-  const handlePublish = async (id: string) => {
+  const handlePublish = (id: string) => {
     setActionMenu(null);
-    await publishMutation.mutate(id);
-    refetch();
+    publishMutation.mutate(id);
   };
 
   // Phase 40 — approve a PENDING_REVIEW event. Backend bumps status to
   // PUBLISHED + fires admin + business owner notifications.
-  const handleApprove = async (id: string) => {
+  const handleApprove = (id: string) => {
     setActionMenu(null);
-    await approveMutation.mutate(id);
-    refetch();
+    approveMutation.mutate(id);
   };
 
   // Phase 40 — reject a PENDING_REVIEW event. Reason is shown verbatim to
@@ -113,47 +156,38 @@ export default function EventsAdminPage() {
     setRejectReason('');
     setRejecting({ id, title });
   };
-  const confirmReject = async () => {
+  const confirmReject = () => {
     if (!rejecting) return;
     if (rejectReason.trim().length < 10) return;
-    await rejectMutation.mutate({
+    rejectMutation.mutate({
       id: rejecting.id,
       reason: rejectReason.trim(),
     });
-    setRejecting(null);
-    setRejectReason('');
-    refetch();
   };
 
-  const handleCancel = async (id: string) => {
+  const handleCancel = (id: string) => {
     if (!confirm('Cancel this event? All ACTIVE tickets will be marked CANCELLED. Refunds are handled separately via the wallet refund flow.')) {
       return;
     }
     setActionMenu(null);
-    await cancelMutation.mutate(id);
-    refetch();
+    cancelMutation.mutate(id);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm('Delete this event permanently? Only allowed if no tickets have been sold.')) {
       return;
     }
     setActionMenu(null);
-    await deleteMutation.mutate(id);
-    refetch();
+    deleteMutation.mutate(id);
   };
 
-  const handleRefundAll = async (id: string, title: string, event?: RubyEvent) => {
+  const handleRefundAll = (id: string, title: string, event?: RubyEvent) => {
     // Phase 40 — count Paystack-paid tickets so we can WARN the admin that
     // refundAll only handles wallet payments. Without this warning the
     // admin sees "0 skipped" and assumes everything was refunded —
     // Paystack customers get nothing and call support.
     let paystackCount = 0;
     if (event) {
-      // We don't have the per-ticket breakdown without a fetch, but we
-      // can approximate from "tickets sold vs wallet ledger" later. For
-      // now, surface that PAYSTACK isn't handled at all so admin can
-      // proactively reach out.
       const totalSold = event.ticketTiers.reduce(
         (s, t) => s + t.quantitySold,
         0,
@@ -176,17 +210,10 @@ export default function EventsAdminPage() {
       return;
     }
     setActionMenu(null);
-    const result = await refundMutation.mutate(id);
-    if (result) {
-      alert(
-        `Refund complete:\n` +
-          `  ${result.refunded} tickets refunded (₦${result.totalNgnRefunded.toLocaleString()})\n` +
-          `  ${result.skipped} skipped (already refunded / free / card payments)\n` +
-          `  ${result.failures} failures\n\n` +
-          `Card (Paystack) tickets need a manual refund via the Paystack dashboard until V1.1.`,
-      );
-    }
-    refetch();
+    refundMutation.mutate(id);
+    // Success + error feedback now handled by the mutation's onSuccess
+    // toast (set on the useMutation definition above) and the default
+    // useMutation error toast. No need for the manual alert() block.
   };
 
   const columns: Column<RubyEvent>[] = [
@@ -555,7 +582,7 @@ function EventFormModal({
     // Phase 42 — guard against submitting without a venue pin. Backend
     // DTO would reject anyway but a clear inline message is better UX.
     if (!form.geoCoordinates) {
-      alert('Please drop a pin on the venue map (latitude + longitude required).');
+      toast.error('Drop a pin on the venue map before saving — events without coordinates can\'t show up on the customer map.');
       return;
     }
     setSaving(true);
@@ -597,8 +624,13 @@ function EventFormModal({
         await api.events.update(event._id, updatePayload);
       }
       onSuccess();
+      toast.success(mode === 'create' ? 'Event created' : 'Event saved');
     } catch (err: any) {
-      alert(`Save failed: ${err?.message || 'Unknown error'}`);
+      const msg = err?.response?.data?.error?.message
+        || err?.response?.data?.message
+        || err?.message
+        || 'Unknown error';
+      toast.error(`Save failed: ${msg}`, { duration: 8000 });
     } finally {
       setSaving(false);
     }

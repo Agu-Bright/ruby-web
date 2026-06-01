@@ -386,6 +386,15 @@ export default function EventsAdminPage() {
         <EventDetailModal
           event={viewingEvent}
           onClose={() => setViewingEvent(null)}
+          onEdit={() => {
+            // Close detail modal, open the edit form in one step. The
+            // existing EventFormModal already supports tier add/edit/
+            // remove + image upload, so we route the in-place "Edit
+            // tiers" CTA through it instead of duplicating that UI.
+            const e = viewingEvent;
+            setViewingEvent(null);
+            setEditingEvent(e);
+          }}
         />
       )}
       {creating && (
@@ -892,9 +901,13 @@ function EventFormModal({
 function EventDetailModal({
   event,
   onClose,
+  onEdit,
 }: {
   event: RubyEvent;
   onClose: () => void;
+  /** Opens the EventFormModal in edit mode. Wired by the parent so it
+   *  can close the detail modal and open the editor in one step. */
+  onEdit: () => void;
 }) {
   const [tab, setTab] = useState<'overview' | 'tickets'>('overview');
 
@@ -934,6 +947,7 @@ function EventDetailModal({
             totalSold={totalSold}
             totalAvailable={totalAvailable}
             grossRevenueNgn={grossRevenueNgn}
+            onEdit={onEdit}
           />
         ) : (
           <EventTicketsTab eventId={event._id} />
@@ -948,12 +962,20 @@ function EventOverviewTab({
   totalSold,
   totalAvailable,
   grossRevenueNgn,
+  onEdit,
 }: {
   event: RubyEvent;
   totalSold: number;
   totalAvailable: number;
   grossRevenueNgn: number;
+  /** Open the EventFormModal in edit mode for this event. */
+  onEdit: () => void;
 }) {
+  // Backend rule (events.service.ts:175-187): tier definitions become
+  // immutable once any ticket has been sold to protect inventory math.
+  // We mirror that here as a disabled state so admins understand WHY
+  // the edit affordance is unavailable rather than seeing a backend 400.
+  const tiersLocked = totalSold > 0;
   return (
     <div className="space-y-4">
       {event.coverImageUrl && (
@@ -1018,7 +1040,27 @@ function EventOverviewTab({
         )}
       </Section>
 
-      <Section label="Ticket tiers">
+      <Section
+        label="Ticket tiers"
+        action={
+          tiersLocked ? (
+            <span
+              className="text-[11px] text-gray-400 uppercase tracking-wider"
+              title="Tiers are locked once tickets have been sold. Cancel the event and create a new one if you need to change pricing or quantity."
+            >
+              Locked · {totalSold} sold
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="text-[11px] font-semibold text-ruby-600 hover:text-ruby-700 uppercase tracking-wider"
+            >
+              Edit tiers →
+            </button>
+          )
+        }
+      >
         <div className="space-y-2">
           {event.ticketTiers.map((t) => (
             <div
@@ -1224,16 +1266,21 @@ function DetailStat({ label, value }: { label: string; value: React.ReactNode })
 
 function Section({
   label,
+  action,
   children,
 }: {
   label: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-        {label}
-      </p>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          {label}
+        </p>
+        {action}
+      </div>
       {children}
     </div>
   );

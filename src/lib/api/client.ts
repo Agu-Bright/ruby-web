@@ -1075,6 +1075,19 @@ export const api = {
       request<import("@/lib/types").PayoutStats>("/admin/payouts/stats"),
   },
 
+  // P70: Ops health endpoints (SMS gateway, Paystack balance, etc.) —
+  // surfaced on the admin /finance page so an operator can diagnose silent
+  // outages (e.g. Termii misconfigured) without poking at backend logs.
+  health: {
+    sms: () =>
+      request<import("@/lib/types").SmsHealth>("/admin/health/sms"),
+    smsTest: (body: { phone: string; message?: string }) =>
+      request<{ sent: boolean; phone: string }>("/admin/health/sms/test", {
+        method: "POST",
+        body,
+      }),
+  },
+
   feeConfigs: {
     list: (
       params?: {

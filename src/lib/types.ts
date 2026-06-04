@@ -2608,3 +2608,14 @@ export type RubySelectFeedItem =
       distanceKm?: number;
       deepLink: string;
     };
+
+// P70 — admin /health/sms response (see backend SmsService.getHealth)
+export interface SmsHealth {
+  provider: string;          // 'termii' | 'twilio' | 'unset'
+  configured: boolean;
+  balance: number | null;    // NGN — null when provider != termii or balance fetch failed
+  currency: string | null;   // 'NGN' typically
+  lastSendAt: string | null; // ISO timestamp of most recent sendSms() attempt
+  lastSendOk: boolean | null;// true if the most recent send returned ok
+  lastError: string | null;  // most recent failure detail
+}

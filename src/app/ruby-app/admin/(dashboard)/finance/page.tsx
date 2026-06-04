@@ -29,6 +29,7 @@ import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, DataTable, Modal, StatusBadge, type Column } from '@/components/ui';
+import { SmsHealthCard } from './SmsHealthCard';
 import type {
   Payout,
   PayoutStatus,
@@ -340,6 +341,10 @@ export default function FinancePage() {
   return (
     <div>
       <PageHeader title="Finance" description="Manage payouts, transactions, wallets, and fee configurations" />
+
+      {/* P70 — Ops widget for the SMS gateway. Sits above payout stats so a
+          silent OTP outage is the first thing visible when opening Finance. */}
+      <SmsHealthCard />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[

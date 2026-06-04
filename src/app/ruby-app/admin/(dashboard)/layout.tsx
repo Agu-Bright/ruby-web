@@ -37,6 +37,7 @@ import {
   Sparkles,
   Receipt,
   Gift,
+  MessageSquare,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -124,6 +125,10 @@ const navGroups: NavGroup[] = [
       // outstanding-points balance is a real ₦ liability against the
       // platform; finance reviews it during reconciliation.
       { label: "Rewards", href: "/ruby-app/admin/rewards", icon: Gift },
+      // P70 — Messaging test surface. SUPER_ADMIN-only screen for firing
+      // a one-off SMS through the live gateway to verify Termii config
+      // after an env change, without needing to do a full signup flow.
+      { label: "Messaging", href: "/ruby-app/admin/messaging", icon: MessageSquare, superOnly: true },
     ],
   },
 ];

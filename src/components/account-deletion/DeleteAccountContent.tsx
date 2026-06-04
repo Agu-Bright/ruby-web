@@ -126,7 +126,7 @@ export default function DeleteAccountContent() {
                 <p className="text-sm font-semibold text-gray-800 mb-2">Before you go, consider these alternatives:</p>
                 <ul className="text-sm text-gray-600 space-y-1.5">
                   <li>&#8226; <strong>Disable notifications</strong> — Turn off push notifications in your device settings.</li>
-                  <li>&#8226; <strong>Contact support</strong> — If you&apos;re having issues, our team can help. Email <a href="mailto:support@rubyaggregators.com" className="text-ruby-red hover:underline">support@rubyaggregators.com</a></li>
+                  <li>&#8226; <strong>Contact support</strong> — If you&apos;re having issues, our team can help. Email <a href="mailto:it@rubyplus.net" className="text-ruby-red hover:underline">it@rubyplus.net</a></li>
                 </ul>
               </div>
 

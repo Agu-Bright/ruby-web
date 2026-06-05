@@ -2531,6 +2531,26 @@ export interface DeoluHealthMetrics {
     status?: string;
     error?: string;
   } | null;
+  // P77 (f) — data-layer health for the Deolu search pipeline. Surfaces
+  // (a) embedding coverage on LIVE businesses (a population <100% means
+  // the `$vectorSearch` pipeline can't reach those rows) and (b) a single
+  // canary query run against the index so ops can confirm end-to-end
+  // pipeline health, not just index presence.
+  searchHealth?: {
+    businesses: {
+      totalLive: number;
+      withEmbedding: number;
+      missingEmbedding: number;
+      embeddingCoveragePct: number;
+    };
+    sampleQuery: {
+      query?: string;
+      hits?: number;
+      latencyMs?: number;
+      firstHitName?: string;
+      error?: string;
+    } | null;
+  };
 }
 
 // ──────────────────── Phase 50: Ruby+ Select ────────────────────

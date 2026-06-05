@@ -30,6 +30,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, DataTable, Modal, StatusBadge, type Column } from '@/components/ui';
 import { SmsHealthCard } from './SmsHealthCard';
+import { DeoluHealthCard } from './DeoluHealthCard';
 import type {
   Payout,
   PayoutStatus,
@@ -345,6 +346,12 @@ export default function FinancePage() {
       {/* P70 — Ops widget for the SMS gateway. Sits above payout stats so a
           silent OTP outage is the first thing visible when opening Finance. */}
       <SmsHealthCard />
+
+      {/* P77 (f) — Deolu search-pipeline health. Catches the three failures
+          that cause the "no merchants" canned-reply loop: missing Atlas
+          index, businesses without embeddings, end-to-end canary returning
+          zero. Lets ops triage from one page instead of grepping logs. */}
+      <DeoluHealthCard />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[

@@ -801,7 +801,7 @@ function CreateAdminModal({
         <div className="space-y-4">
           <SectionHeader icon={KeyRound} title="Credentials" description="Auto-filled from city selection, still editable" />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label-text">First Name</label>
               <input
@@ -965,7 +965,7 @@ function ViewAdminModal({
         {/* Account Info */}
         <div>
           <SectionHeader icon={Users} title="Account Information" />
-          <div className="grid grid-cols-3 gap-4 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
             <DetailCard icon={ExternalLink} label="Email" value={admin.email} />
             <DetailCard icon={Shield} label="Role" value={ROLE_CONFIG[role]?.label || role} />
             <DetailCard icon={admin.scope === 'GLOBAL' ? Globe : MapPin} label="Scope" value={admin.scope} />
@@ -979,7 +979,7 @@ function ViewAdminModal({
         {admin.scope === 'LOCATION' && admin.locationIds && admin.locationIds.length > 0 && (
           <div>
             <SectionHeader icon={MapPin} title="Location Assignments" description={`${admin.locationIds.length} assigned location${admin.locationIds.length !== 1 ? 's' : ''}`} />
-            <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
               {admin.locationIds.map((loc, idx) => {
                 const isObject = typeof loc === 'object' && loc !== null;
                 const name = isObject ? loc.name : locationNames[idx];
@@ -1134,7 +1134,7 @@ function EditAdminModal({
         {/* Personal Info */}
         <div className="space-y-4">
           <SectionHeader icon={Users} title="Personal Information" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label-text">First Name</label>
               <input

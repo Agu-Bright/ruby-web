@@ -907,7 +907,7 @@ export default function TemplatesPage() {
             <div className="p-4 bg-gradient-to-br from-gray-50 via-white to-gray-50 rounded-xl border border-gray-100 space-y-4">
               <h3 className="text-sm font-bold text-gray-900">Review Template</h3>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <DetailCard icon={FolderOpen} label="Category" value={selectedCategory?.name || '—'} />
                 <DetailCard icon={Link2} label="Subcategory" value={selectedSubcategory?.name || '—'} />
                 <DetailCard icon={FileText} label="Template Name" value={form.name} />

@@ -429,7 +429,7 @@ export default function FinancePage() {
               </div>
               <StatusBadge status={selectedPayout.status} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-xs text-gray-500 mb-1">Amount</p>
                 <p className="text-2xl font-bold text-gray-900">{formatCurrency(selectedPayout.amount, selectedPayout.currency)}</p>
@@ -439,7 +439,7 @@ export default function FinancePage() {
                 <p className="text-lg font-medium text-gray-900">{selectedPayout.method || 'Bank Transfer'}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><p className="text-gray-500">Business ID</p><p className="font-mono text-gray-900">{selectedPayout.businessId}</p></div>
               <div><p className="text-gray-500">Location ID</p><p className="font-mono text-gray-900">{selectedPayout.locationId}</p></div>
               <div><p className="text-gray-500">Requested</p><p className="text-gray-900">{formatDateTime(selectedPayout.createdAt)}</p></div>

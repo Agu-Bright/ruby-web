@@ -824,7 +824,7 @@ function DetailModal({
             <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Source
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
                 <div className="text-[10px] text-gray-500 uppercase tracking-wider">Type</div>
                 <div className="font-mono text-gray-700">{p!.sourceType}</div>
@@ -850,7 +850,7 @@ function DetailModal({
               Bank account
             </div>
             {detail.bank ? (
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <div className="text-[10px] text-gray-500 uppercase tracking-wider">Bank</div>
                   <div className="text-gray-700">{detail.bank.bankName || '—'}</div>
@@ -881,7 +881,7 @@ function DetailModal({
           </div>
 
           {/* Wallet & Provider */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 bg-gray-50 rounded-lg">
               <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
                 Wallet

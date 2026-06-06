@@ -1186,7 +1186,7 @@ function CreateLocationModal({
           )}
 
           {/* Name & Slug — auto-filled, still editable */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label-text">Location Name</label>
               <input
@@ -1224,7 +1224,7 @@ function CreateLocationModal({
               Fetching precise coordinates...
             </div>
           )}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="label-text">Center Latitude</label>
               <input
@@ -1255,7 +1255,7 @@ function CreateLocationModal({
         {/* Currency & Language */}
         <div className="space-y-4">
           <SectionHeader icon={Languages} title="Currency & Language" />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label-text">Default Currency</label>
               <SearchableSelect
@@ -1297,7 +1297,7 @@ function CreateLocationModal({
           </button>
           {showDelivery && (
             <div className="p-4 border-t border-gray-200 bg-white">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="label-text">Pricing Mode</label>
                   <select
@@ -1374,7 +1374,7 @@ function CreateLocationModal({
           </button>
           {showFees && (
             <div className="p-4 border-t border-gray-200 bg-white">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="label-text">Order Commission %</label>
                   <input type="number" step="0.1" min="0" max="100"

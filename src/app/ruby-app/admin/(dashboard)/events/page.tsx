@@ -709,7 +709,7 @@ function EventFormModal({
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Venue name">
             <input
               required
@@ -777,7 +777,7 @@ function EventFormModal({
           })()}
         />
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Starts at">
             <input
               type="datetime-local"

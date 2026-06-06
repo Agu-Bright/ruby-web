@@ -450,7 +450,7 @@ export default function LegalDocumentsPage() {
           </div>
 
           {/* Title + Version */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Title</label>
               <input

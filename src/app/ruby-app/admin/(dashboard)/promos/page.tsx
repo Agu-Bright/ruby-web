@@ -494,7 +494,7 @@ export default function PromosPage() {
           </div>
 
           {/* Display Order + Active */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Display Order</label>
               <input
@@ -520,7 +520,7 @@ export default function PromosPage() {
           </div>
 
           {/* Date Range */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
               <input
@@ -630,7 +630,7 @@ export default function PromosPage() {
               <p className="text-sm text-gray-600">{viewModal.description}</p>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Link Type</p>
                 <p className="text-sm font-medium text-gray-900 mt-1">{viewModal.linkType}</p>

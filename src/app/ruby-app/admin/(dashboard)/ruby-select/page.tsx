@@ -360,7 +360,7 @@ export default function RubySelectPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
                 CTA URL
@@ -415,7 +415,7 @@ export default function RubySelectPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
                 Starts at

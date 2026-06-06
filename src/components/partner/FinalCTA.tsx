@@ -8,11 +8,8 @@ import { businessLink } from "@/lib/subdomain-links";
  *
  * Two CTAs:
  *   - Primary: "Register your business" → /business/register (web flow)
- *   - Secondary: "Coming Soon" app badges (App Store + Google Play)
- *
- * When the apps are listed on the stores, swap the inert divs for
- * actual <Link>s with the real store URLs and remove the "Coming Soon"
- * eyebrow text.
+ *   - Secondary: live App Store + Google Play badges for the Business app
+ *     (App Store ID 6760118324 / Play package com.rubyplus.business).
  */
 export default function FinalCTA() {
   return (
@@ -56,16 +53,18 @@ export default function FinalCTA() {
               </p>
             </div>
 
-            {/* App badges — Coming Soon */}
+            {/* App badges — Business app, live on both stores. */}
             <div className="mt-10 sm:mt-12">
               <p className="text-white/50 text-xs uppercase tracking-wider mb-4">
                 Or get the app
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <div
-                  className="flex items-center gap-2.5 px-5 py-2.5 bg-white/5 border border-white/15 rounded-lg cursor-not-allowed"
-                  aria-disabled="true"
-                  title="Coming Soon"
+                <a
+                  href="https://apps.apple.com/app/ruby-business/id6760118324"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label="Get Ruby+ Business app on the App Store"
+                  className="flex items-center gap-2.5 px-5 py-2.5 bg-white/5 border border-white/15 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <svg
                     className="w-6 h-6 text-white"
@@ -76,17 +75,19 @@ export default function FinalCTA() {
                   </svg>
                   <div className="text-left">
                     <div className="text-[9px] text-white/60 leading-none">
-                      Coming Soon on
+                      Download on the
                     </div>
                     <div className="text-sm font-semibold text-white leading-tight">
                       App Store
                     </div>
                   </div>
-                </div>
-                <div
-                  className="flex items-center gap-2.5 px-5 py-2.5 bg-white/5 border border-white/15 rounded-lg cursor-not-allowed"
-                  aria-disabled="true"
-                  title="Coming Soon"
+                </a>
+                <a
+                  href="https://play.google.com/store/apps/details?id=com.rubyplus.business"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label="Get Ruby+ Business app on Google Play"
+                  className="flex items-center gap-2.5 px-5 py-2.5 bg-white/5 border border-white/15 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <svg
                     className="w-6 h-6 text-white"
@@ -97,13 +98,13 @@ export default function FinalCTA() {
                   </svg>
                   <div className="text-left">
                     <div className="text-[9px] text-white/60 leading-none">
-                      Coming Soon on
+                      Get it on
                     </div>
                     <div className="text-sm font-semibold text-white leading-tight">
                       Google Play
                     </div>
                   </div>
-                </div>
+                </a>
               </div>
             </div>
           </div>

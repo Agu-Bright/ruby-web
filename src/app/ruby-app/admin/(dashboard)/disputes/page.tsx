@@ -177,7 +177,7 @@ export default function DisputesPage() {
 
       {activeTab === 'inbox' ? (
         <div
-          className="grid lg:grid-cols-[360px_1fr] gap-4"
+          className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4"
           style={{ height: 'calc(100vh - 240px)', minHeight: 520 }}
         >
           {/* List pane — always rendered. On mobile, hidden when a dispute

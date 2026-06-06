@@ -52,22 +52,22 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', subtitle 
   return createPortal(
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 animate-fade-in"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} animate-slide-up max-h-[90vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-            {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+      <div className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} animate-slide-up max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-100 shrink-0">
+          <div className="min-w-0 pr-2">
+            <h2 className="text-base font-semibold text-gray-900 truncate">{title}</h2>
+            {subtitle && <p className="text-xs text-gray-500 mt-0.5 truncate">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors -mr-1">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors -mr-1 shrink-0">
             <X className="w-4 h-4 text-gray-400" />
           </button>
         </div>
-        <div className="px-6 py-4 overflow-y-auto flex-1">{children}</div>
+        <div className="px-4 sm:px-6 py-4 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>,
     document.body,

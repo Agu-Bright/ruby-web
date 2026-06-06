@@ -339,7 +339,7 @@ function DeliveryDetailContent({ job, onAction }: { job: DeliveryJob; onAction: 
       </div>
 
       {/* Info Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="bg-gray-50 rounded-lg p-3">
           <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Provider</span>
           <p className="text-sm font-medium text-gray-900 mt-0.5">{job.provider}</p>
@@ -394,7 +394,7 @@ function DeliveryDetailContent({ job, onAction }: { job: DeliveryJob; onAction: 
 
       {/* ETA */}
       {(job.estimatedPickupAt || job.estimatedDeliveryAt) && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {job.estimatedPickupAt && (
             <div className="bg-gray-50 rounded-lg p-3">
               <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Est. Pickup</span>

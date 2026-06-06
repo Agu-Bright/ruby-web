@@ -444,7 +444,7 @@ export default function CampaignsPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Business</p>
                 <p className="text-sm font-medium text-gray-900 mt-1">{getBusinessName(selectedCampaign.businessId) || '-'}</p>

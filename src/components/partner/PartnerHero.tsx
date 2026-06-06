@@ -50,9 +50,15 @@ export default function PartnerHero() {
             </p>
           </div>
 
-          {/* App Store Badges */}
+          {/* App Store Badges — both stores live for the Business app. */}
           <div className="flex flex-wrap gap-3">
-            <div className="flex items-center cursor-pointer gap-2.5 px-5 py-2.5 bg-black border border-white/20 rounded-lg">
+            <a
+              href="https://apps.apple.com/app/ruby-business/id6760118324"
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label="Get Ruby+ Business app on the App Store"
+              className="flex items-center cursor-pointer gap-2.5 px-5 py-2.5 bg-black border border-white/20 rounded-lg hover:bg-black/80 transition-colors"
+            >
               <svg
                 className="w-6 h-6 text-white"
                 viewBox="0 0 24 24"
@@ -62,14 +68,20 @@ export default function PartnerHero() {
               </svg>
               <div>
                 <div className="text-[9px] text-white/60 leading-none">
-                  Coming Soon on
+                  Download on the
                 </div>
                 <div className="text-sm font-semibold text-white leading-tight">
                   App Store
                 </div>
               </div>
-            </div>
-            <div className="flex items-center cursor-pointe gap-2.5 px-5 py-2.5 bg-black border border-white/20 rounded-lg">
+            </a>
+            <a
+              href="https://play.google.com/store/apps/details?id=com.rubyplus.business"
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label="Get Ruby+ Business app on Google Play"
+              className="flex items-center cursor-pointer gap-2.5 px-5 py-2.5 bg-black border border-white/20 rounded-lg hover:bg-black/80 transition-colors"
+            >
               <svg
                 className="w-6 h-6 text-white"
                 viewBox="0 0 24 24"
@@ -79,13 +91,13 @@ export default function PartnerHero() {
               </svg>
               <div>
                 <div className="text-[9px] text-white/60 leading-none">
-                  Coming Soon on
+                  Get it on
                 </div>
                 <div className="text-sm font-semibold text-white leading-tight">
                   Google Play
                 </div>
               </div>
-            </div>
+            </a>
           </div>
         </div>
       </div>

@@ -250,6 +250,7 @@ export default function Footer({ crossDomain = false }: FooterProps) {
                 Download App
               </h4>
               <div className="space-y-3">
+                {/* iOS Customer App — still in App Store review; placeholder until approved. */}
                 <a
                   href="#"
                   className="flex items-center gap-2.5 w-fit px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg hover:bg-white/15 transition-colors"
@@ -270,8 +271,12 @@ export default function Footer({ crossDomain = false }: FooterProps) {
                     </div>
                   </div>
                 </a>
+                {/* Android Customer App — live on Google Play. */}
                 <a
-                  href="#"
+                  href="https://play.google.com/store/apps/details?id=com.rubyplus.customer"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label="Get Ruby+ Customer app on Google Play"
                   className="flex items-center gap-2.5 w-fit px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg hover:bg-white/15 transition-colors"
                 >
                   <svg
@@ -283,7 +288,7 @@ export default function Footer({ crossDomain = false }: FooterProps) {
                   </svg>
                   <div>
                     <div className="text-[9px] text-white/50 leading-none">
-                      Coming Soon on
+                      Get it on
                     </div>
                     <div className="text-xs font-semibold text-white leading-tight">
                       Google Play

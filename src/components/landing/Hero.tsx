@@ -119,6 +119,8 @@ export default function Hero() {
 
               {/* App Store Badges */}
               <div className="flex items-center gap-2 sm:gap-3 mt-6 sm:mt-8">
+                {/* iOS Customer App — still under App Store review; keep
+                    as "Coming Soon" placeholder until Apple approves. */}
                 <a
                   href="#"
                   className="inline-flex items-center gap-2 sm:gap-2.5 bg-black hover:bg-black/80 text-white pl-2.5 sm:pl-3 pr-4 sm:pr-5 py-2 sm:py-2.5 rounded-lg border border-gray-600/50 transition-all duration-200 hover:-translate-y-0.5"
@@ -139,8 +141,12 @@ export default function Hero() {
                     </div>
                   </div>
                 </a>
+                {/* Android Customer App — live on Google Play. */}
                 <a
-                  href="#"
+                  href="https://play.google.com/store/apps/details?id=com.rubyplus.customer"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label="Get Ruby+ Customer app on Google Play"
                   className="inline-flex items-center gap-2 sm:gap-2.5 bg-black hover:bg-black/80 text-white pl-2.5 sm:pl-3 pr-4 sm:pr-5 py-2 sm:py-2.5 rounded-lg border border-gray-600/50 transition-all duration-200 hover:-translate-y-0.5"
                 >
                   <svg
@@ -152,7 +158,7 @@ export default function Hero() {
                   </svg>
                   <div className="text-left">
                     <div className="text-[8px] sm:text-[9px] leading-none uppercase tracking-wider opacity-70">
-                      Coming Soon on
+                      Get it on
                     </div>
                     <div className="text-xs sm:text-sm font-semibold leading-tight mt-0.5">
                       Google Play

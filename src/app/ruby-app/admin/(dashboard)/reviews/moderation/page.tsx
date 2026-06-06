@@ -273,7 +273,7 @@ export default function ReviewModerationPage() {
       >
         {selected && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
                   Business

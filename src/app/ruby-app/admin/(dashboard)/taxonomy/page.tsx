@@ -938,7 +938,7 @@ function CategoriesTab() {
           {/* Classification */}
           <div className="space-y-4">
             <SectionHeader icon={Layers} title="Classification" description="Group type and ordering" />
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <label className="label-text">Group Type</label>
                 <div className="relative">
@@ -1031,13 +1031,13 @@ function CategoriesTab() {
               <SectionHeader icon={FolderTree} title="Category Information" />
               <div className="mt-4 space-y-3">
                 {/* Top row: key identifiers */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <DetailCard icon={Layers} label="Group Type" value={GROUP_TYPE_CONFIG[viewCategory.defaultGroupType]?.label || viewCategory.defaultGroupType} />
                   <DetailCard icon={Hash} label="Display Order" value={String(viewCategory.displayOrder)} />
                   <DetailCard label="Icon Key" value={viewCategory.iconKey || '—'} mono />
                 </div>
                 {/* Bottom row: flags */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
                     <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-1.5">Shopping</p>
                     <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold ${viewCategory.isShopping ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>

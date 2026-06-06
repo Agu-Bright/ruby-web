@@ -16,7 +16,7 @@ import ScrollReveal from "../landing/ScrollReveal";
 const faqs = [
   {
     q: "How do I sign up?",
-    a: "Download the Ruby+ Business app (coming soon to App Store and Google Play) or sign up via our web flow. You'll need your CAC certificate, a business bank account, and 5 minutes.",
+    a: "Download the Ruby+ Business app on the App Store or Google Play, or sign up via our web flow. You'll need your CAC certificate, a business bank account, and 5 minutes.",
   },
   {
     q: "When do I get paid?",

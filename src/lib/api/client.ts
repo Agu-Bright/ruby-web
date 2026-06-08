@@ -1079,13 +1079,24 @@ export const api = {
   // surfaced on the admin /finance page so an operator can diagnose silent
   // outages (e.g. Termii misconfigured) without poking at backend logs.
   health: {
+    /**
+     * P80: returns the chained MessagingHealth shape (chain + per-provider
+     * status + 24h failover stats). Old SmsHealth callers receive the
+     * extra fields but ignore them — still TS-safe via the union.
+     */
     sms: () =>
-      request<import("@/lib/types").SmsHealth>("/admin/health/sms"),
-    smsTest: (body: { phone: string; message?: string }) =>
-      request<{ sent: boolean; phone: string }>("/admin/health/sms/test", {
-        method: "POST",
-        body,
-      }),
+      request<import("@/lib/types").MessagingHealth>("/admin/health/sms"),
+    whatsapp: () =>
+      request<import("@/lib/types").MessagingHealth>(
+        "/admin/health/whatsapp",
+      ),
+    smsTest: (body: import("@/lib/types").MessagingTestRequest) =>
+      request<{
+        sent: boolean;
+        phone: string;
+        channel: "SMS" | "WHATSAPP";
+        provider: "twilio" | "termii" | "chain";
+      }>("/admin/health/sms/test", { method: "POST", body }),
   },
 
   feeConfigs: {
@@ -1298,6 +1309,16 @@ export const api = {
           lastName?: string;
           email?: string;
         }>;
+        // P94 — per-source breakdown (REVIEW/REFERRAL/REEL/PAYMENT/ADMIN
+        // credits in the last 30d). Zeroed buckets present so the UI
+        // doesn't have to conditionally render.
+        bySourceLast30d?: Record<
+          string,
+          { count: number; totalPoints: number; uniqueUsers: number }
+        >;
+        // P94 — # rows currently in the QUARANTINED queue. Drives the
+        // badge on the Quarantine tab.
+        quarantineQueueSize?: number;
       }>("/admin/rewards/stats"),
 
     getUser: (userId: string) =>
@@ -1343,6 +1364,92 @@ export const api = {
         `/admin/rewards/users/${userId}/adjust`,
         { method: "POST", body: { pointsDelta, reason } },
       ),
+
+    // P99 — Quarantine queue: paginated list of credits with
+    // verdict=QUARANTINED awaiting admin triage.
+    getQuarantine: (params?: {
+      sourceType?: string;
+      page?: number;
+      limit?: number;
+    }) =>
+      request<{
+        items: Array<{
+          _id: string;
+          userId:
+            | string
+            | { _id: string; firstName?: string; lastName?: string; email?: string };
+          type: string;
+          pointsDelta: number;
+          balanceAfter: number;
+          sourceType?: string;
+          sourceId?: string;
+          fraudScore?: number;
+          fraudVerdict?: string;
+          deviceFingerprintId?: string;
+          clientIp?: string;
+          description: string;
+          reason?: string;
+          createdAt: string;
+        }>;
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>("/admin/rewards/quarantine", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+
+    clearQuarantine: (entryId: string, reason?: string) =>
+      request<{
+        entryId: string;
+        userId: string;
+        pointsDelta: number;
+        newBalance: number;
+      }>(`/admin/rewards/quarantine/${entryId}/clear`, {
+        method: "POST",
+        body: { reason },
+      }),
+
+    rejectQuarantine: (entryId: string, reason: string) =>
+      request<{ entryId: string; deleted: true }>(
+        `/admin/rewards/quarantine/${entryId}/reject`,
+        { method: "POST", body: { reason } },
+      ),
+
+    clawback: (sourceType: string, sourceId: string, reason: string) =>
+      request<{ userId: string; reversed: number; reason: string }>(
+        "/admin/rewards/clawback",
+        { method: "POST", body: { sourceType, sourceId, reason } },
+      ),
+
+    // P99 — Cluster alerts: fraud-ring signals from shared device
+    // fingerprint or shared client IP across many users / many entries.
+    getClusterAlerts: () =>
+      request<{
+        deviceClusters: Array<{
+          deviceFingerprintId: string;
+          userIds: string[];
+          userCount: number;
+          lastSeen: string;
+          entryCount: number;
+        }>;
+        ipClusters: Array<{
+          clientIp: string;
+          userIds: string[];
+          userCount: number;
+          lastSeen: string;
+          entryCount: number;
+        }>;
+        generatedAt: string;
+        thresholds: {
+          deviceWindowDays: number;
+          deviceMinUsers: number;
+          ipWindowDays: number;
+          ipMinEntries: number;
+        };
+      }>("/admin/rewards/cluster-alerts"),
   },
 
   adProducts: {

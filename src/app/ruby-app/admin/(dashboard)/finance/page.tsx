@@ -29,7 +29,12 @@ import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { PageHeader, DataTable, Modal, StatusBadge, type Column } from '@/components/ui';
-import { SmsHealthCard } from './SmsHealthCard';
+// P80 — replaced the single-provider SmsHealthCard with the chain-aware
+// MessagingHealthCard. The new card handles BOTH SMS and WhatsApp; we
+// just render it twice with different `channel` props. SmsHealthCard.tsx
+// stays in the repo until the next release for safety, but it's no
+// longer rendered anywhere.
+import { MessagingHealthCard } from './MessagingHealthCard';
 import { DeoluHealthCard } from './DeoluHealthCard';
 import type {
   Payout,
@@ -343,9 +348,11 @@ export default function FinancePage() {
     <div>
       <PageHeader title="Finance" description="Manage payouts, transactions, wallets, and fee configurations" />
 
-      {/* P70 — Ops widget for the SMS gateway. Sits above payout stats so a
+      {/* P80 — chain-aware health cards (SMS + WhatsApp). Replace the
+          P70 single-provider SmsHealthCard. Sit above payout stats so a
           silent OTP outage is the first thing visible when opening Finance. */}
-      <SmsHealthCard />
+      <MessagingHealthCard channel="SMS" />
+      <MessagingHealthCard channel="WHATSAPP" />
 
       {/* P77 (f) — Deolu search-pipeline health. Catches the three failures
           that cause the "no merchants" canned-reply loop: missing Atlas

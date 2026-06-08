@@ -125,6 +125,15 @@ const navGroups: NavGroup[] = [
       // outstanding-points balance is a real ₦ liability against the
       // platform; finance reviews it during reconciliation.
       { label: "Rewards", href: "/ruby-app/admin/rewards", icon: Gift },
+      // P99 — fraud-ring dashboard (device + IP clusters across reward
+      // ledger rows). Same finance/super_admin RBAC as the parent
+      // Rewards screen; surfaced separately because the queue is
+      // monitored on a different cadence than the main rewards dash.
+      {
+        label: "Cluster Alerts",
+        href: "/ruby-app/admin/rewards/clusters",
+        icon: ShieldAlert,
+      },
       // P70 — Messaging test surface. SUPER_ADMIN-only screen for firing
       // a one-off SMS through the live gateway to verify Termii config
       // after an env change, without needing to do a full signup flow.

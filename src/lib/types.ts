@@ -2630,12 +2630,69 @@ export type RubySelectFeedItem =
     };
 
 // P70 — admin /health/sms response (see backend SmsService.getHealth)
+/**
+ * P70-era flat shape — kept temporarily for any old caller that hasn't
+ * been migrated. New code should use `MessagingHealth` below.
+ */
 export interface SmsHealth {
-  provider: string;          // 'termii' | 'twilio' | 'unset'
+  provider: string;
   configured: boolean;
-  balance: number | null;    // NGN — null when provider != termii or balance fetch failed
-  currency: string | null;   // 'NGN' typically
-  lastSendAt: string | null; // ISO timestamp of most recent sendSms() attempt
-  lastSendOk: boolean | null;// true if the most recent send returned ok
-  lastError: string | null;  // most recent failure detail
+  balance: number | null;
+  currency: string | null;
+  lastSendAt: string | null;
+  lastSendOk: boolean | null;
+  lastError: string | null;
+}
+
+/**
+ * P80 — messaging chain health for SMS or WhatsApp. Returned by both
+ * `GET /admin/health/sms` and `GET /admin/health/whatsapp`.
+ */
+export type MessagingProviderName = 'twilio' | 'termii';
+
+export interface MessagingProviderHealth {
+  name: MessagingProviderName;
+  configured: boolean;
+  lastSendAt: string | null;
+  lastSendOk: boolean | null;
+  lastError: string | null;
+  balance: number | null;
+  currency: string | null;
+  balanceLabel?: string;
+}
+
+export interface MessagingStats24h {
+  totalSends: number;
+  byProvider: Partial<Record<MessagingProviderName, number>>;
+  failedAll: number;
+  failoverRatePct: number;
+  byKind: Record<string, number>;
+}
+
+export interface MessagingHealth {
+  channel: 'SMS' | 'WHATSAPP';
+  /** Ordered provider chain — empty when unconfigured. */
+  chain: MessagingProviderName[];
+  providers: Record<MessagingProviderName, MessagingProviderHealth>;
+  stats24h: MessagingStats24h;
+}
+
+export type WhatsAppTemplateKey =
+  | 'NEW_ORDER_ALERT'
+  | 'NEW_BOOKING_ALERT'
+  | 'NEW_ENQUIRY_ALERT'
+  | 'REPING';
+
+/**
+ * Body shape for `POST /admin/health/sms/test`. Channel + provider
+ * override + (for WhatsApp) the template key + a free-form variable map
+ * keyed by the variable name from WHATSAPP_TEMPLATE_REGISTRY.
+ */
+export interface MessagingTestRequest {
+  phone: string;
+  message?: string;
+  channel?: 'SMS' | 'WHATSAPP';
+  providerOverride?: MessagingProviderName;
+  templateKey?: WhatsAppTemplateKey;
+  variables?: Record<string, string>;
 }

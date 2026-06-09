@@ -36,6 +36,7 @@ import { PageHeader, DataTable, Modal, StatusBadge, type Column } from '@/compon
 // longer rendered anywhere.
 import { MessagingHealthCard } from './MessagingHealthCard';
 import { DeoluHealthCard } from './DeoluHealthCard';
+import { WebSearchHealthCard } from './WebSearchHealthCard';
 import type {
   Payout,
   PayoutStatus,
@@ -359,6 +360,12 @@ export default function FinancePage() {
           index, businesses without embeddings, end-to-end canary returning
           zero. Lets ops triage from one page instead of grepping logs. */}
       <DeoluHealthCard />
+
+      {/* P100 — Web Search (Google CSE) health. Surfaces provider
+          config status + Mongo cache effectiveness so ops can see
+          quota burn rate at a glance. Misconfig banner spells out the
+          two env vars the backend needs. */}
+      <WebSearchHealthCard />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[

@@ -2016,6 +2016,36 @@ export const api = {
       ),
   },
 
+  // ─────────────────────────────────────────────────────────────────
+  // Web Search admin — surfaces Google Custom Search provider health
+  // + Mongo cache stats on the Finance page so ops can monitor the
+  // paid-API quota burn and tune cache TTL if needed.
+  // ─────────────────────────────────────────────────────────────────
+  webSearch: {
+    getHealth: () =>
+      request<{
+        configured: boolean;
+        activeProvider: "GOOGLE" | "BRAVE" | "SERPAPI" | null;
+        cacheRowsAlive: number;
+        last7d: { totalHits: number; uniqueQueries: number };
+      }>("/admin/web-search/health"),
+    testSearch: (q: string) =>
+      request<{
+        results: Array<{
+          title: string;
+          link: string;
+          snippet: string;
+          displayLink: string;
+          faviconUrl: string;
+          thumbnail?: { url: string; width?: number; height?: number } | null;
+        }>;
+        totalResults: number;
+        searchTimeMs: number;
+        provider: "GOOGLE" | "BRAVE" | "SERPAPI";
+        cached: boolean;
+      }>("/admin/web-search/test", { params: { q } }),
+  },
+
   // ──────────────── Phase 50: Ruby+ Select ────────────────
   rubySelect: {
     list: (params?: { status?: string; locationId?: string; page?: number; limit?: number }) => {

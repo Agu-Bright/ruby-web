@@ -171,11 +171,16 @@ export default function PromosPage() {
     }
   };
 
+  // P105 — `/(main)/ride` is removed from the screenRoute dropdown.
+  // The in-app ride flow is decommissioned; promos that previously
+  // pointed at it have been migrated to EXTERNAL + externalUrl
+  // `uber://` via scripts/redirect-ride-promo-to-uber.ts. Admins
+  // should use the EXTERNAL link type with `uber://` to route any
+  // future promo at the Uber app.
   const SCREEN_ROUTE_LABELS: Record<string, string> = {
     '/(tabs)': 'Home',
     '/(tabs)/explore': 'Explore / Reels',
     '/(main)/wallet': 'Wallet',
-    '/(main)/ride': 'Request Ride',
     '/(main)/dispatch': 'Send Package',
     '/(main)/chowdeck': 'Chowdeck',
     '/(tabs)/orders': 'Orders',

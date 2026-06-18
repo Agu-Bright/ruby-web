@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Star, ShieldCheck, Flag, Trash2, Eye, Search, ChevronDown } from 'lucide-react';
+import { Star, ShieldCheck, Flag, Trash2, Eye, Search, ChevronDown, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { useApi, useMutation } from '@/lib/hooks';
@@ -31,6 +31,12 @@ interface Review {
   text?: string;
   photos?: string[];
   isVerified: boolean;
+  // P103 — admin-curated Featured pin for the home tab reviews
+  // marquee. Distinct from `isVerified` (which controls whether the
+  // review surfaces on the home screen at all). Featured reviews
+  // sort FIRST and get a purple "Featured" pill on the customer card.
+  isFeatured?: boolean;
+  featuredUntil?: string;
   isFlagged: boolean;
   flagReason?: string;
   reply?: { text: string; repliedAt: string };
@@ -61,6 +67,15 @@ export default function ReviewsPage() {
     (id: string) => api.reviews.verify(id)
   );
 
+  // P103 — admin-curated Feature toggle for the home tab reviews
+  // marquee. Distinct from Verify (which controls whether a review
+  // surfaces on the home screen at all). Featured reviews sort first
+  // and get a purple "Featured" pill on the customer card.
+  const { mutate: featureReview, isLoading: featuring } = useMutation(
+    ({ id, isFeatured }: { id: string; isFeatured: boolean }) =>
+      api.reviews.feature(id, { isFeatured })
+  );
+
   const { mutate: deleteReview, isLoading: deleting } = useMutation(
     (id: string) => api.reviews.delete(id)
   );
@@ -86,6 +101,21 @@ export default function ReviewsPage() {
       refetch();
     }
   }, [verifyReview, refetch]);
+
+  const handleFeature = useCallback(async (review: Review) => {
+    const result = await featureReview({
+      id: review._id,
+      isFeatured: !review.isFeatured,
+    });
+    if (result) {
+      toast.success(
+        review.isFeatured
+          ? 'Review unfeatured'
+          : 'Review featured — it will sort first on the home tab marquee with a purple pill',
+      );
+      refetch();
+    }
+  }, [featureReview, refetch]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteConfirm) return;
@@ -167,10 +197,17 @@ export default function ReviewsPage() {
       key: 'status',
       header: 'Status',
       render: (r) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* P103 — Featured is the new admin-curated marquee pin
+              (purple). It outranks Verified in the home marquee. */}
+          {r.isFeatured && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+              <Sparkles className="w-3 h-3" /> Featured
+            </span>
+          )}
           {r.isVerified && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-              <ShieldCheck className="w-3 h-3" /> Featured
+              <ShieldCheck className="w-3 h-3" /> Verified
             </span>
           )}
           {r.isFlagged && (
@@ -178,7 +215,7 @@ export default function ReviewsPage() {
               <Flag className="w-3 h-3" /> Flagged
             </span>
           )}
-          {!r.isVerified && !r.isFlagged && (
+          {!r.isVerified && !r.isFlagged && !r.isFeatured && (
             <span className="text-xs text-gray-400">—</span>
           )}
         </div>
@@ -207,9 +244,26 @@ export default function ReviewsPage() {
             className={`p-1.5 rounded-md hover:bg-gray-100 ${
               r.isVerified ? 'text-green-600' : 'text-gray-400'
             }`}
-            title={r.isVerified ? 'Remove from Home Screen' : 'Feature on Home Screen'}
+            title={r.isVerified ? 'Remove Verified' : 'Verify for Home Screen'}
           >
             <ShieldCheck className="w-4 h-4" />
+          </button>
+          {/* P103 — Feature toggle. Distinct from Verify: Featured
+              reviews sort FIRST on the home marquee with a purple
+              pill. Use sparingly — editorial spotlight. */}
+          <button
+            onClick={() => handleFeature(r)}
+            disabled={featuring}
+            className={`p-1.5 rounded-md hover:bg-gray-100 ${
+              r.isFeatured ? 'text-purple-600' : 'text-gray-400'
+            }`}
+            title={
+              r.isFeatured
+                ? 'Unfeature this review'
+                : 'Feature on home tab marquee (purple pill, sorts first)'
+            }
+          >
+            <Sparkles className="w-4 h-4" />
           </button>
           {admin?.roles?.includes('super_admin') && (
             <button

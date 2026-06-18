@@ -12,6 +12,8 @@ import {
   FileText, ExternalLink, AlertTriangle, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Trash2,
   Plus, Copy, Loader2, Package, Wrench, Edit2, Archive, Power, Image as ImageIcon, GitBranch,
   Wallet as WalletIcon, AlertCircle, X as XIcon, ArrowDownLeft, ArrowUpRight, DollarSign,
+  // P119 — sort indicators on clickable column headers.
+  ArrowUp, ArrowDown, ArrowUpDown,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -38,11 +40,44 @@ import type {
   AdminCreateBusinessRequest, Location, Category, Subcategory,
   Product, ProductStatus, UpdateProductRequest,
   ServiceListing, ServiceStatus, UpdateServiceRequest, PricingType, ServiceFulfillmentMode,
+  // P119 — sort + branch-type unions for the new filter / sort surface.
+  BusinessSortKey, BusinessBranchType, CacDocumentStatus,
 } from '@/lib/types';
 import { formatDate, formatDateTime, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName } from '@/lib/utils';
 import type { Wallet, LedgerEntry } from '@/lib/types';
+// P119 — SearchableSelect for the Category / Subcategory / Location row-2
+// filters. Single-select capability is enough; lots of options need
+// search-as-you-type rather than scrolling a long select.
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'LIVE', 'REJECTED', 'SUSPENDED'];
+
+// P119 — admin businesses page sort vocabulary. Keep label order in sync
+// with the column-header sort UI (Business / Created) and the "Sort by"
+// dropdown (Rating / Reviews / Orders / Branch count). Status is NOT
+// sortable — lexicographic sort on the enum (APPROVED / DRAFT / LIVE /
+// PENDING_REVIEW / REJECTED / SUSPENDED) doesn't match the natural
+// status flow and would mislead admins; status filtering covers it.
+type ColumnSortKey = 'name' | 'createdAt';
+type MetricSortKey = 'averageRating' | 'totalReviews' | 'orderCount' | 'branchCount';
+
+const COLUMN_SORT_KEYS: readonly ColumnSortKey[] = ['name', 'createdAt'] as const;
+const METRIC_SORT_OPTIONS: ReadonlyArray<{ key: MetricSortKey; label: string }> = [
+  { key: 'averageRating', label: 'Rating' },
+  { key: 'totalReviews', label: 'Reviews' },
+  { key: 'orderCount', label: 'Orders' },
+  { key: 'branchCount', label: 'Branch count' },
+] as const;
+
+// P119 — vocabulary for the new row-2 dropdowns. Backend mirrors these.
+const CAC_STATUS_OPTIONS: CacDocumentStatus[] = ['PENDING', 'VERIFIED', 'REJECTED'];
+const PANDAGO_STATUS_OPTIONS = [
+  'NOT_REGISTERED',
+  'PENDING',
+  'ACTIVE',
+  'FAILED',
+  'STALE',
+] as const;
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -184,6 +219,36 @@ export default function BusinessesPage() {
   const pathname = usePathname();
   const deepLinkOpenId = searchParams?.get('openId') || null;
   const deepLinkOwnerId = searchParams?.get('ownerId') || null;
+  // P119 — additional URL deep-links beyond the Phase 44 ?openId / ?ownerId
+  // pair. parentBusinessId pins the page to a brand's branches; the rest
+  // are filter / sort / pagination state encoded into shareable URLs.
+  const deepLinkParentBusinessId = searchParams?.get('parentBusinessId') || null;
+  const deepLinkInit = useMemo(() => {
+    const qp = searchParams;
+    if (!qp) return {} as Partial<BusinessFilterParams>;
+    const init: any = {};
+    const status = qp.get('status'); if (status) init.status = status;
+    const categoryId = qp.get('categoryId'); if (categoryId) init.categoryId = categoryId;
+    const subcategoryId = qp.get('subcategoryId'); if (subcategoryId) init.subcategoryId = subcategoryId;
+    const locationId = qp.get('locationId'); if (locationId) init.locationId = locationId;
+    const cacStatus = qp.get('cacStatus'); if (cacStatus) init.cacStatus = cacStatus;
+    const pandagoStatus = qp.get('pandagoStatus'); if (pandagoStatus) init.pandagoStatus = pandagoStatus;
+    const isClaimed = qp.get('isClaimed'); if (isClaimed !== null && isClaimed !== '') init.isClaimed = isClaimed === 'true';
+    const isFeatured = qp.get('isFeatured'); if (isFeatured !== null && isFeatured !== '') init.isFeatured = isFeatured === 'true';
+    const isVerified = qp.get('isVerified'); if (isVerified !== null && isVerified !== '') init.isVerified = isVerified === 'true';
+    const branchType = qp.get('branchType'); if (branchType) init.branchType = branchType;
+    const createdFrom = qp.get('createdFrom'); if (createdFrom) init.createdFrom = createdFrom;
+    const createdTo = qp.get('createdTo'); if (createdTo) init.createdTo = createdTo;
+    const sortBy = qp.get('sortBy'); if (sortBy) init.sortBy = sortBy;
+    const sortOrder = qp.get('sortOrder'); if (sortOrder === 'asc' || sortOrder === 'desc') init.sortOrder = sortOrder;
+    const pageStr = qp.get('page'); if (pageStr) init.page = Math.max(1, parseInt(pageStr, 10) || 1);
+    const searchStr = qp.get('search'); if (searchStr) init.search = searchStr;
+    return init as Partial<BusinessFilterParams>;
+    // We intentionally only hydrate from URL ONCE on mount. After that
+    // user interactions own the state and write back to URL via the
+    // sync effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Guard so we only auto-open once per URL state — without this, the
   // detail modal would re-open every render when the user closes it.
   const consumedOpenIdRef = useRef<string | null>(null);
@@ -194,9 +259,34 @@ export default function BusinessesPage() {
     ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? { locationId: toLocationId(admin.locationIds[0]) } : {}),
     // Phase 44 — apply the URL filter at mount.
     ...(deepLinkOwnerId ? { ownerId: deepLinkOwnerId } : {}),
+    // P119 — hydrate every filter / sort / page from URL on first paint
+    // so shareable filtered links restore state exactly. The deep-link
+    // parentBusinessId is applied below so its companion branchType
+    // override doesn't fight with whatever's already in URL.
+    ...deepLinkInit,
+    ...(deepLinkParentBusinessId
+      ? { parentBusinessId: deepLinkParentBusinessId, branchType: 'branches' as BusinessBranchType }
+      : {}),
   });
-  const [search, setSearch] = useState('');
-  const [branchTypeFilter, setBranchTypeFilter] = useState<'all' | 'brands' | 'branches' | 'standalone'>('all');
+  const [search, setSearch] = useState((deepLinkInit as any).search || '');
+  // P119 — branchType moves from a separate client-side state to the
+  // central filters object (server-side now). Local state alias kept
+  // as a getter so existing JSX reads cleanly. Setter writes via the
+  // filter setter below.
+  const branchTypeFilter: BusinessBranchType = (filters.branchType ?? 'all') as BusinessBranchType;
+  const setBranchTypeFilter = useCallback(
+    (next: BusinessBranchType) =>
+      setFilters((f) => ({
+        ...f,
+        branchType: next === 'all' ? undefined : next,
+        // Switching the dropdown clears any deep-linked parentBusinessId
+        // pill — the user is choosing a different slice intentionally.
+        parentBusinessId:
+          next === 'branches' ? f.parentBusinessId : undefined,
+        page: 1,
+      })),
+    [],
+  );
   const [detailBusiness, setDetailBusiness] = useState<Business | null>(null);
   const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog' | 'branches' | 'wallet'>('info');
   const [showFundBusinessModal, setShowFundBusinessModal] = useState(false);
@@ -288,6 +378,96 @@ export default function BusinessesPage() {
     []
   );
 
+  // P119 — Row-2 filter dropdown sources. Categories + locations load
+  // once at mount (small lists, cached). Subcategories load per-selected-
+  // category (also small) and clear when the category clears.
+  const { data: allCategories } = useApi<Category[]>(
+    () => api.categories.list({ isActive: true }),
+    [],
+  );
+  const { data: allSubcategories } = useApi<Subcategory[]>(
+    () =>
+      filters.categoryId
+        ? api.subcategories.list({ categoryId: filters.categoryId, isActive: true, limit: 500 })
+        : Promise.resolve({ success: true, data: [] as Subcategory[] }),
+    [filters.categoryId],
+    { enabled: !!filters.categoryId },
+  );
+  const { data: allLocations } = useApi<Location[]>(
+    () => api.locations.list({ limit: 500 } as any),
+    [],
+  );
+
+  // P119 — when ?parentBusinessId=X is in URL, fetch that parent's name
+  // so the "Filtered: branches of [Brand Name]" pill renders nicely.
+  // One-off fetch; cached per id by useApi's effect deps.
+  const { data: parentBrand } = useApi<Business>(
+    () =>
+      filters.parentBusinessId
+        ? api.businesses.get(filters.parentBusinessId)
+        : Promise.resolve({ success: true, data: null as unknown as Business }),
+    [filters.parentBusinessId],
+    { enabled: !!filters.parentBusinessId },
+  );
+
+  // P119 — URL sync. Encodes every filter / sort / page / search into the
+  // URL so a filtered view is shareable via Slack / email and survives
+  // reloads. router.replace (not push) — keeps the back-button useful.
+  // Skips defaults so the URL stays readable.
+  // First-run skip: state already hydrated from URL via deepLinkInit; the
+  // initial render would otherwise immediately re-write the same URL.
+  const urlSyncSkipRef = useRef(true);
+  useEffect(() => {
+    if (urlSyncSkipRef.current) {
+      urlSyncSkipRef.current = false;
+      return;
+    }
+    const qp = new URLSearchParams();
+    // Preserve ?openId if some other effect is still consuming it.
+    const openId = searchParams?.get('openId');
+    if (openId) qp.set('openId', openId);
+    if (filters.ownerId) qp.set('ownerId', filters.ownerId);
+    if (filters.status) qp.set('status', filters.status);
+    if (filters.categoryId) qp.set('categoryId', filters.categoryId);
+    if (filters.subcategoryId) qp.set('subcategoryId', filters.subcategoryId);
+    if (filters.locationId) qp.set('locationId', filters.locationId);
+    if (filters.cacStatus) qp.set('cacStatus', filters.cacStatus);
+    if (filters.pandagoStatus) qp.set('pandagoStatus', filters.pandagoStatus);
+    if (filters.isClaimed !== undefined) qp.set('isClaimed', String(filters.isClaimed));
+    if (filters.isFeatured !== undefined) qp.set('isFeatured', String(filters.isFeatured));
+    if (filters.isVerified !== undefined) qp.set('isVerified', String(filters.isVerified));
+    if (filters.branchType && filters.branchType !== 'all') qp.set('branchType', filters.branchType);
+    if (filters.parentBusinessId) qp.set('parentBusinessId', filters.parentBusinessId);
+    if (filters.createdFrom) qp.set('createdFrom', filters.createdFrom);
+    if (filters.createdTo) qp.set('createdTo', filters.createdTo);
+    if (filters.sortBy && filters.sortBy !== 'createdAt') qp.set('sortBy', filters.sortBy);
+    if (filters.sortOrder && filters.sortOrder !== 'desc') qp.set('sortOrder', filters.sortOrder);
+    if (filters.page && filters.page > 1) qp.set('page', String(filters.page));
+    if (search) qp.set('search', search);
+    const qs = qp.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname || '/ruby-app/admin/businesses');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.ownerId,
+    filters.status,
+    filters.categoryId,
+    filters.subcategoryId,
+    filters.locationId,
+    filters.cacStatus,
+    filters.pandagoStatus,
+    filters.isClaimed,
+    filters.isFeatured,
+    filters.isVerified,
+    filters.branchType,
+    filters.parentBusinessId,
+    filters.createdFrom,
+    filters.createdTo,
+    filters.sortBy,
+    filters.sortOrder,
+    filters.page,
+    search,
+  ]);
+
   // Mutations
   const showError = useCallback((message: string) => toast.error(message), []);
   const mutationOpts = { onError: showError };
@@ -358,15 +538,22 @@ export default function BusinessesPage() {
     }
   }, [branchCache]);
 
-  // Filter data for hierarchical display
+  // Filter data for hierarchical display.
+  // P119 — branch-type filtering is now server-side, so brands/branches/
+  // standalone modes pass through verbatim. The 'all' mode (default) still
+  // needs to hide top-level branches so they only appear when a parent
+  // row is expanded; the server returns the full mixed list and we hide
+  // children at the table level. The parentBusinessId deep-link bypasses
+  // this — when set, the server has already narrowed to a brand's
+  // children and every returned row IS meant to be top-level.
   const displayData = useMemo(() => {
     if (!businesses) return [];
-    if (branchTypeFilter === 'brands') return businesses.filter(b => b.isParent);
-    if (branchTypeFilter === 'branches') return businesses.filter(b => !!b.parentBusinessId);
-    if (branchTypeFilter === 'standalone') return businesses.filter(b => !b.isParent && !b.parentBusinessId);
-    // "all" mode: hide branches from top-level (they appear under their parent when expanded)
-    return businesses.filter(b => !b.parentBusinessId);
-  }, [businesses, branchTypeFilter]);
+    if (filters.parentBusinessId) return businesses;
+    if (branchTypeFilter === 'all') {
+      return businesses.filter((b) => !b.parentBusinessId);
+    }
+    return businesses;
+  }, [businesses, branchTypeFilter, filters.parentBusinessId]);
 
   // Fetch full detail
   const { data: fullDetail, isLoading: loadingDetail, error: detailError } = useApi<Business>(
@@ -718,7 +905,93 @@ export default function BusinessesPage() {
     ['reject', 'suspend', 'reject-cac', 'unverify-deolu'].includes(action);
 
   // ─── Table column headers ───
-  const tableHeaders = ['Business', 'Status', 'Owner', 'Location', 'Pandago', 'Created', ''];
+  // P119 — Phone column added between Owner and Location. Business /
+  // Status / Created are sortable via clickable headers (server-side
+  // sortBy). Phone / Owner / Location / Pandago / actions are not
+  // sortable (string sorts on populated/nested fields are ambiguous).
+  const tableHeaders: ReadonlyArray<{
+    label: string;
+    sortKey?: ColumnSortKey;
+    align?: 'left' | 'right';
+    widthClass?: string;
+  }> = [
+    { label: 'Business', sortKey: 'name' },
+    { label: 'Status' },
+    { label: 'Owner' },
+    { label: 'Phone' },
+    { label: 'Location' },
+    { label: 'Pandago' },
+    { label: 'Created', sortKey: 'createdAt' },
+    { label: '', widthClass: 'w-20' },
+  ];
+
+  // P119 — column-header click handler. Toggles direction if already
+  // active; otherwise sets that column as the active sort. Picking a
+  // column ALSO clears any active metric-dropdown sort so the two UIs
+  // never disagree about what's sorted.
+  const activeColumnSort: ColumnSortKey | null =
+    filters.sortBy && (COLUMN_SORT_KEYS as readonly string[]).includes(filters.sortBy)
+      ? (filters.sortBy as ColumnSortKey)
+      : null;
+  const activeMetricSort: MetricSortKey | null =
+    filters.sortBy && !(COLUMN_SORT_KEYS as readonly string[]).includes(filters.sortBy)
+      ? (filters.sortBy as MetricSortKey)
+      : null;
+  const sortDir: 'asc' | 'desc' = filters.sortOrder ?? 'desc';
+  const handleColumnSort = useCallback(
+    (key: ColumnSortKey) => {
+      setFilters((f) => {
+        const isSame = f.sortBy === key;
+        const nextOrder: 'asc' | 'desc' =
+          isSame ? (f.sortOrder === 'asc' ? 'desc' : 'asc') : 'desc';
+        return { ...f, sortBy: key, sortOrder: nextOrder, page: 1 };
+      });
+    },
+    [],
+  );
+  const handleMetricSort = useCallback(
+    (key: MetricSortKey | '') => {
+      setFilters((f) => ({
+        ...f,
+        sortBy: key || undefined,
+        // Default desc for metrics — bigger is better.
+        sortOrder: key ? 'desc' : f.sortOrder,
+        page: 1,
+      }));
+    },
+    [],
+  );
+
+  // P119 — true when ANY filter beyond the inherited LOCATION-admin
+  // scope is in effect. Drives both the "Clear filters" button visibility
+  // and what it clears.
+  const hasActiveFilters =
+    !!filters.status ||
+    !!filters.categoryId ||
+    !!filters.subcategoryId ||
+    !!filters.locationId ||
+    !!filters.cacStatus ||
+    !!filters.pandagoStatus ||
+    filters.isClaimed !== undefined ||
+    filters.isFeatured !== undefined ||
+    filters.isVerified !== undefined ||
+    !!filters.parentBusinessId ||
+    !!filters.createdFrom ||
+    !!filters.createdTo ||
+    !!filters.ownerId ||
+    (!!filters.branchType && filters.branchType !== 'all');
+
+  const clearAllFilters = useCallback(() => {
+    setFilters((f) => ({
+      page: 1,
+      limit: f.limit ?? 20,
+      // Preserve LOCATION-admin scope clamp.
+      ...(admin?.scope === 'LOCATION' && admin.locationIds.length === 1
+        ? { locationId: toLocationId(admin.locationIds[0]) }
+        : {}),
+    }));
+    setSearch('');
+  }, [admin]);
 
   return (
     <div className="space-y-6">
@@ -762,8 +1035,43 @@ export default function BusinessesPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="card px-4 py-3">
+      {/* P119 — "Filtered: branches of [Brand Name]" pill. Only renders
+          when ?parentBusinessId=X is in URL (set by the detail modal's
+          "View all branches" deep-link). Clicking × clears the filter. */}
+      {filters.parentBusinessId && (
+        <div className="card px-4 py-2 bg-blue-50/40 border-blue-100">
+          <div className="flex items-center gap-2 text-sm">
+            <GitBranch className="w-4 h-4 text-blue-500 shrink-0" />
+            <span className="text-blue-700">
+              Filtered: branches of{' '}
+              <span className="font-semibold">
+                {parentBrand?.name ?? '…'}
+              </span>
+            </span>
+            <button
+              className="ml-auto inline-flex items-center justify-center w-5 h-5 rounded hover:bg-blue-100 text-blue-600 transition-colors"
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  parentBusinessId: undefined,
+                  branchType: undefined,
+                  page: 1,
+                }))
+              }
+              title="Clear brand filter"
+            >
+              <XIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filters — two stacked rows. Row 1: search + status + branch
+          type + clear (matches today's shape). Row 2 (P119): category /
+          subcategory / location / CAC / Pandago / claimed / featured /
+          date range. */}
+      <div className="card px-4 py-3 space-y-3">
+        {/* ─── Row 1 ─── */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -772,7 +1080,7 @@ export default function BusinessesPage() {
               className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors placeholder:text-gray-400"
               placeholder="Search businesses..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setFilters(f => ({ ...f, page: 1 })); }}
             />
           </div>
           <div className="relative">
@@ -790,12 +1098,32 @@ export default function BusinessesPage() {
             <select
               className="appearance-none bg-gray-50 border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors cursor-pointer"
               value={branchTypeFilter}
-              onChange={(e) => setBranchTypeFilter(e.target.value as typeof branchTypeFilter)}
+              onChange={(e) => setBranchTypeFilter(e.target.value as BusinessBranchType)}
             >
               <option value="all">All types</option>
               <option value="brands">Brands (Parents)</option>
               <option value="branches">Branches</option>
               <option value="standalone">Standalone</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+          {/* P119 — Sort by metric dropdown. Off-column sorts (rating,
+              reviews, orders, branch count) that don't have a visible
+              column to click. Picking a metric overrides any active
+              column-header sort. */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-gray-50 border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors cursor-pointer"
+              value={activeMetricSort ?? ''}
+              onChange={(e) => handleMetricSort((e.target.value as MetricSortKey) || '')}
+              title="Sort by a non-column metric"
+            >
+              <option value="">Sort by (column)</option>
+              {METRIC_SORT_OPTIONS.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label} ↓
+                </option>
+              ))}
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
@@ -808,14 +1136,175 @@ export default function BusinessesPage() {
               {stats.pendingReview} pending review
             </button>
           )}
-          {(filters.status || branchTypeFilter !== 'all') && (
+          {(hasActiveFilters || search) && (
             <button
               className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
-              onClick={() => { setFilters(f => ({ ...f, status: undefined, page: 1 })); setBranchTypeFilter('all'); }}
+              onClick={clearAllFilters}
             >
               Clear filters
             </button>
           )}
+        </div>
+
+        {/* ─── Row 2 — advanced filters (P119) ─── */}
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
+          {/* Category */}
+          <div className="min-w-[180px]">
+            <SearchableSelect
+              options={[
+                { value: '', label: 'All categories' },
+                ...((allCategories ?? []).map((c) => ({ value: c._id, label: c.name }))),
+              ]}
+              value={filters.categoryId ?? ''}
+              onChange={(v) =>
+                setFilters((f) => ({
+                  ...f,
+                  categoryId: v || undefined,
+                  subcategoryId: undefined,
+                  page: 1,
+                }))
+              }
+              placeholder="All categories"
+            />
+          </div>
+          {/* Subcategory — disabled until a category is picked */}
+          <div className="min-w-[180px]">
+            <SearchableSelect
+              options={[
+                { value: '', label: filters.categoryId ? 'All subcategories' : 'Pick a category first' },
+                ...((allSubcategories ?? []).map((s) => ({ value: s._id, label: s.name }))),
+              ]}
+              value={filters.subcategoryId ?? ''}
+              onChange={(v) =>
+                setFilters((f) => ({ ...f, subcategoryId: v || undefined, page: 1 }))
+              }
+              placeholder="All subcategories"
+              disabled={!filters.categoryId}
+            />
+          </div>
+          {/* Location */}
+          <div className="min-w-[180px]">
+            <SearchableSelect
+              options={[
+                { value: '', label: 'All locations' },
+                ...((allLocations ?? []).map((l) => ({ value: l._id, label: l.name }))),
+              ]}
+              value={filters.locationId ?? ''}
+              onChange={(v) =>
+                setFilters((f) => ({ ...f, locationId: v || undefined, page: 1 }))
+              }
+              placeholder="All locations"
+              // LOCATION-scoped admins are pinned to their location.
+              disabled={admin?.scope === 'LOCATION' && admin.locationIds.length === 1}
+            />
+          </div>
+          {/* CAC Status */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-gray-50 border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors cursor-pointer"
+              value={filters.cacStatus ?? ''}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  cacStatus: (e.target.value || undefined) as CacDocumentStatus | undefined,
+                  page: 1,
+                }))
+              }
+            >
+              <option value="">CAC: Any</option>
+              {CAC_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  CAC: {s}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+          {/* Pandago Status */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-gray-50 border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors cursor-pointer"
+              value={filters.pandagoStatus ?? ''}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  pandagoStatus: (e.target.value || undefined) as typeof filters.pandagoStatus,
+                  page: 1,
+                }))
+              }
+            >
+              <option value="">Pandago: Any</option>
+              {PANDAGO_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  Pandago: {s.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+          {/* Claimed / Unclaimed */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-gray-50 border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors cursor-pointer"
+              value={filters.isClaimed === undefined ? '' : filters.isClaimed ? 'true' : 'false'}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  isClaimed: e.target.value === '' ? undefined : e.target.value === 'true',
+                  page: 1,
+                }))
+              }
+            >
+              <option value="">Claim: Any</option>
+              <option value="true">Claimed</option>
+              <option value="false">Unclaimed</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+          {/* Featured */}
+          <div className="relative">
+            <select
+              className="appearance-none bg-gray-50 border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors cursor-pointer"
+              value={filters.isFeatured === undefined ? '' : filters.isFeatured ? 'true' : 'false'}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  isFeatured: e.target.value === '' ? undefined : e.target.value === 'true',
+                  page: 1,
+                }))
+              }
+            >
+              <option value="">Featured: Any</option>
+              <option value="true">Featured</option>
+              <option value="false">Not featured</option>
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          </div>
+          {/* Created date range */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 whitespace-nowrap">Created</span>
+            <input
+              type="date"
+              className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors"
+              value={filters.createdFrom ?? ''}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, createdFrom: e.target.value || undefined, page: 1 }))
+              }
+              max={filters.createdTo ?? undefined}
+              title="Created on or after"
+            />
+            <span className="text-xs text-gray-400">→</span>
+            <input
+              type="date"
+              className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 transition-colors"
+              value={filters.createdTo ?? ''}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, createdTo: e.target.value || undefined, page: 1 }))
+              }
+              min={filters.createdFrom ?? undefined}
+              title="Created on or before"
+            />
+          </div>
         </div>
       </div>
 
@@ -825,11 +1314,36 @@ export default function BusinessesPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50">
-                {tableHeaders.map((h, i) => (
-                  <th key={i} className={`px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider ${i === tableHeaders.length - 1 ? 'w-20' : ''}`}>
-                    {h}
-                  </th>
-                ))}
+                {tableHeaders.map((h, i) => {
+                  // P119 — clickable header when sortKey is set. Header
+                  // shows up/down arrow when it's the active sort, faded
+                  // double-arrow otherwise. Picking a header here also
+                  // clears the "Sort by" metric dropdown indirectly via
+                  // `activeColumnSort` derivation.
+                  const isActive = !!h.sortKey && activeColumnSort === h.sortKey;
+                  return (
+                    <th
+                      key={i}
+                      className={`px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider ${h.widthClass ?? ''} ${h.sortKey ? 'cursor-pointer select-none hover:text-gray-700' : ''}`}
+                      onClick={() => h.sortKey && handleColumnSort(h.sortKey)}
+                    >
+                      <div className="inline-flex items-center gap-1">
+                        <span>{h.label}</span>
+                        {h.sortKey && (
+                          isActive ? (
+                            sortDir === 'asc' ? (
+                              <ArrowUp className="w-3 h-3 text-ruby-600" />
+                            ) : (
+                              <ArrowDown className="w-3 h-3 text-ruby-600" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-gray-300" />
+                          )
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -920,6 +1434,14 @@ export default function BusinessesPage() {
                             </div>
                           )}
                         </td>
+                        {/* P119 — Phone column. tel: link + copy-to-clipboard on
+                            hover. Renders contact.phone as the primary and
+                            contact.phone2 as a smaller second line if present.
+                            Branch rows show their OWN phone (each branch is a
+                            distinct Business doc with its own contact). */}
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <PhoneCell phone={b.contact?.phone} phone2={b.contact?.phone2} />
+                        </td>
                         {/* Location */}
                         <td className="px-4 py-3 text-sm text-gray-700">
                           <div className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -997,6 +1519,10 @@ export default function BusinessesPage() {
                               <td className="px-4 py-3 text-sm text-gray-700">
                                 <div className="text-sm text-gray-700 font-medium truncate">{getOwnerName(branch.ownerId) || 'Unknown'}</div>
                               </td>
+                              {/* P119 — Phone (branch's own contact.phone) */}
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                <PhoneCell phone={branch.contact?.phone} phone2={branch.contact?.phone2} />
+                              </td>
                               {/* Location */}
                               <td className="px-4 py-3 text-sm text-gray-700">
                                 <div className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -1004,6 +1530,11 @@ export default function BusinessesPage() {
                                   <span className="truncate">{getLocationName(branch.locationId) || '—'}</span>
                                 </div>
                               </td>
+                              {/* P119 — Pandago slot kept empty for branch rows so
+                                  the column count matches the parent row's 8-cell
+                                  layout. Branches inherit auto-register from the
+                                  parent; per-row Pandago status isn't useful here. */}
+                              <td className="px-4 py-3 text-sm text-gray-400">—</td>
                               {/* Created */}
                               <td className="px-4 py-3 text-sm text-gray-500">{formatDate(branch.createdAt)}</td>
                               {/* Actions */}
@@ -1702,7 +2233,21 @@ export default function BusinessesPage() {
 
             {/* Tab: Branches */}
             {detailTab === 'branches' && (
-              <BranchesTab businessId={displayBusiness._id} isParent={!!displayBusiness.isParent} />
+              <BranchesTab
+                businessId={displayBusiness._id}
+                isParent={!!displayBusiness.isParent}
+                // P119-C1 — "View all in main table" deep-link. Closes
+                // this modal and routes back to the businesses page with
+                // ?parentBusinessId=X, which the page picks up via
+                // deepLinkParentBusinessId + the pill header. Pass the
+                // brand name so the pill renders immediately without a
+                // second fetch round-trip.
+                onViewAllInTable={() => {
+                  setDetailBusiness(null);
+                  const id = displayBusiness._id;
+                  router.push(`/ruby-app/admin/businesses?parentBusinessId=${id}`);
+                }}
+              />
             )}
 
             {/* Tab: Wallet — admin can top up the business's NGN wallet
@@ -2122,8 +2667,86 @@ export default function BusinessesPage() {
 
 // ─── Helper Components ───
 
+/**
+ * P119 — Phone cell for the main businesses table.
+ *
+ * Renders `contact.phone` as a tappable `tel:` link, with a small copy
+ * icon that appears on hover for quick clipboard capture. If a secondary
+ * phone (`contact.phone2`) is set, it's shown as a smaller second line.
+ *
+ * Empty state: em-dash. Click on either the link OR the copy icon stops
+ * propagation so it doesn't accidentally open the row's detail modal.
+ */
+function PhoneCell({ phone, phone2 }: { phone?: string; phone2?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(
+    async (e: React.MouseEvent, value: string) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(value);
+        setCopied(true);
+        toast.success('Copied');
+        setTimeout(() => setCopied(false), 1500);
+      } catch {
+        // Private-browsing fallback — at least let the user know.
+        toast.error('Copy failed — long-press to select');
+      }
+    },
+    [],
+  );
+  if (!phone && !phone2) {
+    return <span className="text-gray-300">—</span>;
+  }
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      {phone && (
+        <div className="group inline-flex items-center gap-1.5">
+          <a
+            href={`tel:${phone}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-sm text-blue-600 hover:text-blue-700 hover:underline truncate"
+            title={phone}
+          >
+            {phone}
+          </a>
+          <button
+            type="button"
+            onClick={(e) => copy(e, phone)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100"
+            title={copied ? 'Copied' : 'Copy'}
+          >
+            <Copy className="w-3 h-3 text-gray-400" />
+          </button>
+        </div>
+      )}
+      {phone2 && (
+        <a
+          href={`tel:${phone2}`}
+          onClick={(e) => e.stopPropagation()}
+          className="text-[11px] text-gray-500 hover:text-gray-700 hover:underline truncate"
+          title={phone2}
+        >
+          {phone2}
+        </a>
+      )}
+    </div>
+  );
+}
+
 // ─── Branches Tab ───
-function BranchesTab({ businessId, isParent }: { businessId: string; isParent: boolean }) {
+function BranchesTab({
+  businessId,
+  isParent,
+  onViewAllInTable,
+}: {
+  businessId: string;
+  isParent: boolean;
+  // P119-C1 — when set, the tab shows a "View all in main table" button
+  // that closes the modal and deep-links to the businesses page filtered
+  // to this brand's branches. Optional so non-deep-linkable contexts
+  // (sibling-branches view) can omit it.
+  onViewAllInTable?: () => void;
+}) {
   const { data: branches, isLoading: loading, error } = useApi<Business[]>(
     () => api.businesses.getBranches(businessId),
     [businessId],
@@ -2153,11 +2776,23 @@ function BranchesTab({ businessId, isParent }: { businessId: string; isParent: b
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
           {isParent ? 'Branch Locations' : 'Sibling Branches'}
         </span>
-        <span className="text-xs text-gray-400">{branches.length} branch(es)</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">{branches.length} branch(es)</span>
+          {isParent && onViewAllInTable && (
+            <button
+              onClick={onViewAllInTable}
+              className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+              title="Filter the main businesses table to these branches"
+            >
+              View all in main table
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="space-y-2">
         {branches.map((branch: Business) => (
@@ -2658,8 +3293,15 @@ function PandagoBadge({
 
   const isManualEligible =
     outlet?.isLegacy === true || business.isClaimed === false;
+  // P118 — claimed/non-legacy businesses normally hide the button (auto-
+  // register owns the happy path). But a FAILED status means auto-register
+  // has actually tripped — every admin should be able to retry it then,
+  // regardless of legacy/claim status. The other two states (NOT_REGISTERED
+  // / STALE) keep the original gate so admin can't pre-empt auto-register
+  // / the cron sync.
   const showRegisterButton =
-    isManualEligible && (status === 'NOT_REGISTERED' || status === 'FAILED' || status === 'STALE');
+    (isManualEligible && (status === 'NOT_REGISTERED' || status === 'STALE')) ||
+    status === 'FAILED';
 
   return (
     <div className="flex flex-col gap-1 min-w-0">
@@ -2675,9 +3317,14 @@ function PandagoBadge({
       >
         {labels[status] || status}
       </span>
-      {/* Manual register / re-register link. Visible for legacy + unclaimed
-          businesses (auto-register only fires for claimed merchants). Lets
-          ops repair FAILED outlets after fixing the underlying data. */}
+      {/* Manual register / retry link. Visible for:
+          - legacy + unclaimed businesses (auto-register only fires for
+            claimed merchants), and
+          - any FAILED business (P118 — admin recovery escape hatch after
+            auto-register has tripped). The retry button is NOT a fix for
+            the underlying Pandago auth issue — it just re-invokes the
+            same registration path so the admin can verify recovery once
+            the upstream cause is resolved off-platform. */}
       {showRegisterButton && (
         <button
           onClick={(e) => {
@@ -2687,7 +3334,13 @@ function PandagoBadge({
           disabled={registering}
           className="text-[10px] font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50 hover:underline w-fit"
         >
-          {registering ? 'Registering…' : status === 'NOT_REGISTERED' ? 'Register' : 'Re-register'}
+          {registering
+            ? 'Registering…'
+            : status === 'NOT_REGISTERED'
+              ? 'Register'
+              : status === 'FAILED'
+                ? 'Retry'
+                : 'Re-register'}
         </button>
       )}
       {status === 'FAILED' && outlet?.lastError && (

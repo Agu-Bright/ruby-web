@@ -1491,6 +1491,26 @@ export interface LocationFilterParams extends PaginationParams {
   search?: string;
 }
 
+// P119 — admin businesses page sort surface. Keep in sync with the
+// backend BUSINESS_SORT_KEYS array (dto/index.ts).
+export type BusinessSortKey =
+  | 'createdAt'
+  | 'updatedAt'
+  | 'name'
+  | 'averageRating'
+  | 'totalReviews'
+  | 'orderCount'
+  | 'branchCount';
+
+// P119 — convenience enum mirroring the backend BUSINESS_BRANCH_TYPES.
+// 'all' is treated as no filter; 'brands' = isParent=true; 'branches'
+// = has parentBusinessId; 'standalone' = neither.
+export type BusinessBranchType =
+  | 'all'
+  | 'brands'
+  | 'branches'
+  | 'standalone';
+
 export interface BusinessFilterParams extends PaginationParams {
   locationId?: string;
   status?: BusinessStatus;
@@ -1500,6 +1520,22 @@ export interface BusinessFilterParams extends PaginationParams {
   // page when an admin clicks "View businesses" on a customer who owns
   // multiple, AND by the new ?ownerId= URL param on the businesses page.
   ownerId?: string;
+
+  // P119 — extended filter surface. Each maps 1-to-1 to the backend
+  // BusinessQueryDto field of the same name. All optional.
+  subcategoryId?: string;
+  cacStatus?: CacDocumentStatus;
+  pandagoStatus?: 'NOT_REGISTERED' | 'PENDING' | 'ACTIVE' | 'FAILED' | 'STALE';
+  isClaimed?: boolean;
+  isFeatured?: boolean;
+  isVerified?: boolean;
+  isParent?: boolean;
+  parentBusinessId?: string;
+  branchType?: BusinessBranchType;
+  createdFrom?: string; // ISO date "YYYY-MM-DD" or full ISO
+  createdTo?: string;
+  sortBy?: BusinessSortKey;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface OrderFilterParams extends PaginationParams {
@@ -1637,6 +1673,11 @@ export interface CustomerFilterParams extends PaginationParams {
 // ============================================================
 // Ad Campaigns
 // ============================================================
+// P109 — PUSH_NOTIFICATION is back as a Deolu-branded one-shot geofenced
+// broadcast. The defensive "Other (retired)" fallback in `getAdTypeName()`
+// stays for any future retired type. Historical pre-P106 PUSH_NOTIFICATION
+// campaigns now resolve to the proper "Push Notification" label (instead
+// of the P106 fallback).
 export type AdType = 'FEATURED_LISTING' | 'SLIDESHOW_AD' | 'EXPLORE_REELS_AD' | 'PUSH_NOTIFICATION' | 'FEATURED_REVIEWS';
 export type AdCampaignStatus = 'PENDING_REVIEW' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'REJECTED' | 'CANCELLED';
 export type AdPaymentStatus = 'PENDING' | 'PAID' | 'REFUNDED';
@@ -1664,6 +1705,8 @@ export interface AdCampaign {
   totalCost: number;
   currency: string;
   paymentStatus: AdPaymentStatus;
+  /** P108 — how the merchant paid. 'WALLET' = NGN debit; 'IAP' = Apple StoreKit. */
+  paymentSource?: 'WALLET' | 'IAP' | 'IAP_CREDITS';
   startDate?: string;
   endDate?: string;
   impressions: number;
@@ -1674,6 +1717,12 @@ export interface AdCampaign {
   locationId?: string | { _id: string; name: string; slug: string };
   reviewIds?: string[];
   isOrganic?: boolean;
+  /**
+   * P108 — payment-source-specific data. For IAP campaigns:
+   *   iapTransactionId, iapEnvironment, iapProductId, iapPurchaseDate,
+   *   iapQuantity (PER_DAY days bought), iapPricingMode ('FIXED_DURATION' | 'PER_DAY')
+   */
+  metadata?: Record<string, any>;
   createdAt: string;
   updatedAt: string;
 }

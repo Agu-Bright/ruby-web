@@ -20,9 +20,13 @@ import FinalCTA from '@/components/partner/FinalCTA';
  * onto a bare signup form with no context. Now the business subdomain
  * shows the full landing: hero, trust strip, how-it-works, feature grid,
  * app showcase, supported categories, pricing promise, testimonials,
- * FAQ, and a closing CTA. The "Register your business" CTAs (inside
- * PartnerHero + FinalCTA) use `businessLink('/register')`, which keeps
- * the merchant on `business.rubyplus.net/register`.
+ * FAQ, and a closing CTA.
+ *
+ * P107 — "Register your business" web-flow CTAs removed from PartnerHero
+ * and FinalCTA. Merchant onboarding flows through the mobile apps; the
+ * App Store / Google Play badges on the landing are the only entry point.
+ * The web `/register` route still works (deep links / business app
+ * fallback) but is no longer surfaced from the landing.
  *
  * This reuses the EXACT same section components as `rubyplus.net/partner`
  * — one set of marketing sections, two hosts that surface them. The only

@@ -214,16 +214,22 @@ export function getLocationName(location: any): string {
   return location?.name || '';
 }
 
+// P109 — PUSH_NOTIFICATION label restored (Deolu-branded). Historical pre-P106
+// PUSH_NOTIFICATION campaigns now resolve to "Push Notification" instead of
+// the P106 fallback "Other (retired)". The defensive fallback stays for any
+// future retired type.
 const AD_TYPE_LABELS: Record<string, string> = {
   FEATURED_LISTING: 'Featured Listing',
   SLIDESHOW_AD: 'Slideshow Ad',
   EXPLORE_REELS_AD: 'Explore Reels Ad',
-  PUSH_NOTIFICATION: 'Push Notification',
+  PUSH_NOTIFICATION: 'Push Notification (Deolu)',
   FEATURED_REVIEWS: 'Featured Reviews',
 };
 
 export function getAdTypeName(type: string): string {
-  return AD_TYPE_LABELS[type] || type;
+  // Defensive fallback: known type → friendly label; unknown type
+  // (e.g. some future-retired AdType) → "Other (retired)".
+  return AD_TYPE_LABELS[type] || 'Other (retired)';
 }
 
 const AD_STATUS_LABELS: Record<string, string> = {

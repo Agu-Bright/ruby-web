@@ -18,6 +18,9 @@ import type {
 import { formatDate, formatCurrency, getAdTypeName, getAdStatusLabel, getBusinessName, getLocationName } from '@/lib/utils';
 
 const STATUS_OPTIONS: AdCampaignStatus[] = ['PENDING_REVIEW', 'ACTIVE', 'PAUSED', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+// P109 — PUSH_NOTIFICATION restored to TYPE_OPTIONS and AD_TYPE_ICONS. Bell
+// icon matches the legacy v2 representation; the defensive fallback in
+// getAdTypeName() still covers any future retired types.
 const TYPE_OPTIONS: AdType[] = ['FEATURED_LISTING', 'SLIDESHOW_AD', 'EXPLORE_REELS_AD', 'PUSH_NOTIFICATION', 'FEATURED_REVIEWS'];
 
 const AD_TYPE_ICONS: Record<string, typeof Star> = {
@@ -471,6 +474,58 @@ export default function CampaignsPage() {
               </div>
             </div>
 
+            {/* P108 — Payment source chip + IAP per-day footnote when relevant. */}
+            {(() => {
+              const paymentSource = selectedCampaign.paymentSource;
+              const meta = selectedCampaign.metadata || {};
+              const iapQuantity = typeof meta.iapQuantity === 'number' ? meta.iapQuantity : null;
+              const iapPricingMode = meta.iapPricingMode as string | undefined;
+              const iapProductId = meta.iapProductId as string | undefined;
+              const isLegacyPack =
+                paymentSource === 'IAP' &&
+                (iapPricingMode === 'FIXED_DURATION' ||
+                  (iapProductId && !iapProductId.includes('.daily.v3')));
+              const sourceLabel =
+                paymentSource === 'IAP'
+                  ? isLegacyPack
+                    ? 'App Store (fixed pack)'
+                    : 'App Store'
+                  : paymentSource === 'IAP_CREDITS'
+                    ? 'IAP Credits (deprecated)'
+                    : paymentSource === 'WALLET'
+                      ? 'Wallet'
+                      : null;
+              if (!sourceLabel && !iapQuantity) return null;
+              const sourceColor =
+                paymentSource === 'IAP'
+                  ? 'bg-blue-100 text-blue-700 border-blue-200'
+                  : paymentSource === 'WALLET'
+                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                    : 'bg-gray-100 text-gray-700 border-gray-200';
+              return (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                    Payment Source
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {sourceLabel && (
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md border ${sourceColor}`}
+                      >
+                        {sourceLabel}
+                      </span>
+                    )}
+                  </div>
+                  {paymentSource === 'IAP' && iapQuantity && !isLegacyPack && (
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      Bought {iapQuantity} {iapQuantity === 1 ? 'day' : 'days'} via App
+                      Store at ₦{(selectedCampaign.ratePerUnit ?? 0).toLocaleString()}/day.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             {selectedCampaign.startDate && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Date Range</p>
@@ -570,6 +625,24 @@ export default function CampaignsPage() {
                 min={0}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20"
               />
+              {/* P108 — clarify per-day semantics applies to both payment paths.
+                  P109 — branch on rateUnit for the NOTIFICATION case (PUSH_NOTIFICATION
+                  is flat-fee per broadcast, not per day). */}
+              <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">
+                {editingProduct.rateUnit === 'NOTIFICATION' ? (
+                  <>
+                    Per-notification rate. Wallet (Android, web) charges this once
+                    per broadcast in NGN. iOS bills via Apple at the matching USD
+                    price tier — one IAP transaction creates one Deolu-branded push.
+                  </>
+                ) : (
+                  <>
+                    Per-day rate. Wallet (Android, web) charges this directly in NGN.
+                    iOS bills via Apple at the matching USD price tier × the number
+                    of days the merchant picks at purchase.
+                  </>
+                )}
+              </p>
             </div>
             <div className="flex gap-2">
               <button

@@ -722,6 +722,20 @@ export const api = {
     // Multi-branch: list child branches of a parent business
     getBranches: (parentId: string) =>
       request<import("@/lib/types").Business[]>(`/admin/businesses/${parentId}/branches`),
+    /**
+     * P119 — thin helper for the businesses page's Brand filter
+     * search-as-you-type. Hits the regular admin list with isParent=true
+     * and a small limit; results feed the SearchableSelect popover when
+     * the admin is picking a parent brand to filter children of.
+     */
+    brands: (search?: string, limit = 20) =>
+      request<import("@/lib/types").Business[]>("/admin/businesses", {
+        params: {
+          isParent: true,
+          search,
+          limit,
+        } as Record<string, string | number | boolean | undefined>,
+      }),
     // Keep backward-compat alias
     updateStatus: (
       id: string,
@@ -1249,6 +1263,15 @@ export const api = {
       request<any>(`/admin/reviews/${id}/verify`, { method: "PATCH" }),
     delete: (id: string) =>
       request<null>(`/admin/reviews/${id}`, { method: "DELETE" }),
+
+    // P103 — admin Feature toggle for the home tab reviews marquee.
+    // Featured reviews sort first and get a purple "Featured" pill on
+    // the card. Separate from the paid FEATURED_REVIEWS ad type.
+    feature: (id: string, data: { isFeatured: boolean; featuredUntil?: string }) =>
+      request<any>(`/admin/reviews/${id}/feature`, {
+        method: "PATCH",
+        body: data,
+      }),
 
     // P51 §7 — moderation queue + trust dashboard.
     listQuarantined: (params?: {

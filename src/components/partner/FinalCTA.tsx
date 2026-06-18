@@ -1,15 +1,13 @@
-import { ArrowRight } from "lucide-react";
 import ScrollReveal from "../landing/ScrollReveal";
-import { businessLink } from "@/lib/subdomain-links";
 
 /**
  * Full-bleed final CTA section. Black background with ruby-red accents
  * to give the page a strong visual close before the footer.
  *
- * Two CTAs:
- *   - Primary: "Register your business" → /business/register (web flow)
- *   - Secondary: live App Store + Google Play badges for the Business app
- *     (App Store ID 6760118324 / Play package com.rubyplus.business).
+ * P107 — Primary "Register your business" CTA removed. Merchant onboarding
+ * now flows through the mobile apps, so the App Store + Google Play badges
+ * (App Store ID 6760118324 / Play package com.rubyplus.business) are the
+ * only entry point on the landing.
  */
 export default function FinalCTA() {
   return (
@@ -39,24 +37,13 @@ export default function FinalCTA() {
               No setup fees. No monthly fees. Just growth.
             </p>
 
-            {/* Primary CTA — cross-origin in production. See subdomain-links.ts. */}
-            <div className="mt-8 sm:mt-10 flex flex-col items-center gap-4">
-              <a
-                href={businessLink('/register')}
-                className="inline-flex items-center gap-2 bg-ruby-red text-white px-8 sm:px-10 py-4 rounded-lg font-semibold text-base hover:bg-ruby-red/90 transition-colors shadow-lg shadow-ruby-red/40"
-              >
-                Register your business
-                <ArrowRight className="w-5 h-5" />
-              </a>
-              <p className="text-white/60 text-xs sm:text-sm">
-                Free to register. Set up in 5 minutes.
-              </p>
-            </div>
+            {/* P107 — "Register your business" CTA removed. The App Store +
+                Google Play badges below are the primary entry point now. */}
 
             {/* App badges — Business app, live on both stores. */}
-            <div className="mt-10 sm:mt-12">
+            <div className="mt-8 sm:mt-10">
               <p className="text-white/50 text-xs uppercase tracking-wider mb-4">
-                Or get the app
+                Get the app
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a

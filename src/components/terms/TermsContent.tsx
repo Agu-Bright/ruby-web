@@ -3,7 +3,7 @@
 import { ScrollReveal } from "@/components/landing";
 
 const EFFECTIVE_DATE = "March 28, 2026";
-const LAST_UPDATED = "March 28, 2026";
+const LAST_UPDATED = "June 19, 2026";
 
 const TOC = [
   { id: "acceptance", label: "Acceptance of Terms" },
@@ -14,7 +14,7 @@ const TOC = [
   { id: "orders-bookings", label: "Orders & Bookings" },
   { id: "delivery", label: "Delivery Services" },
   { id: "payments", label: "Payments" },
-  { id: "reviews", label: "Reviews & Content" },
+  { id: "reviews", label: "Reviews, User Content & Community Rules" },
   { id: "ip", label: "Intellectual Property" },
   { id: "liability", label: "Limitation of Liability" },
   { id: "disputes", label: "Dispute Resolution" },
@@ -235,13 +235,155 @@ export default function TermsContent() {
               </ul>
             </Section>
 
-            <Section id="reviews" title="9. Reviews & User Content">
-              <p>Users may post reviews, ratings, reels (short videos), and comments on the Platform. By posting content, you:</p>
+            <Section id="reviews" title="9. Reviews, User Content & Community Rules">
+              <p>
+                Users may post reviews, ratings, reels (short videos), comments,
+                chat messages and other user-generated content on the Platform.
+                The following policy applies to all such content and to every
+                user account.
+              </p>
+
+              <h3 className="font-semibold text-gray-800 mt-6 mb-2 text-base">
+                9.1 Zero tolerance for objectionable content and abusive users
+              </h3>
+              <p>
+                Ruby+ enforces a strict <strong>zero-tolerance policy</strong>{" "}
+                for objectionable content and abusive behaviour. You agree that
+                you will <strong>not</strong> upload, post, transmit, or
+                otherwise make available any content or behaviour that:
+              </p>
               <ul className="list-disc list-inside space-y-1.5 ml-2">
-                <li>Grant Ruby+ a non-exclusive, royalty-free, worldwide license to display, distribute, and promote your content on the Platform.</li>
-                <li>Confirm that your content is truthful, not defamatory, and does not violate any third-party rights.</li>
-                <li>Acknowledge that reviews and reels may be subject to admin review before being published.</li>
-                <li>Agree that Ruby+ may remove content that violates community guidelines.</li>
+                <li>
+                  Is hateful, harassing, threatening, defamatory, or
+                  discriminatory toward any person or group;
+                </li>
+                <li>
+                  Contains sexually explicit material, nudity, or pornography;
+                </li>
+                <li>Depicts or incites violence, self-harm, or terrorism;</li>
+                <li>
+                  Promotes illegal activity, fraud, scams, or the sale of
+                  prohibited goods or services;
+                </li>
+                <li>Infringes intellectual property or privacy rights of others;</li>
+                <li>
+                  Is spam, misleading, or designed to manipulate ratings or reviews.
+                </li>
+              </ul>
+              <p>
+                Violation of this policy may result in the immediate removal of
+                the content and the suspension or permanent termination of your
+                account, at Ruby+&apos;s sole discretion.
+              </p>
+
+              <h3 className="font-semibold text-gray-800 mt-6 mb-2 text-base">
+                9.2 Automatic filtering of objectionable content
+              </h3>
+              <p>
+                Every piece of user-typed content submitted to the Platform —
+                including reviews, reel captions, and chat messages — is screened
+                automatically by our server-side moderation filter at the moment
+                of submission. The filter rejects content that contains slurs,
+                hate speech, explicit terms, threats of violence, and other
+                category-defined objectionable language, and surfaces a clear
+                error message to the user instructing them to edit their
+                submission before it can be posted.
+              </p>
+
+              <h3 className="font-semibold text-gray-800 mt-6 mb-2 text-base">
+                9.3 Reporting objectionable content
+              </h3>
+              <p>
+                Every user-generated-content surface on the Platform (reviews,
+                reels, chat messages, business listings, and user profiles)
+                provides a clearly accessible &ldquo;Report&rdquo; control.
+                Tapping it opens a short reason selector (Spam, Harassment, Hate
+                speech, Sexual content, Violence, Misinformation, Other) and
+                submits the report directly to our admin moderation queue. The
+                report is anonymous to the reported party.
+              </p>
+
+              <h3 className="font-semibold text-gray-800 mt-6 mb-2 text-base">
+                9.4 Blocking abusive users
+              </h3>
+              <p>
+                Every user-generated-content surface also provides a
+                &ldquo;Block&rdquo; control. When you block another user:
+              </p>
+              <ul className="list-disc list-inside space-y-1.5 ml-2">
+                <li>
+                  All of that user&apos;s reviews, reels, chat threads, and any
+                  other content authored by them are removed from your feed{" "}
+                  <strong>instantly</strong> — before the action is even
+                  acknowledged by our servers.
+                </li>
+                <li>
+                  The blocked user is prevented from sending you direct messages
+                  or otherwise contacting you through the Platform.
+                </li>
+                <li>
+                  The block is recorded in our admin moderation system,{" "}
+                  <strong>notifying our team</strong> of the abusive behaviour
+                  so we can act on it.
+                </li>
+                <li>
+                  Blocking is reciprocal — the blocked user will likewise not see
+                  your content.
+                </li>
+                <li>
+                  You may unblock a user at any time from the &ldquo;Blocked
+                  users&rdquo; list in your account settings.
+                </li>
+              </ul>
+
+              <h3 className="font-semibold text-gray-800 mt-6 mb-2 text-base">
+                9.5 Our 24-hour response commitment
+              </h3>
+              <p>
+                Ruby+ commits to reviewing and acting on every report of
+                objectionable content <strong>within 24 hours</strong>. When a
+                report is upheld, we will:
+              </p>
+              <ul className="list-disc list-inside space-y-1.5 ml-2">
+                <li>
+                  Remove the offending content from the Platform so it is no
+                  longer visible to any user; and
+                </li>
+                <li>
+                  Suspend or permanently terminate the account of the user who
+                  posted the offending content, in accordance with the severity
+                  of the violation and any prior history.
+                </li>
+              </ul>
+              <p>
+                Frivolous or mistaken reports may be dismissed with a note for
+                audit. Repeat or co-ordinated abuse of the reporting system is
+                itself a violation of these Terms and may result in account
+                action against the reporter.
+              </p>
+
+              <h3 className="font-semibold text-gray-800 mt-6 mb-2 text-base">
+                9.6 Content licence
+              </h3>
+              <p>By posting content on the Platform, you also:</p>
+              <ul className="list-disc list-inside space-y-1.5 ml-2">
+                <li>
+                  Grant Ruby+ a non-exclusive, royalty-free, worldwide licence
+                  to display, distribute, and promote your content on the
+                  Platform;
+                </li>
+                <li>
+                  Confirm that your content is truthful, not defamatory, and
+                  does not violate any third-party rights;
+                </li>
+                <li>
+                  Acknowledge that reviews and reels may be subject to admin
+                  review before being published; and
+                </li>
+                <li>
+                  Agree that Ruby+ may remove content that violates these
+                  community rules.
+                </li>
               </ul>
             </Section>
 

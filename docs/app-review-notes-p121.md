@@ -18,8 +18,8 @@ explicitly ticks a checkbox stating, verbatim:
 > violent content, and that my account may be suspended for violations."
 
 The checkbox is also present above the existing tappable Terms / Privacy
-Policy links (which open https://rubyplus.com/terms and
-https://rubyplus.com/privacy in the system browser).
+Policy links (which open https://rubyplus.net/terms and
+https://rubyplus.net/privacy in the system browser).
 
 ### 2. Automatic objectionable-content filter
 Every piece of user-typed content — review text, reel captions, chat

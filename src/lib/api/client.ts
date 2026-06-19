@@ -1310,6 +1310,45 @@ export const api = {
       }),
   },
 
+  // P121 — Content moderation admin endpoints (App Store Guideline 1.2
+  // 24-hour SLA for actioning reports).
+  moderation: {
+    listReports: (params?: {
+      page?: number;
+      limit?: number;
+      contentType?: string;
+      status?: string;
+    }) =>
+      request<any[]>("/admin/moderation/reports", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    getReport: (id: string) =>
+      request<{ report: any; content: any }>(
+        `/admin/moderation/reports/${id}`,
+      ),
+    resolveReport: (
+      id: string,
+      body: {
+        resolution:
+          | "RESOLVED_CONTENT_REMOVED"
+          | "RESOLVED_USER_SUSPENDED"
+          | "DISMISSED";
+        adminNotes?: string;
+      },
+    ) =>
+      request<any>(`/admin/moderation/reports/${id}/resolve`, {
+        method: "POST",
+        body,
+      }),
+    stats: () =>
+      request<{
+        pending: number;
+        resolvedToday: number;
+        oldestPendingAt?: string;
+        oldestAgeHours: number | null;
+      }>("/admin/moderation/stats"),
+  },
+
   // Phase 59 — Review Rewards Engine admin endpoints.
   rewards: {
     stats: () =>

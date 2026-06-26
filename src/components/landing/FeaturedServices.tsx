@@ -3,23 +3,18 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import ScrollReveal from './ScrollReveal';
+import {
+  useSelectedLocation,
+  RUBY_PLUS_API_BASE,
+} from '@/lib/selected-location';
 
-// P128-LAND — Lagos data wiring for the landing page Featured Services
-// section. Fetches the backend `whats-hot` feed (admin-curated +
-// merchant-paid promotions + organic high-rated, sorted by promotion
-// then rating). Falls back to a small Lagos-themed placeholder set if
-// the env var is missing or the fetch fails, so the section is never
-// blank.
-//
-// Environment:
-//   NEXT_PUBLIC_API_URL          — backend root (e.g. https://api.rubyplus.net/api)
-//   NEXT_PUBLIC_LAGOS_LOCATION_ID — ObjectId of the Lagos location doc.
-//                                   See backend /admin/locations to find it.
-//                                   Without this, the section renders the
-//                                   fallback set below.
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || 'https://api.rubyplus.net/api';
-const LAGOS_LOCATION_ID = process.env.NEXT_PUBLIC_LAGOS_LOCATION_ID || '';
+// P128-LAND — Featured Services scoped to the city currently picked
+// in the RedStrip location picker (defaults to Lagos). Fetches the
+// backend `whats-hot` feed (admin-curated + merchant-paid promotions
+// + organic high-rated, sorted by promotion then rating) for the
+// selected location and refetches when the user changes city. Falls
+// back to a small placeholder set if the fetch fails so the section
+// is never blank.
 
 interface PublicBusinessCard {
   _id: string;
@@ -152,26 +147,19 @@ export default function FeaturedServices() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [services, setServices] = useState<ServiceCard[]>(FALLBACK);
   const [, setLoading] = useState(false);
+  const { selectedLocation } = useSelectedLocation();
 
-  // Fetch Lagos whats-hot businesses from the public backend endpoint.
-  // Best-effort: on any failure we keep the fallback set so the section
-  // is never empty.
+  // Refetch whenever the user picks a different city in RedStrip.
+  // Best-effort — on any failure we keep the previous data so the
+  // section is never empty (a flash of fallback is better than blank).
   useEffect(() => {
+    if (!selectedLocation?._id) return;
     let cancelled = false;
-    if (!LAGOS_LOCATION_ID) {
-      if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
-        console.warn(
-          '[FeaturedServices] NEXT_PUBLIC_LAGOS_LOCATION_ID not set — showing fallback. Set it in .env.local to fetch real Lagos businesses.',
-        );
-      }
-      return;
-    }
     (async () => {
       try {
         setLoading(true);
         const res = await fetch(
-          `${API_BASE}/public/businesses/whats-hot?locationId=${LAGOS_LOCATION_ID}&limit=8`,
+          `${RUBY_PLUS_API_BASE}/public/businesses/whats-hot?locationId=${selectedLocation._id}&limit=8`,
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -183,7 +171,7 @@ export default function FeaturedServices() {
           setServices(data.map(mapBusinessToCard));
         }
       } catch {
-        // Silent — fallback already set on mount
+        // Silent — previous data stays visible
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -191,7 +179,7 @@ export default function FeaturedServices() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selectedLocation?._id]);
 
   return (
     <section
@@ -205,7 +193,7 @@ export default function FeaturedServices() {
               Discover the Best
             </p>
             <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-ruby-black uppercase tracking-wide">
-              Featured Services in Lagos
+              Featured Services in {selectedLocation?.name || 'Lagos'}
             </h2>
             <div className="mt-2 w-12 h-1 bg-ruby-red rounded-full mx-auto sm:mx-0" />
           </div>
@@ -251,7 +239,7 @@ export default function FeaturedServices() {
                   <div className="mb-3">
                     <Stars rating={svc.rating} reviews={svc.reviews} />
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center">
                     <span className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-1">
                       <svg
                         className="w-3 h-3 sm:w-3.5 sm:h-3.5"
@@ -268,9 +256,6 @@ export default function FeaturedServices() {
                       </svg>
                       {svc.location}
                     </span>
-                    <span className="text-[10px] sm:text-xs font-semibold px-3 sm:px-4 py-1.5 bg-ruby-red text-white rounded-full">
-                      View
-                    </span>
                   </div>
                 </div>
               </Link>
@@ -285,26 +270,6 @@ export default function FeaturedServices() {
               ))}
             </div>
           )}
-        </div>
-
-        {/* Write Review CTA */}
-        <div className="mt-8 sm:mt-12 bg-white rounded-xl sm:rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center justify-between p-5 sm:p-6 lg:p-8 gap-4">
-          <div className="text-center sm:text-left">
-            <h3 className="text-base sm:text-lg font-bold text-ruby-black">
-              Write a Review
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-              Help others find the best in town.
-            </p>
-          </div>
-          <a
-            href="https://apps.apple.com/us/app/ruby/id6760121727"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="w-full sm:w-auto px-6 py-2.5 bg-ruby-red text-white text-sm font-semibold rounded-lg whitespace-nowrap hover:bg-ruby-red/90 transition-colors text-center"
-          >
-            Leave a Review
-          </a>
         </div>
       </div>
     </section>

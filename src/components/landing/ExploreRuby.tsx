@@ -3,20 +3,17 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import ScrollReveal from './ScrollReveal';
+import {
+  useSelectedLocation,
+  RUBY_PLUS_API_BASE,
+} from '@/lib/selected-location';
 
-// P128-LAND — Lagos data wiring for the landing page Explore Ruby+
-// section. Fetches the public Ruby+ Select aggregator feed which mixes
-// admin-curated posts, FEATURED_LISTING ads, and what's-hot business
-// fallback. Falls back to a small placeholder set when the env var is
-// missing or the fetch fails.
-//
-// Environment:
-//   NEXT_PUBLIC_API_URL          — backend root (e.g. https://api.rubyplus.net/api)
-//   NEXT_PUBLIC_LAGOS_LOCATION_ID — ObjectId of the Lagos location doc.
-//                                   Same env var as FeaturedServices.
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || 'https://api.rubyplus.net/api';
-const LAGOS_LOCATION_ID = process.env.NEXT_PUBLIC_LAGOS_LOCATION_ID || '';
+// P128-LAND — Explore Ruby+ scoped to the city currently picked in
+// the RedStrip location picker (defaults to Lagos). Fetches the public
+// Ruby+ Select aggregator feed (mix of admin-curated posts,
+// FEATURED_LISTING ads, and what's-hot business fallback) for the
+// selected location and refetches when the user changes city. Falls
+// back to a small placeholder set if the fetch fails.
 
 /**
  * Ruby+ Select feed item shapes (kind discriminator).
@@ -150,22 +147,16 @@ function mapItemToCard(item: RubySelectItem): ArticleCard | null {
 export default function ExploreRuby() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [articles, setArticles] = useState<ArticleCard[]>(FALLBACK);
+  const { selectedLocation } = useSelectedLocation();
 
+  // Refetch when the user picks a different city in RedStrip.
   useEffect(() => {
+    if (!selectedLocation?._id) return;
     let cancelled = false;
-    if (!LAGOS_LOCATION_ID) {
-      if (process.env.NODE_ENV !== 'production') {
-        // eslint-disable-next-line no-console
-        console.warn(
-          '[ExploreRuby] NEXT_PUBLIC_LAGOS_LOCATION_ID not set — showing fallback. Set it in .env.local to fetch the real Lagos Ruby+ Select feed.',
-        );
-      }
-      return;
-    }
     (async () => {
       try {
         const res = await fetch(
-          `${API_BASE}/public/ruby-select?locationId=${LAGOS_LOCATION_ID}`,
+          `${RUBY_PLUS_API_BASE}/public/ruby-select?locationId=${selectedLocation._id}`,
         );
         if (!res.ok) return;
         const json = await res.json();
@@ -178,13 +169,13 @@ export default function ExploreRuby() {
           .filter((c): c is ArticleCard => !!c);
         if (mapped.length > 0) setArticles(mapped);
       } catch {
-        // Silent — fallback already set
+        // Silent — previous data stays visible
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [selectedLocation?._id]);
 
   return (
     <section className="py-12 sm:py-16 lg:py-20 bg-white">
@@ -215,10 +206,11 @@ export default function ExploreRuby() {
                   className="font-playfair text-xl sm:text-2xl lg:text-4xl font-bold text-white uppercase"
                   style={{ fontVariant: 'small-caps' }}
                 >
-                  Explore Ruby+ in Lagos
+                  Explore Ruby+ in {selectedLocation?.name || 'Lagos'}
                 </h2>
                 <p className="mt-2 sm:mt-3 text-[10px] sm:text-xs lg:text-sm text-white/70 max-w-xl mx-auto leading-relaxed px-4">
-                  Editor picks, what&apos;s hot, and trending businesses — curated weekly for Lagos.
+                  Editor picks, what&apos;s hot, and trending businesses —
+                  curated weekly for {selectedLocation?.name || 'Lagos'}.
                 </p>
               </div>
 

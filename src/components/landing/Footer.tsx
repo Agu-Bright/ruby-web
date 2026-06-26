@@ -259,9 +259,13 @@ export default function Footer({ crossDomain = false }: FooterProps) {
                 Download App
               </h4>
               <div className="space-y-3">
-                {/* iOS Customer App — still in App Store review; placeholder until approved. */}
+                {/* iOS Customer App — live on the App Store (approved
+                    June 2026). */}
                 <a
-                  href="#"
+                  href="https://apps.apple.com/us/app/ruby/id6760121727"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label="Download Ruby+ Customer app on the App Store"
                   className="flex items-center gap-2.5 w-fit px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg hover:bg-white/15 transition-colors"
                 >
                   <svg
@@ -273,7 +277,7 @@ export default function Footer({ crossDomain = false }: FooterProps) {
                   </svg>
                   <div>
                     <div className="text-[9px] text-white/50 leading-none">
-                      Coming Soon on
+                      Download on the
                     </div>
                     <div className="text-xs font-semibold text-white leading-tight">
                       App Store

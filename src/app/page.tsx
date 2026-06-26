@@ -4,6 +4,7 @@ import RedStrip from '@/components/landing/RedStrip';
 import Categories from '@/components/landing/Categories';
 import StatsStrip from '@/components/landing/StatsStrip';
 import FeaturedServices from '@/components/landing/FeaturedServices';
+import PrimeBannerCarousel from '@/components/landing/PrimeBannerCarousel';
 import WhyChoose from '@/components/landing/WhyChoose';
 import ForPatrons from '@/components/landing/ForPatrons';
 import ExploreRuby from '@/components/landing/ExploreRuby';
@@ -21,6 +22,9 @@ export default function LandingPage() {
       <Categories />
       <StatsStrip />
       <FeaturedServices />
+      {/* P120-E2 — Prime tier banner carousel. Renders nothing when no
+          Prime merchants in any city have an approved banner. */}
+      <PrimeBannerCarousel />
       <WhyChoose />
       <ForPatrons />
       <ExploreRuby />

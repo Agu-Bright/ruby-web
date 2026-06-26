@@ -1873,6 +1873,191 @@ export const api = {
   },
 
   // ─────────────────────────────────────────────────────────────────
+  // P120 — Business Ad Subscriptions admin surface.
+  // Drives the /admin/ad-subscriptions page: list / cancel /
+  // upgrade-downgrade / perks / banner moderation / onboarding queue /
+  // revenue stats. Mounted at /admin/ad-subscriptions on the backend.
+  // ─────────────────────────────────────────────────────────────────
+  adSubscriptions: {
+    /** List tier definitions (Starter / Growth / Prime). */
+    tiers: () =>
+      request<
+        Array<{
+          tier: "STARTER" | "GROWTH" | "PRIME";
+          displayName: string;
+          weeklyAmountNgn: number;
+          pushBlastsPerMonth: number;
+          reelsPerMonth: number;
+          perkBullets: string[];
+        }>
+      >("/admin/ad-subscriptions/tiers"),
+
+    /** Paginated subscription list with filters. */
+    list: (params?: {
+      page?: number;
+      limit?: number;
+      tier?: "STARTER" | "GROWTH" | "PRIME";
+      status?:
+        | "ACTIVE"
+        | "IN_GRACE_PERIOD"
+        | "PAUSED"
+        | "CANCELLED"
+        | "EXPIRED";
+      businessId?: string;
+      periodEndFrom?: string;
+      periodEndTo?: string;
+    }) =>
+      request<any[]>(
+        `/admin/ad-subscriptions${
+          params
+            ? "?" +
+              new URLSearchParams(
+                Object.entries(params).reduce(
+                  (acc, [k, v]) => (v != null ? { ...acc, [k]: String(v) } : acc),
+                  {},
+                ),
+              ).toString()
+            : ""
+        }`,
+      ),
+
+    /** Single subscription detail. */
+    get: (id: string) => request<any>(`/admin/ad-subscriptions/${id}`),
+
+    /**
+     * Force-cancel — admin-only since P124 (merchant-facing cancel was
+     * replaced by pause/resume). Perks live to currentPeriodEnd then
+     * EXPIRED by the cron sweep. Use this for chargeback / TOS
+     * violation / refund-and-close support tickets.
+     */
+    cancel: (id: string, body?: { reason?: string }) =>
+      request<any>(`/admin/ad-subscriptions/${id}/cancel`, {
+        method: "POST",
+        body: JSON.stringify(body || {}),
+      }),
+
+    /**
+     * P124 — Pause on the merchant's behalf. Identical effect to the
+     * merchant's pause: status -> PAUSED, managed campaign frozen,
+     * cached tier cleared. Useful for support tickets ("merchant said
+     * pause my sub").
+     */
+    pause: (id: string, body?: { reason?: string }) =>
+      request<any>(`/admin/ad-subscriptions/${id}/pause`, {
+        method: "POST",
+        body: JSON.stringify(body || {}),
+      }),
+
+    /**
+     * P124 — Resume a PAUSED subscription without billing the wallet
+     * (admin-only courtesy path; the renewal cron will pick up billing
+     * from the next period boundary). Mirrors the merchant resume
+     * effect (fresh 7-day period, managed campaign re-opened, cached
+     * tier restored) — just without the upfront wallet debit.
+     */
+    resume: (id: string) =>
+      request<any>(`/admin/ad-subscriptions/${id}/resume`, {
+        method: "POST",
+      }),
+
+    /** Admin upgrade/downgrade — immediate-expire + new sub on WALLET. */
+    upgradeDowngrade: (
+      id: string,
+      body: { tier: "STARTER" | "GROWTH" | "PRIME" },
+    ) =>
+      request<any>(`/admin/ad-subscriptions/${id}/upgrade-downgrade`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    /** Force-expire — past-grace cleanup or escalation path. */
+    expire: (id: string) =>
+      request<any>(`/admin/ad-subscriptions/${id}/expire`, { method: "POST" }),
+
+    /** Mark the free profile-setup perk done. */
+    markProfileSetup: (id: string) =>
+      request<any>(`/admin/ad-subscriptions/${id}/perks/profile-setup`, {
+        method: "PATCH",
+      }),
+
+    /** Update polished-photos count (0..6+). */
+    setPolishedPhotos: (id: string, count: number) =>
+      request<any>(`/admin/ad-subscriptions/${id}/perks/polished-photos`, {
+        method: "PATCH",
+        body: JSON.stringify({ count }),
+      }),
+
+    /** Schedule the creative shoot (PRIME only). */
+    scheduleShoot: (id: string, scheduledAt: string) =>
+      request<any>(
+        `/admin/ad-subscriptions/${id}/perks/creative-shoot/schedule`,
+        {
+          method: "POST",
+          body: JSON.stringify({ scheduledAt }),
+        },
+      ),
+
+    /** Mark the creative shoot complete (PRIME only). */
+    completeShoot: (id: string) =>
+      request<any>(
+        `/admin/ad-subscriptions/${id}/perks/creative-shoot/complete`,
+        { method: "POST" },
+      ),
+
+    /** Admin banner upload — auto-approves. */
+    uploadBanner: (id: string, body: { imageUrl: string; ctaText?: string }) =>
+      request<any>(`/admin/ad-subscriptions/${id}/banner`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+
+    /** Moderate merchant-uploaded banner (APPROVED / REJECTED). */
+    moderateBanner: (
+      id: string,
+      body: {
+        decision: "APPROVED" | "REJECTED";
+        rejectionReason?: string;
+      },
+    ) =>
+      request<any>(`/admin/ad-subscriptions/${id}/banner/moderate`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+
+    /** Flat onboarding-perk queue across all active subs. */
+    onboardingQueue: () =>
+      request<
+        Array<{
+          subscriptionId: string;
+          businessId: any;
+          tier: "STARTER" | "GROWTH" | "PRIME";
+          perk:
+            | "PROFILE_SETUP"
+            | "POLISHED_PHOTOS"
+            | "CREATIVE_SHOOT_SCHEDULE"
+            | "CREATIVE_SHOOT_COMPLETE"
+            | "BANNER_MODERATION";
+          detail: string;
+          daysWaiting: number;
+        }>
+      >("/admin/ad-subscriptions/queue/onboarding"),
+
+    /** Revenue + status aggregates. */
+    stats: () =>
+      request<{
+        totalActive: number;
+        weeklyRevenueNgn: number;
+        monthlyRevenueNgnEstimate: number;
+        byTier: Array<{
+          _id: "STARTER" | "GROWTH" | "PRIME";
+          count: number;
+          weeklyRevenueNgn: number;
+        }>;
+        byStatus: Array<{ _id: string; count: number }>;
+      }>("/admin/ad-subscriptions/stats/summary"),
+  },
+
+  // ─────────────────────────────────────────────────────────────────
   // Events — Phase 6 ticketing. Admin CRUD + publish/cancel.
   // The customer-facing read paths live under /public/events; this
   // section is the admin surface only.

@@ -94,6 +94,11 @@ const navGroups: NavGroup[] = [
       { label: "Bookings", href: "/ruby-app/admin/bookings", icon: CalendarCheck },
       { label: "Disputes", href: "/ruby-app/admin/disputes", icon: AlertTriangle },
       { label: "Campaigns", href: "/ruby-app/admin/campaigns", icon: Megaphone },
+      // P120 — Business Ad Subscriptions (Starter / Growth / Prime).
+      // Sits in Operations because daily admin work is operational:
+      // moderating banner uploads, marking onboarding perks done,
+      // upgrading/cancelling subs on merchant request.
+      { label: "Ad Subscriptions", href: "/ruby-app/admin/ad-subscriptions", icon: Sparkles },
       { label: "Promos", href: "/ruby-app/admin/promos", icon: Tag },
       { label: "Marketers", href: "/ruby-app/admin/marketers", icon: Users },
       { label: "Broadcasts", href: "/ruby-app/admin/broadcasts", icon: Radio },

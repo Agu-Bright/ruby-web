@@ -80,9 +80,14 @@ export default function ForPatrons() {
               ))}
             </div>
 
-            {/* CTA */}
+            {/* CTA — customer side stays on the marketing host (rubyplus.net).
+                Absolute URL is intentional so this works whether the page
+                is served from rubyplus.net or a business.* sub-domain rewrite. */}
             <ScrollReveal delay={4}>
-              <button className="btn-ruby mt-8 inline-flex items-center gap-2 px-8 py-3 bg-ruby-red text-white text-sm font-semibold rounded-lg uppercase tracking-wide">
+              <a
+                href="https://rubyplus.net"
+                className="btn-ruby mt-8 inline-flex items-center gap-2 px-8 py-3 bg-ruby-red text-white text-sm font-semibold rounded-lg uppercase tracking-wide"
+              >
                 Get Started
                 <svg
                   className="w-4 h-4"
@@ -97,7 +102,7 @@ export default function ForPatrons() {
                     d="M17 8l4 4m0 0l-4 4m4-4H3"
                   />
                 </svg>
-              </button>
+              </a>
             </ScrollReveal>
           </div>
 

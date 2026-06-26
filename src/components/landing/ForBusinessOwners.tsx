@@ -88,14 +88,21 @@ export default function ForBusinessOwners() {
               ))}
             </div>
 
-            {/* CTA */}
+            {/* CTA — business side opens the business sub-domain
+                (registration / merchant dashboard) in a new tab so we don't
+                steal the customer's marketing-site context. */}
             <ScrollReveal delay={4}>
-              <button className="btn-ruby mt-8 inline-flex items-center gap-2 px-8 py-3 bg-ruby-red text-white text-sm font-semibold rounded-lg uppercase tracking-wide">
+              <a
+                href="https://business.rubyplus.net"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-ruby mt-8 inline-flex items-center gap-2 px-8 py-3 bg-ruby-red text-white text-sm font-semibold rounded-lg uppercase tracking-wide"
+              >
                 Get Started
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
                 </svg>
-              </button>
+              </a>
             </ScrollReveal>
           </div>
         </div>

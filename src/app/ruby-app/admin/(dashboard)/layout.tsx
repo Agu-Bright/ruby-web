@@ -38,6 +38,8 @@ import {
   Receipt,
   Gift,
   MessageSquare,
+  MessageCircle,
+  Bell,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -78,6 +80,10 @@ const navGroups: NavGroup[] = [
       // BELOW the carousel); this controls the carousel ITSELF.
       { label: "Ruby+ Select", href: "/ruby-app/admin/ruby-select", icon: Sparkles, hiddenForRoles: ["location_admin"] },
       { label: "Legal", href: "/ruby-app/admin/legal", icon: Scale, hiddenForRoles: ["location_admin"] },
+      // Admin-managed email recipients for platform-wide ops alerts (ad
+      // payments today; payouts + business submissions reserved).
+      // Distinct from the per-domain Events Recipients screen.
+      { label: "System Alerts", href: "/ruby-app/admin/system-alerts", icon: Bell, hiddenForRoles: ["location_admin"] },
     ],
   },
   {
@@ -143,6 +149,10 @@ const navGroups: NavGroup[] = [
       // a one-off SMS through the live gateway to verify Termii config
       // after an env change, without needing to do a full signup flow.
       { label: "Messaging", href: "/ruby-app/admin/messaging", icon: MessageSquare, superOnly: true },
+      // P135 — Merchant support contact singleton. SUPER_ADMIN-only edit
+      // surface for the WhatsApp number + intro message the business app's
+      // "Talk to Ruby+" card uses.
+      { label: "Merchant Support", href: "/ruby-app/admin/merchant-support", icon: MessageCircle, superOnly: true },
     ],
   },
 ];

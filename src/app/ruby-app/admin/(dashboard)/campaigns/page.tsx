@@ -109,27 +109,21 @@ export default function CampaignsPage() {
     [JSON.stringify(filters)],
   );
   const { data: statsData } = useApi(() => api.adCampaigns.stats(), []);
-  const { data: adProductsData, refetch: refetchProducts } = useApi(
-    () => api.adProducts.list(),
-    [],
-  );
 
   const approveMutation = useMutation(api.adCampaigns.approve);
   const rejectMutation = useMutation(
     (id: string) => api.adCampaigns.reject(id, { rejectionReason }),
   );
   const deleteMutation = useMutation(api.adCampaigns.delete);
-  const updatePriceMutation = useMutation(
-    (input: { type: string; ratePerUnit: number }) =>
-      api.adProducts.updatePrice(input.type, input.ratePerUnit),
-  );
 
   const campaigns = campaignsData || [];
   const stats = statsData as AdCampaignStats | undefined;
   const pagination = campaignsMeta;
-  const adProducts = (adProductsData || []) as AdProduct[];
-  const [editingProduct, setEditingProduct] = useState<AdProduct | null>(null);
-  const [newPrice, setNewPrice] = useState('');
+
+  // P131 — adProducts/editingProduct/newPrice/updatePriceMutation state +
+  // edit-price modal removed alongside the "Ad Product Pricing" section.
+  // The legacy per-day/per-notification pricing model was replaced by
+  // P120 tier subscriptions (pricing now lives at /admin/subscriptions).
 
   // Upload Reel Modal state
   const [uploadReelOpen, setUploadReelOpen] = useState(false);
@@ -332,39 +326,19 @@ export default function CampaignsPage() {
         </div>
       )}
 
-      {/* Ad Product Pricing */}
-      {adProducts.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Ad Product Pricing</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {adProducts.map((p) => {
-              const Icon = AD_TYPE_ICONS[p.type] || Zap;
-              return (
-                <div key={p.type} className="bg-white rounded-xl border border-gray-200 p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-8 h-8 rounded-full bg-ruby-50 flex items-center justify-center">
-                      <Icon className="h-4 w-4 text-ruby-500" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">{p.name}</span>
-                  </div>
-                  <p className="text-lg font-bold text-gray-900">
-                    {formatCurrency(p.ratePerUnit)}
-                    <span className="text-xs font-normal text-gray-500 ml-1">
-                      /{p.rateUnit === 'DAY' ? 'day' : 'notification'}
-                    </span>
-                  </p>
-                  <button
-                    onClick={() => { setEditingProduct(p); setNewPrice(String(p.ratePerUnit)); }}
-                    className="mt-2 text-xs text-ruby-600 hover:text-ruby-700 font-medium"
-                  >
-                    Edit Price
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/*
+        P131 — "Ad Product Pricing" section removed.
+        These cards (Explore Reels Ad, Featured Listing, Featured Reviews,
+        Push Notification, Slideshow Ad) priced the deprecated per-day /
+        per-notification one-off ad model. P120 replaced the entire
+        purchase flow with weekly tier subscriptions (Starter / Growth /
+        Prime), whose pricing lives at /ruby-app/admin/subscriptions.
+        Showing both surfaces was confusing — admins were editing prices
+        that no longer drove any in-app purchase. The editing path
+        (editingProduct state + edit-price modal) is kept in place so
+        existing AdTypeConfig rows can still be patched via the API
+        client if needed, just not from this page.
+      */}
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -605,75 +579,14 @@ export default function CampaignsPage() {
         </Modal>
       )}
 
-      {/* Edit Ad Product Price Modal */}
-      {editingProduct && (
-        <Modal
-          isOpen={!!editingProduct}
-          onClose={() => setEditingProduct(null)}
-          title={`Update Price: ${editingProduct.name}`}
-          size="sm"
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Rate Per {editingProduct.rateUnit === 'DAY' ? 'Day' : 'Notification'} (NGN)
-              </label>
-              <input
-                type="number"
-                value={newPrice}
-                onChange={(e) => setNewPrice(e.target.value)}
-                min={0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20"
-              />
-              {/* P108 — clarify per-day semantics applies to both payment paths.
-                  P109 — branch on rateUnit for the NOTIFICATION case (PUSH_NOTIFICATION
-                  is flat-fee per broadcast, not per day). */}
-              <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">
-                {editingProduct.rateUnit === 'NOTIFICATION' ? (
-                  <>
-                    Per-notification rate. Wallet (Android, web) charges this once
-                    per broadcast in NGN. iOS bills via Apple at the matching USD
-                    price tier — one IAP transaction creates one Deolu-branded push.
-                  </>
-                ) : (
-                  <>
-                    Per-day rate. Wallet (Android, web) charges this directly in NGN.
-                    iOS bills via Apple at the matching USD price tier × the number
-                    of days the merchant picks at purchase.
-                  </>
-                )}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setEditingProduct(null)}
-                className="flex-1 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  const price = parseFloat(newPrice);
-                  if (isNaN(price) || price < 0) return;
-                  try {
-                    await updatePriceMutation.mutate({ type: editingProduct.type, ratePerUnit: price });
-                    toast.success('Price updated successfully');
-                    setEditingProduct(null);
-                    refetchProducts();
-                  } catch {
-                    toast.error('Failed to update price');
-                  }
-                }}
-                disabled={updatePriceMutation.isLoading}
-                className="flex-1 py-2 bg-ruby-600 text-white text-sm font-medium rounded-lg hover:bg-ruby-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-              >
-                {updatePriceMutation.isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* P131 — Edit Ad Product Price Modal removed alongside the
+          "Ad Product Pricing" section above. The legacy per-day /
+          per-notification pricing model was retired by the P120 weekly
+          tier subscriptions; current pricing lives at
+          /ruby-app/admin/subscriptions. The underlying
+          api.adProducts.updatePrice endpoint is left intact in the API
+          client for any out-of-band script that still needs to patch
+          legacy AdTypeConfig rows. */}
 
       {/* Upload Reel Modal */}
       <Modal

@@ -1589,25 +1589,89 @@ export const api = {
     broadcastPreview: (params: {
       targetAudience: import("@/lib/types").BroadcastTargetAudience;
       locationIds?: string[];
+      platforms?: import("@/lib/types").BroadcastPlatform[];
     }) => {
       const searchParams = new URLSearchParams();
       searchParams.set("targetAudience", params.targetAudience);
       (params.locationIds || []).forEach((id) =>
         searchParams.append("locationIds", id),
       );
+      (params.platforms || []).forEach((p) =>
+        searchParams.append("platforms", p),
+      );
       return request<import("@/lib/types").BroadcastPreviewResponse>(
         `/admin/notifications/broadcast/preview?${searchParams.toString()}`,
       );
     },
-    broadcastHistory: (params?: { page?: number; limit?: number }) => {
+    broadcastHistory: (params?: {
+      page?: number;
+      limit?: number;
+      status?: import("@/lib/types").BroadcastStatus;
+      includeTest?: boolean;
+    }) => {
       const searchParams = new URLSearchParams();
       if (params?.page) searchParams.set("page", String(params.page));
       if (params?.limit) searchParams.set("limit", String(params.limit));
+      if (params?.status) searchParams.set("status", params.status);
+      if (params?.includeTest) searchParams.set("includeTest", "true");
       const qs = searchParams.toString();
       return request<import("@/lib/types").BroadcastHistoryResponse>(
         `/admin/notifications/broadcast/history${qs ? `?${qs}` : ""}`,
       );
     },
+    /**
+     * Full detail for one broadcast — used by the history detail modal.
+     * Returns the same shape as a history list row plus full `data`,
+     * `errorMessage`, and deep-link metadata.
+     */
+    broadcastDetail: (id: string) =>
+      request<import("@/lib/types").BroadcastNotification>(
+        `/admin/notifications/broadcast/${id}`,
+      ),
+    /**
+     * Single-recipient dry-run. Useful for previewing how a deep-link or
+     * attachment renders before mass-blasting. Recorded as a TEST-status
+     * broadcast in history.
+     */
+    broadcastTest: (data: import("@/lib/types").TestBroadcastRequest) =>
+      request<import("@/lib/types").BroadcastNotification>(
+        "/admin/notifications/broadcast/test",
+        { method: "POST", body: data },
+      ),
+    /**
+     * Cancel a SCHEDULED broadcast before its scheduledAt arrives.
+     * 400 if the broadcast already fired. Idempotent on CANCELLED.
+     */
+    broadcastCancel: (id: string) =>
+      request<import("@/lib/types").BroadcastNotification>(
+        `/admin/notifications/broadcast/${id}/cancel`,
+        { method: "POST" },
+      ),
+    /**
+     * Clone an existing broadcast and send it as a fresh row. Pass
+     * `scheduledAt` to schedule the resend instead of firing immediately.
+     */
+    broadcastResend: (id: string, body: { scheduledAt?: string } = {}) =>
+      request<import("@/lib/types").BroadcastNotification>(
+        `/admin/notifications/broadcast/${id}/resend`,
+        { method: "POST", body },
+      ),
+  },
+
+  // P135 — admin-editable singleton powering the business app's
+  // "Talk to Ruby+" support card. SUPER_ADMIN only on the backend.
+  merchantSupport: {
+    get: () =>
+      request<import("@/lib/types").MerchantSupportConfig>(
+        "/admin/merchant-support",
+      ),
+    update: (
+      data: import("@/lib/types").UpdateMerchantSupportConfigPayload,
+    ) =>
+      request<import("@/lib/types").MerchantSupportConfig>(
+        "/admin/merchant-support",
+        { method: "PUT", body: data },
+      ),
   },
 
   legalDocuments: {
@@ -2220,6 +2284,38 @@ export const api = {
         body: { qrCode },
       }),
   },
+  // Admin-managed platform alert recipients (ad payments, etc.). Direct
+  // clone of eventRecipients shape — same CRUD + test endpoint. Backend
+  // path: /admin/system-alerts/recipients.
+  systemAlerts: {
+    list: () =>
+      request<import("@/lib/types").SystemAlertRecipient[]>(
+        "/admin/system-alerts/recipients",
+      ),
+    create: (data: import("@/lib/types").CreateSystemAlertRecipientRequest) =>
+      request<import("@/lib/types").SystemAlertRecipient>(
+        "/admin/system-alerts/recipients",
+        { method: "POST", body: data },
+      ),
+    update: (
+      id: string,
+      data: import("@/lib/types").UpdateSystemAlertRecipientRequest,
+    ) =>
+      request<import("@/lib/types").SystemAlertRecipient>(
+        `/admin/system-alerts/recipients/${id}`,
+        { method: "PATCH", body: data },
+      ),
+    remove: (id: string) =>
+      request<void>(`/admin/system-alerts/recipients/${id}`, {
+        method: "DELETE",
+      }),
+    sendTest: () =>
+      request<{ sentTo: string; message: string }>(
+        "/admin/system-alerts/recipients/test",
+        { method: "POST" },
+      ),
+  },
+
   // Phase 40 — event notification recipients (clone of dispute pattern).
   eventRecipients: {
     list: () =>

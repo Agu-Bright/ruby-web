@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ScrollReveal from './ScrollReveal';
 import {
   useSelectedLocation,
@@ -147,7 +148,45 @@ export default function FeaturedServices() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [services, setServices] = useState<ServiceCard[]>(FALLBACK);
   const [, setLoading] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
   const { selectedLocation } = useSelectedLocation();
+
+  // Track scroll position to enable/disable arrow buttons. Runs on scroll
+  // events + when services array changes (e.g. after fetch). useCallback
+  // so the listener handler reference is stable.
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateScrollState, { passive: true });
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      el.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
+  }, [updateScrollState, services.length]);
+
+  const scrollBy = (direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Scroll by roughly one card width plus gap. Empirical card widths
+    // are 280/320/340 across breakpoints — use 80% of viewport so the
+    // user lands on the next set cleanly without overshooting.
+    const amount = el.clientWidth * 0.8;
+    el.scrollBy({
+      left: direction === 'left' ? -amount : amount,
+      behavior: 'smooth',
+    });
+  };
 
   // Refetch whenever the user picks a different city in RedStrip.
   // Best-effort — on any failure we keep the previous data so the
@@ -200,10 +239,38 @@ export default function FeaturedServices() {
         </ScrollReveal>
 
         {/* Horizontal Scrolling Cards */}
-        <div className="mt-8 sm:mt-10 relative">
+        <div className="mt-8 sm:mt-10 relative group">
+          {/* Left scroll arrow — desktop only, hidden when at start */}
+          <button
+            type="button"
+            aria-label="Scroll featured services left"
+            onClick={() => scrollBy('left')}
+            disabled={!canScrollLeft}
+            className={`hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-20 w-11 h-11 rounded-full bg-white shadow-lg items-center justify-center text-ruby-black hover:bg-ruby-red hover:text-white transition-all ${
+              canScrollLeft
+                ? 'opacity-0 group-hover:opacity-100 pointer-events-auto'
+                : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          {/* Right scroll arrow — desktop only, hidden when at end */}
+          <button
+            type="button"
+            aria-label="Scroll featured services right"
+            onClick={() => scrollBy('right')}
+            disabled={!canScrollRight}
+            className={`hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-20 w-11 h-11 rounded-full bg-white shadow-lg items-center justify-center text-ruby-black hover:bg-ruby-red hover:text-white transition-all ${
+              canScrollRight
+                ? 'opacity-0 group-hover:opacity-100 pointer-events-auto'
+                : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
           <div
             ref={scrollRef}
-            className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide"
+            className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide scroll-smooth"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {services.map((svc) => (

@@ -1865,10 +1865,58 @@ export interface AdminNotificationListResponse {
 }
 
 // ============================================================
-// Broadcast Notifications
+// Broadcast Notifications  (P129 — extended)
 // ============================================================
-export type BroadcastTargetAudience = 'ALL' | 'USERS' | 'BUSINESS_OWNERS';
-export type BroadcastStatus = 'PENDING' | 'SENDING' | 'COMPLETED' | 'FAILED';
+/**
+ * Audience for an admin broadcast.
+ *
+ * Preferred (new in P129): CUSTOMER_APP / BUSINESS_APP — explicit about
+ * which mobile app's device tokens receive the push. The admin UI
+ * surfaces these as "Customer App" / "Business App".
+ *
+ * Legacy aliases (kept for back-compat with existing history rows + any
+ * scripts that hardcoded them): USERS ≡ CUSTOMER_APP,
+ * BUSINESS_OWNERS ≡ BUSINESS_APP.
+ *
+ * Cross-cutting: ALL — both customer + business devices.
+ */
+export type BroadcastTargetAudience =
+  | 'ALL'
+  | 'USERS'
+  | 'BUSINESS_OWNERS'
+  | 'CUSTOMER_APP'
+  | 'BUSINESS_APP';
+
+export type BroadcastStatus =
+  | 'PENDING'
+  | 'SENDING'
+  | 'COMPLETED'
+  | 'FAILED'
+  /** Created with a future `scheduledAt`. Scheduler cron fires it when due. */
+  | 'SCHEDULED'
+  /** Admin cancelled a SCHEDULED broadcast before it fired. */
+  | 'CANCELLED'
+  /** Single-recipient dry-run send. Excluded from default history view. */
+  | 'TEST';
+
+export type BroadcastPlatform = 'ios' | 'android' | 'web';
+
+/**
+ * Tap-to-deep-link target on a broadcast. `kind` is loosely-typed (string)
+ * so we can ship new deep-link kinds from the admin UI without a backend
+ * release — mobile silently ignores unknown kinds.
+ *
+ * Common kinds (mobile route handlers):
+ *   BUSINESS, EVENT, CATEGORY, CHAT, ORDER, BOOKING, REWARDS, WALLET,
+ *   PROMO, SCREEN, EXTERNAL_URL, NONE.
+ */
+export interface BroadcastDeepLink {
+  kind: string;
+  targetId?: string;
+  url?: string;
+  screen?: string;
+  params?: Record<string, unknown>;
+}
 
 /**
  * One photo OR one video attached to a broadcast. Stored on the
@@ -1891,11 +1939,19 @@ export interface BroadcastNotification {
   body: string;
   targetAudience: BroadcastTargetAudience;
   locationIds: string[];
+  platforms?: BroadcastPlatform[];
   sentBy: string | { _id: string; firstName?: string; lastName?: string };
   totalRecipients: number;
   totalPushSent: number;
   totalFailed: number;
+  totalOpened?: number;
   status: BroadcastStatus;
+  scheduledAt?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  testRecipientId?: string;
+  errorMessage?: string;
+  deepLink?: BroadcastDeepLink;
   data?: Record<string, unknown>;
   attachment?: BroadcastAttachment;
   completedAt?: string;
@@ -1908,10 +1964,30 @@ export interface BroadcastNotificationRequest {
   body: string;
   targetAudience: BroadcastTargetAudience;
   locationIds?: string[];
+  /** Platform filter — empty or omitted = all platforms. */
+  platforms?: BroadcastPlatform[];
+  /** ISO date string. When set + in the future, broadcast is SCHEDULED. */
+  scheduledAt?: string;
+  /** Tap-to-deep-link target. Echoed verbatim into push `data.deepLink`. */
+  deepLink?: BroadcastDeepLink;
   data?: Record<string, unknown>;
   // Optional — single photo OR single video. Build the object after
   // uploading the file to `/admin/media/upload` so this carries a URL.
   attachment?: BroadcastAttachment;
+}
+
+/**
+ * Body for `POST /admin/notifications/broadcast/test` — one-recipient
+ * dry-run. Use to preview how a deep-link / attachment will render
+ * before mass-blasting.
+ */
+export interface TestBroadcastRequest {
+  title: string;
+  body: string;
+  testRecipientId: string;
+  deepLink?: BroadcastDeepLink;
+  attachment?: BroadcastAttachment;
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -1926,6 +2002,9 @@ export interface BroadcastPreviewResponse {
   audienceBreakdown: {
     users: number;
     businessOwners: number;
+    ios: number;
+    android: number;
+    web: number;
   };
 }
 
@@ -1937,6 +2016,38 @@ export interface BroadcastHistoryResponse {
     total: number;
     totalPages: number;
   };
+}
+
+// ============================================================
+// Merchant Support Contact  (P135 — admin-editable singleton)
+// ============================================================
+/**
+ * Singleton config powering the business mobile app's "Talk to Ruby+"
+ * card. Edited at /ruby-app/admin/merchant-support by super_admin.
+ * Read by the business app via the unauthed `/public/merchant-support`
+ * endpoint.
+ */
+export interface MerchantSupportConfig {
+  _id: string;
+  /** E.164 digits-only, no leading `+`. wa.me expects exactly this shape. */
+  whatsappPhone: string;
+  /** Pre-fill message the WhatsApp composer opens with. Cap 280 chars. */
+  whatsappIntroMessage: string;
+  /** Voice-call fallback with leading `+`. Empty / missing → no voice CTA. */
+  voicePhone?: string;
+  /** When false, the business app hides the card entirely (ops blackout). */
+  isActive: boolean;
+  /** Last admin who saved. Shown in the form footer for accountability. */
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateMerchantSupportConfigPayload {
+  whatsappPhone?: string;
+  whatsappIntroMessage?: string;
+  voicePhone?: string;
+  isActive?: boolean;
 }
 
 // ============================================================
@@ -2452,6 +2563,36 @@ export interface UpdateEventRecipientRequest {
   label?: string;
   isActive?: boolean;
   events?: Partial<EventNotificationRecipient["events"]>;
+}
+
+// System-alert recipient — admin-managed list for platform-wide ops alerts
+// (ad payments, future payout-requested + business-submission). Direct
+// clone of EventNotificationRecipient pattern, distinct backend collection
+// (system_alert_recipients). Env-var fallback: SYSTEM_ALERT_INBOX_EMAIL.
+export interface SystemAlertRecipient {
+  _id: string;
+  email: string;
+  label?: string;
+  isActive: boolean;
+  alerts: {
+    adPayment: boolean;
+    payoutRequested: boolean;
+    businessSubmission: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSystemAlertRecipientRequest {
+  email: string;
+  label?: string;
+  alerts?: Partial<SystemAlertRecipient["alerts"]>;
+}
+
+export interface UpdateSystemAlertRecipientRequest {
+  label?: string;
+  isActive?: boolean;
+  alerts?: Partial<SystemAlertRecipient["alerts"]>;
 }
 
 // Phase 40 P7 — analytics shapes

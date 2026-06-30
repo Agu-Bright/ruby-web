@@ -34,14 +34,29 @@ import {
   XCircle,
   Loader2,
   AlertCircle,
+  Clock,
+  Send,
+  Inbox,
+  Play,
 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type AdTier = "STARTER" | "GROWTH" | "PRIME";
-type AdStatus = "ACTIVE" | "IN_GRACE_PERIOD" | "PAUSED" | "CANCELLED" | "EXPIRED";
-type Tab = "subscriptions" | "onboarding" | "stats";
+type AdStatus =
+  | "PENDING_ONBOARDING_REVIEW"
+  | "ACTIVE"
+  | "IN_GRACE_PERIOD"
+  | "PAUSED"
+  | "CANCELLED"
+  | "EXPIRED";
+type Tab =
+  | "subscriptions"
+  | "pendingReview"
+  | "pushBlastRequests"
+  | "onboarding"
+  | "stats";
 
 const TIER_COLORS: Record<AdTier, string> = {
   STARTER: "bg-amber-100 text-amber-800 border-amber-300",
@@ -50,6 +65,10 @@ const TIER_COLORS: Record<AdTier, string> = {
 };
 
 const STATUS_COLORS: Record<AdStatus, string> = {
+  // P139 — paid but awaiting admin onboarding fulfilment. Distinct
+  // colour from ACTIVE so the queue is unmissable.
+  PENDING_ONBOARDING_REVIEW:
+    "bg-indigo-100 text-indigo-800 border border-indigo-300",
   ACTIVE: "bg-green-100 text-green-800",
   IN_GRACE_PERIOD: "bg-amber-100 text-amber-800",
   // P124 — paused is reversible (the merchant can resume); colour it
@@ -84,6 +103,8 @@ export default function AdSubscriptionsPage() {
           {(
             [
               { key: "subscriptions", label: "Subscriptions" },
+              { key: "pendingReview", label: "Pending review" },
+              { key: "pushBlastRequests", label: "Push blast inbox" },
               { key: "onboarding", label: "Onboarding queue" },
               { key: "stats", label: "Stats" },
             ] as { key: Tab; label: string }[]
@@ -104,6 +125,8 @@ export default function AdSubscriptionsPage() {
       </div>
 
       {tab === "subscriptions" && <SubscriptionsTab />}
+      {tab === "pendingReview" && <PendingReviewTab />}
+      {tab === "pushBlastRequests" && <PushBlastRequestsTab />}
       {tab === "onboarding" && <OnboardingTab />}
       {tab === "stats" && <StatsTab />}
     </div>
@@ -243,6 +266,7 @@ function SubscriptionsTab() {
           className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white"
         >
           <option value="">All statuses</option>
+          <option value="PENDING_ONBOARDING_REVIEW">Pending review</option>
           <option value="ACTIVE">Active</option>
           <option value="IN_GRACE_PERIOD">In grace</option>
           <option value="PAUSED">Paused</option>
@@ -732,6 +756,613 @@ function StatCard({ label, value }: { label: string; value: string }) {
         {label}
       </div>
       <div className="text-2xl font-bold text-gray-900">{value}</div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// P139 — Pending review tab
+// Lists subscriptions awaiting admin onboarding (paid but not yet
+// activated). Each row shows the merchant, tier, paid time, deadline
+// countdown, and an "Activate now" button that flips the sub to ACTIVE
+// + starts the 7-day billing week from that moment.
+// ──────────────────────────────────────────────────────────────
+
+function PendingReviewTab() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activating, setActivating] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  // Re-render every 60s so deadline countdowns stay live.
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res: any = await api.adSubscriptions.list({
+        status: "PENDING_ONBOARDING_REVIEW",
+        limit: 100,
+      });
+      // Newest paid first (most urgent at top).
+      const data = (res.data?.items || res.data || []).slice().sort((a: any, b: any) => {
+        const ta = new Date(a.paidAt || a.createdAt).getTime();
+        const tb = new Date(b.paidAt || b.createdAt).getTime();
+        return ta - tb; // oldest first — those approaching deadline
+      });
+      setRows(data);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load pending subscriptions.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleActivate = async (id: string, businessName: string) => {
+    if (
+      !confirm(
+        `Activate ${businessName}'s subscription now? The 7-day billing week starts from this moment. Make sure you've completed profile setup, polished photos, and the first push blast.`,
+      )
+    )
+      return;
+    setActivating(id);
+    try {
+      await api.adSubscriptions.activate(id);
+      toast.success("Subscription activated.");
+      await load();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || "Activation failed.";
+      toast.error(msg);
+    } finally {
+      setActivating(null);
+    }
+  };
+
+  const formatCountdown = (deadlineIso?: string) => {
+    if (!deadlineIso) return { text: "—", overdue: false };
+    const ms = new Date(deadlineIso).getTime() - Date.now();
+    if (ms <= 0) return { text: "Past deadline — auto-activate next cron", overdue: true };
+    const hours = Math.floor(ms / 3_600_000);
+    const minutes = Math.floor((ms % 3_600_000) / 60_000);
+    if (hours >= 1) return { text: `${hours}h ${minutes}m remaining`, overdue: false };
+    return { text: `${Math.max(minutes, 1)}m remaining`, overdue: false };
+  };
+
+  // tick is consumed via formatCountdown re-running on render
+  void tick;
+
+  return (
+    <div className="space-y-4">
+      {/* Header strip */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-indigo-100 rounded-lg">
+            <Clock className="w-5 h-5 text-indigo-700" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">
+              Pending onboarding review
+            </h2>
+            <p className="text-xs text-gray-600 max-w-2xl">
+              Merchants who&apos;ve paid but are awaiting Ruby+ onboarding
+              (profile setup, polished photos, first push blast). Every sub
+              auto-activates 48 h after payment unless you finish setup and
+              activate manually first.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={load}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-16 text-center text-sm text-gray-500">
+          <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="py-16 text-center text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
+          <CheckCircle className="w-10 h-10 mx-auto mb-3 text-green-300" />
+          <div className="font-semibold text-gray-700">All caught up</div>
+          <div className="text-xs text-gray-500 mt-1">
+            No subscriptions waiting for onboarding right now.
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((sub) => {
+            const biz = sub.businessId || {};
+            const tier = sub.tier as AdTier;
+            const countdown = formatCountdown(sub.reviewDeadlineAt);
+            const perks = sub.onboardingPerks || {};
+            return (
+              <div
+                key={sub._id}
+                className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center gap-4"
+              >
+                {/* Merchant */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {biz.logoUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={biz.logoUrl}
+                      alt=""
+                      className="w-10 h-10 rounded-lg object-cover bg-gray-100 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex-shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-900 truncate">
+                        {biz.name || "Unknown business"}
+                      </span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full border ${TIER_COLORS[tier]}`}
+                      >
+                        {tier}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Paid {formatDate(sub.paidAt || sub.createdAt)} ·{" "}
+                      {formatCurrency(sub.weeklyAmountNgn || 0, "NGN")}/wk
+                    </div>
+                  </div>
+                </div>
+
+                {/* Perk checklist */}
+                <div className="flex items-center gap-3 text-xs flex-shrink-0">
+                  <PerkPill
+                    label="Profile"
+                    done={!!perks.profileSetupDoneAt}
+                  />
+                  <PerkPill
+                    label={`Photos ${perks.polishedPhotosUploadedCount || 0}/6`}
+                    done={(perks.polishedPhotosUploadedCount || 0) >= 6}
+                  />
+                  <PerkPill
+                    label="Push blast"
+                    done={(perks.pushBlastFulfilledCount || 0) >= 1}
+                  />
+                </div>
+
+                {/* Deadline + Activate */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <div
+                    className={`text-xs ${countdown.overdue ? "text-amber-700" : "text-gray-600"} text-right`}
+                  >
+                    <div className="font-medium">{countdown.text}</div>
+                    <div className="text-[10px] text-gray-400">
+                      Auto by {formatDate(sub.reviewDeadlineAt)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleActivate(sub._id, biz.name || "this business")}
+                    disabled={activating === sub._id}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 rounded-lg"
+                  >
+                    {activating === sub._id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Play className="w-3.5 h-3.5" />
+                    )}
+                    Activate now
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PerkPill({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div
+      className={`flex items-center gap-1 px-2 py-1 rounded-full ${done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
+    >
+      {done ? (
+        <CheckCircle className="w-3 h-3" />
+      ) : (
+        <Clock className="w-3 h-3" />
+      )}
+      <span>{label}</span>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// P139 — Push blast request inbox tab
+// Merchants no longer fire push blasts directly; they submit requests
+// here and Ruby+ admins fulfil them. PENDING rows show Fulfil + Reject
+// actions; SENT / REJECTED / STALE rows are historical reference.
+// ──────────────────────────────────────────────────────────────
+
+function PushBlastRequestsTab() {
+  const [statusFilter, setStatusFilter] = useState<
+    "PENDING" | "SENT" | "REJECTED" | "STALE" | "ALL"
+  >("PENDING");
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<string | null>(null);
+  const [fulfilTarget, setFulfilTarget] = useState<any>(null); // composer modal
+  const [rejectTarget, setRejectTarget] = useState<any>(null); // reject modal
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res: any = await api.adSubscriptions.listPushBlastRequests(
+        statusFilter === "ALL" ? undefined : statusFilter,
+      );
+      setRows(res.data || []);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load push blast requests.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  const handleFulfil = async (finalMessage: string) => {
+    if (!fulfilTarget) return;
+    setActing(fulfilTarget._id);
+    try {
+      const res: any = await api.adSubscriptions.fulfilPushBlastRequest(
+        fulfilTarget._id,
+        { finalMessage: finalMessage.trim() || undefined },
+      );
+      const recipients = res.data?.recipients ?? 0;
+      toast.success(`Blast sent to ${recipients.toLocaleString()} customer(s).`);
+      setFulfilTarget(null);
+      await load();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || "Fulfilment failed.";
+      toast.error(msg);
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handleReject = async (reason: string) => {
+    if (!rejectTarget) return;
+    if (!reason.trim()) {
+      toast.error("Reason is required.");
+      return;
+    }
+    setActing(rejectTarget._id);
+    try {
+      await api.adSubscriptions.rejectPushBlastRequest(rejectTarget._id, reason.trim());
+      toast.success("Request rejected. Merchant will see your reason.");
+      setRejectTarget(null);
+      await load();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || "Reject failed.";
+      toast.error(msg);
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const statusColor: Record<string, string> = {
+    PENDING: "bg-amber-100 text-amber-800",
+    SENT: "bg-green-100 text-green-800",
+    REJECTED: "bg-red-100 text-red-700",
+    STALE: "bg-gray-100 text-gray-600",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-amber-100 rounded-lg">
+            <Inbox className="w-5 h-5 text-amber-700" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">
+              Push blast inbox
+            </h2>
+            <p className="text-xs text-gray-600 max-w-2xl">
+              Merchant-submitted push blast requests. Fulfil within 48 h or
+              reject with a reason. Fulfilling consumes 1 push quota slot
+              from the merchant&apos;s tier allowance.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white"
+          >
+            <option value="PENDING">Pending</option>
+            <option value="SENT">Sent</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="STALE">Stale</option>
+            <option value="ALL">All</option>
+          </select>
+          <button
+            onClick={load}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="py-16 text-center text-sm text-gray-500">
+          <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="py-16 text-center text-sm text-gray-500 bg-white border border-gray-200 rounded-lg">
+          <Inbox className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+          <div className="font-semibold text-gray-700">No requests</div>
+          <div className="text-xs text-gray-500 mt-1">
+            {statusFilter === "PENDING"
+              ? "No pending requests right now."
+              : `No ${statusFilter.toLowerCase()} requests.`}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((req) => {
+            const biz = req.businessId || {};
+            return (
+              <div
+                key={req._id}
+                className="bg-white border border-gray-200 rounded-lg p-4"
+              >
+                <div className="flex items-start gap-3 flex-wrap">
+                  {/* Merchant + status */}
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {biz.logoUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={biz.logoUrl}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover bg-gray-100 flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-900 truncate">
+                          {biz.name || "Unknown business"}
+                        </span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full ${statusColor[req.status] || statusColor.STALE}`}
+                        >
+                          {req.status}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {formatDate(req.createdAt)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        Radius: {req.radiusKm} km
+                        {req.recipientCount != null
+                          ? ` · Delivered to ${req.recipientCount.toLocaleString()}`
+                          : ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  {req.status === "PENDING" && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => setFulfilTarget(req)}
+                        disabled={acting === req._id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 disabled:bg-green-300 rounded-lg"
+                      >
+                        <Send className="w-3 h-3" /> Fulfil
+                      </button>
+                      <button
+                        onClick={() => setRejectTarget(req)}
+                        disabled={acting === req._id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg"
+                      >
+                        <XCircle className="w-3 h-3" /> Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Message body */}
+                <div className="mt-3 text-sm text-gray-700 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap">
+                  {req.message}
+                </div>
+
+                {req.finalMessage && req.finalMessage !== req.message && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    <span className="font-semibold">Sent as:</span>{" "}
+                    {req.finalMessage}
+                  </div>
+                )}
+                {req.rejectionReason && (
+                  <div className="mt-2 text-xs text-red-700">
+                    <span className="font-semibold">Reason:</span>{" "}
+                    {req.rejectionReason}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Fulfil composer */}
+      {fulfilTarget && (
+        <FulfilComposer
+          request={fulfilTarget}
+          onClose={() => setFulfilTarget(null)}
+          onSubmit={handleFulfil}
+          submitting={acting === fulfilTarget._id}
+        />
+      )}
+
+      {/* Reject modal */}
+      {rejectTarget && (
+        <RejectModal
+          request={rejectTarget}
+          onClose={() => setRejectTarget(null)}
+          onSubmit={handleReject}
+          submitting={acting === rejectTarget._id}
+        />
+      )}
+    </div>
+  );
+}
+
+function FulfilComposer({
+  request,
+  onClose,
+  onSubmit,
+  submitting,
+}: {
+  request: any;
+  onClose: () => void;
+  onSubmit: (finalMessage: string) => void;
+  submitting: boolean;
+}) {
+  const [text, setText] = useState<string>(request.message || "");
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl max-w-lg w-full shadow-xl">
+        <div className="px-5 py-4 border-b border-gray-200">
+          <h3 className="text-base font-semibold text-gray-900">
+            Fulfil push blast
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">
+            Review and tweak the merchant&apos;s message, then send. This
+            consumes 1 of their monthly push quota slots and goes to every
+            customer within {request.radiusKm} km.
+          </p>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <label className="block text-xs font-semibold text-gray-700">
+            Message (max 180 chars)
+          </label>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value.slice(0, 180))}
+            rows={4}
+            className="w-full border border-gray-300 rounded-lg p-3 text-sm"
+            placeholder="Push notification body…"
+          />
+          <div className="text-right text-[11px] text-gray-400">
+            {text.length} / 180
+          </div>
+        </div>
+        <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSubmit(text)}
+            disabled={submitting || text.trim().length === 0}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 disabled:bg-green-300 rounded-lg"
+          >
+            {submitting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Send className="w-3.5 h-3.5" />
+            )}
+            Send blast
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RejectModal({
+  request,
+  onClose,
+  onSubmit,
+  submitting,
+}: {
+  request: any;
+  onClose: () => void;
+  onSubmit: (reason: string) => void;
+  submitting: boolean;
+}) {
+  const [reason, setReason] = useState<string>("");
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl max-w-md w-full shadow-xl">
+        <div className="px-5 py-4 border-b border-gray-200">
+          <h3 className="text-base font-semibold text-gray-900">
+            Reject push blast
+          </h3>
+          <p className="text-xs text-gray-500 mt-1">
+            The merchant will see this reason in their request list. No
+            quota is consumed.
+          </p>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <label className="block text-xs font-semibold text-gray-700">
+            Reason (required, shown to merchant)
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value.slice(0, 300))}
+            rows={3}
+            className="w-full border border-gray-300 rounded-lg p-3 text-sm"
+            placeholder="e.g. Message contains promo claims we can't verify. Please revise + resubmit."
+          />
+          <div className="text-right text-[11px] text-gray-400">
+            {reason.length} / 300
+          </div>
+          <div className="text-xs text-gray-500">
+            Request: <span className="font-mono">{request._id}</span>
+          </div>
+        </div>
+        <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSubmit(reason)}
+            disabled={submitting || reason.trim().length === 0}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:bg-red-300 rounded-lg"
+          >
+            {submitting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <XCircle className="w-3.5 h-3.5" />
+            )}
+            Reject
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

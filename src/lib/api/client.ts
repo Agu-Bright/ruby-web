@@ -1976,6 +1976,7 @@ export const api = {
       limit?: number;
       tier?: "STARTER" | "GROWTH" | "PRIME";
       status?:
+        | "PENDING_ONBOARDING_REVIEW"
         | "ACTIVE"
         | "IN_GRACE_PERIOD"
         | "PAUSED"
@@ -2133,6 +2134,71 @@ export const api = {
         }>;
         byStatus: Array<{ _id: string; count: number }>;
       }>("/admin/ad-subscriptions/stats/summary"),
+
+    // ─── P139 — onboarding review flow + admin-fulfilled push blasts ───
+
+    /**
+     * Manually activate a PENDING_ONBOARDING_REVIEW subscription early
+     * (before the 48h auto-deadline). Starts the 7-day billing week from
+     * NOW (not from paidAt). Idempotent if the sub is already ACTIVE.
+     */
+    activate: (id: string) =>
+      request<any>(`/admin/ad-subscriptions/${id}/activate`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+
+    /**
+     * Admin queue of merchant-submitted push blast requests. Status
+     * filter (default PENDING). Sorted newest-first.
+     */
+    listPushBlastRequests: (status?:
+      | "PENDING"
+      | "SENT"
+      | "REJECTED"
+      | "STALE") =>
+      request<
+        Array<{
+          _id: string;
+          businessId: any;
+          subscriptionId: string;
+          message: string;
+          radiusKm: number;
+          status: "PENDING" | "SENT" | "REJECTED" | "STALE";
+          createdAt: string;
+          fulfilledAt?: string;
+          fulfilledByAdminId?: string;
+          recipientCount?: number;
+          finalMessage?: string;
+          rejectedAt?: string;
+          rejectionReason?: string;
+        }>
+      >(
+        `/admin/ad-subscriptions/push-blast-requests${
+          status ? `?status=${status}` : ""
+        }`,
+      ),
+
+    /**
+     * Admin fires the push blast on behalf of the merchant. Consumes
+     * one of the merchant's monthly quota slots. `finalMessage` is
+     * optional — admin may tweak the merchant's draft before sending.
+     */
+    fulfilPushBlastRequest: (requestId: string, body: { finalMessage?: string }) =>
+      request<any>(
+        `/admin/ad-subscriptions/push-blast-requests/${requestId}/fulfil`,
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+
+    /**
+     * Admin rejects a push blast request with a reason that surfaces
+     * back to the merchant.
+     */
+    rejectPushBlastRequest: (requestId: string, reason: string) =>
+      request<any>(
+        `/admin/ad-subscriptions/push-blast-requests/${requestId}/reject`,
+        { method: "POST", body: JSON.stringify({ reason }) },
+      ),
   },
 
   // ─────────────────────────────────────────────────────────────────

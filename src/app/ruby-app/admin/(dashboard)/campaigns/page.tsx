@@ -131,6 +131,12 @@ export default function CampaignsPage() {
   const [reelVideoPreview, setReelVideoPreview] = useState<string | null>(null);
   const [reelCaption, setReelCaption] = useState('');
   const [reelHashtags, setReelHashtags] = useState('');
+  // P143 — external link field for admin-uploaded reels. Backend stores
+  // this on AdCampaign.externalUrl; viewer renders a tappable "Open ·
+  // <host>" chip on the reel overlay. Whitelist enforced server-side
+  // (http/https only); we add a light client-side check too so admins
+  // see a friendlier error than the API validation throw.
+  const [reelExternalUrl, setReelExternalUrl] = useState('');
   const [reelUploading, setReelUploading] = useState(false);
   const [reelBusinessId, setReelBusinessId] = useState<string>('');
   const [reelBusinessName, setReelBusinessName] = useState('');
@@ -173,6 +179,23 @@ export default function CampaignsPage() {
 
   const handleUploadReel = async () => {
     if (!reelVideoFile) { toast.error('Please select a video'); return; }
+    // P143 — light client validation for the external URL. Backend
+    // already enforces http/https via class-validator, but rejecting
+    // bad input here surfaces a clear toast instead of a 400 round-
+    // trip after the (slow) video upload finishes.
+    const trimmedUrl = reelExternalUrl.trim();
+    if (trimmedUrl) {
+      try {
+        const parsed = new URL(trimmedUrl);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          toast.error('External link must start with http:// or https://');
+          return;
+        }
+      } catch {
+        toast.error('External link is not a valid URL');
+        return;
+      }
+    }
     setReelUploading(true);
     try {
       // Upload video
@@ -187,6 +210,7 @@ export default function CampaignsPage() {
           media: [{ url: videoUrl, type: 'VIDEO' }],
           caption: reelCaption.trim() || undefined,
           hashtags: hashtagsArr.length > 0 ? hashtagsArr : undefined,
+          externalUrl: trimmedUrl || undefined,
         },
         reelBusinessId || undefined,
       );
@@ -197,6 +221,7 @@ export default function CampaignsPage() {
       setReelVideoPreview(null);
       setReelCaption('');
       setReelHashtags('');
+      setReelExternalUrl('');
       setReelBusinessId('');
       setReelBusinessName('');
       setBusinessSearchQuery('');
@@ -591,7 +616,7 @@ export default function CampaignsPage() {
       {/* Upload Reel Modal */}
       <Modal
         isOpen={uploadReelOpen}
-        onClose={() => { if (!reelUploading) { setUploadReelOpen(false); setReelVideoFile(null); setReelVideoPreview(null); setReelCaption(''); setReelHashtags(''); setReelBusinessId(''); setReelBusinessName(''); setBusinessSearchQuery(''); setBusinessSearchResults([]); } }}
+        onClose={() => { if (!reelUploading) { setUploadReelOpen(false); setReelVideoFile(null); setReelVideoPreview(null); setReelCaption(''); setReelHashtags(''); setReelExternalUrl(''); setReelBusinessId(''); setReelBusinessName(''); setBusinessSearchQuery(''); setBusinessSearchResults([]); } }}
         title="Upload Reel"
         subtitle="Auto-approved — will appear in Explore feed immediately"
         size="md"
@@ -719,10 +744,33 @@ export default function CampaignsPage() {
             />
           </div>
 
+          {/* P143 — External link. Renders as a tappable chip on the
+              customer reel viewer overlay. Matches the field the
+              customer mobile Create Reel screen already exposes. */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              External link <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="url"
+              value={reelExternalUrl}
+              onChange={(e) => setReelExternalUrl(e.target.value)}
+              placeholder="https://instagram.com/reel/..."
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={2048}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Shown as a tappable chip on the reel — Instagram, TikTok, X, blog, etc.
+            </p>
+          </div>
+
           {/* Submit */}
           <div className="flex gap-2 pt-2 border-t border-gray-100">
             <button
-              onClick={() => { setUploadReelOpen(false); setReelVideoFile(null); setReelVideoPreview(null); setReelCaption(''); setReelHashtags(''); setReelBusinessId(''); setReelBusinessName(''); setBusinessSearchQuery(''); setBusinessSearchResults([]); }}
+              onClick={() => { setUploadReelOpen(false); setReelVideoFile(null); setReelVideoPreview(null); setReelCaption(''); setReelHashtags(''); setReelExternalUrl(''); setReelBusinessId(''); setReelBusinessName(''); setBusinessSearchQuery(''); setBusinessSearchResults([]); }}
               disabled={reelUploading}
               className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
             >

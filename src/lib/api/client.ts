@@ -1247,7 +1247,21 @@ export const api = {
       }),
     delete: (id: string) =>
       request<null>(`/admin/ads/${id}`, { method: "DELETE" }),
-    createAdminReel: (data: { media: { url: string; type?: string }[]; caption?: string; hashtags?: string[]; locationId?: string }, businessId?: string) =>
+    createAdminReel: (
+      data: {
+        media: { url: string; type?: string }[];
+        caption?: string;
+        hashtags?: string[];
+        locationId?: string;
+        // P143 — admin reels can now carry the same `externalUrl` field
+        // the customer mobile create-reel screen already supports (P137).
+        // Backend whitelist accepts http/https only; the viewer renders
+        // a tappable chip on the Explore overlay.
+        externalUrl?: string;
+        taggedBusinessId?: string;
+      },
+      businessId?: string,
+    ) =>
       request<import("@/lib/types").AdCampaign>(`/admin/ads/reels${businessId ? `?businessId=${businessId}` : ''}`, {
         method: "POST",
         body: data,

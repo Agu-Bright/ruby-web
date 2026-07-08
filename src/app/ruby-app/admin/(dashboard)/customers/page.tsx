@@ -10,6 +10,8 @@ import {
   Plus, X, DollarSign, BadgeCheck, PhoneCall,
   // Phase 44 — icons for the "Business owner" badge + Businesses tab.
   Briefcase, ExternalLink, Building2, GitBranch,
+  // P140 — Excel export button in the page header.
+  Download, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
@@ -17,6 +19,7 @@ import { api } from '@/lib/api';
 import { useApi, useMutation } from '@/lib/hooks';
 import { StatCard, Modal, DataTable, type Column } from '@/components/ui';
 import { formatDate, formatDateTime, formatCurrency, getInitials } from '@/lib/utils';
+import { exportToExcel } from '@/lib/export-to-excel';
 import type { Customer, CustomerFilterParams, CustomerStats, Wallet as WalletType, LedgerEntry, SlimBusiness } from '@/lib/types';
 
 // ─── Inline UI Components ───────────────────────────────────
@@ -87,6 +90,91 @@ export default function CustomersPage() {
     () => api.customers.list({ ...filters, search: search || undefined }),
     [filters, search],
   );
+
+  // P140 — Excel export. Same idea as the businesses page: fire the list
+  // endpoint with the current filters + search but a large limit so the
+  // exported spreadsheet reflects the admin's filtered view rather than
+  // just the visible page (which is capped at ~20 rows). If the total
+  // exceeds our hard cap of 10k, warn the admin to narrow filters.
+  const [exportLoading, setExportLoading] = useState(false);
+  const handleExportExcel = useCallback(async () => {
+    setExportLoading(true);
+    try {
+      const res = await api.customers.list({
+        ...filters,
+        search: search || undefined,
+        page: 1,
+        limit: 10000,
+      });
+      const rows: Customer[] = (res.data as Customer[]) || [];
+      const total = res.meta?.total ?? rows.length;
+      if (total > rows.length) {
+        toast.warning(
+          `Only the first ${rows.length.toLocaleString()} of ${total.toLocaleString()} customers were exported. Tighten filters to narrow the list.`,
+        );
+      }
+      if (rows.length === 0) {
+        toast.info('No customers match the current filters — nothing to export.');
+        return;
+      }
+      exportToExcel<Customer>({
+        filename: 'ruby-customers',
+        sheetName: 'Customers',
+        rows,
+        columns: [
+          {
+            header: 'Full Name',
+            value: (c) => c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+          },
+          { header: 'First Name', value: (c) => c.firstName || '' },
+          { header: 'Last Name', value: (c) => c.lastName || '' },
+          { header: 'Email', value: (c) => c.email },
+          { header: 'Phone', value: (c) => c.phone || '' },
+          {
+            header: 'Auth Provider',
+            value: (c) =>
+              c.authProvider === 'google'
+                ? 'Google'
+                : c.authProvider === 'apple'
+                ? 'Apple'
+                : 'Email',
+          },
+          { header: 'Status', value: (c) => (c.isActive ? 'Active' : 'Inactive') },
+          { header: 'Email Verified', value: (c) => (c.isEmailVerified ? 'Yes' : 'No') },
+          { header: 'Phone Verified', value: (c) => (c.isPhoneVerified ? 'Yes' : 'No') },
+          { header: 'Business Owner', value: (c) => (c.hasBusiness ? 'Yes' : 'No') },
+          { header: 'Business Count', value: (c) => c.businessCount ?? 0 },
+          {
+            header: 'Primary Business',
+            value: (c) => c.primaryBusiness?.name || '',
+          },
+          { header: 'Language', value: (c) => c.preferences?.language || '' },
+          { header: 'Currency', value: (c) => c.preferences?.currency || '' },
+          {
+            header: 'Saved Addresses',
+            value: (c) => c.savedAddresses?.length ?? 0,
+          },
+          {
+            header: 'Last Login',
+            value: (c) => (c.lastLoginAt ? formatDateTime(c.lastLoginAt) : ''),
+          },
+          {
+            header: 'Registered',
+            value: (c) => (c.createdAt ? formatDateTime(c.createdAt) : ''),
+          },
+        ],
+      });
+      toast.success(`Exported ${rows.length.toLocaleString()} customers to Excel.`);
+    } catch (err) {
+      const msg =
+        (err as any)?.response?.data?.error?.message ||
+        (err as any)?.message ||
+        'Export failed';
+      toast.error(msg);
+    } finally {
+      setExportLoading(false);
+    }
+  }, [filters, search]);
 
   // Full detail fetch
   const { data: fullDetail, isLoading: loadingDetail } = useApi<Customer>(
@@ -268,14 +356,29 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-gradient-to-br from-ruby-500 to-ruby-700 rounded-xl flex items-center justify-center shadow-lg shadow-ruby-500/20">
-          <UserCircle className="w-5 h-5 text-white" />
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-ruby-500 to-ruby-700 rounded-xl flex items-center justify-center shadow-lg shadow-ruby-500/20">
+            <UserCircle className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Customer Management</h1>
+            <p className="text-sm text-gray-500 mt-0.5">View and manage end-user accounts</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Customer Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">View and manage end-user accounts</p>
-        </div>
+        <button
+          className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          onClick={handleExportExcel}
+          disabled={exportLoading}
+          title="Download the current filtered list as an Excel spreadsheet"
+        >
+          {exportLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+          Export Excel
+        </button>
       </div>
 
       {/* Stats */}

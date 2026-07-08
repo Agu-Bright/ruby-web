@@ -14,6 +14,8 @@ import {
   Wallet as WalletIcon, AlertCircle, X as XIcon, ArrowDownLeft, ArrowUpRight, DollarSign,
   // P119 — sort indicators on clickable column headers.
   ArrowUp, ArrowDown, ArrowUpDown,
+  // P140 — Excel export button in the page header.
+  Download,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -44,6 +46,7 @@ import type {
   BusinessSortKey, BusinessBranchType, CacDocumentStatus,
 } from '@/lib/types';
 import { formatDate, formatDateTime, formatCurrency, toLocationId, getOwnerName, getOwnerEmail, getCategoryName, getSubcategoryName, getLocationName } from '@/lib/utils';
+import { exportToExcel } from '@/lib/export-to-excel';
 import type { Wallet, LedgerEntry } from '@/lib/types';
 // P119 — SearchableSelect for the Category / Subcategory / Location row-2
 // filters. Single-select capability is enough; lots of options need
@@ -803,6 +806,107 @@ export default function BusinessesPage() {
     [refetch],
   );
 
+  // P140 — Excel export. Fetches the same list endpoint with the CURRENT
+  // filters + search but a large limit (10k) so the export reflects the
+  // admin's filtered view rather than just the visible page. We over-fetch
+  // to a hard cap because rendering-page pagination (typically 20 rows)
+  // isn't useful to anyone downloading data for reporting. On >10k, the
+  // toast warns the admin only the first 10k were exported and to
+  // tighten filters if they need more.
+  const [exportLoading, setExportLoading] = useState(false);
+  const handleExportExcel = useCallback(async () => {
+    setExportLoading(true);
+    try {
+      const res = await api.businesses.list({
+        ...filters,
+        search: search || undefined,
+        page: 1,
+        limit: 10000,
+      });
+      const rows: Business[] = (res.data as Business[]) || [];
+      const total = res.meta?.total ?? rows.length;
+      if (total > rows.length) {
+        toast.warning(
+          `Only the first ${rows.length.toLocaleString()} of ${total.toLocaleString()} businesses were exported. Tighten filters to narrow the list.`,
+        );
+      }
+      if (rows.length === 0) {
+        toast.info('No businesses match the current filters — nothing to export.');
+        return;
+      }
+      exportToExcel<Business>({
+        filename: 'ruby-businesses',
+        sheetName: 'Businesses',
+        rows,
+        columns: [
+          { header: 'Name', value: (b) => b.name },
+          { header: 'Slug', value: (b) => b.slug },
+          { header: 'Status', value: (b) => b.status },
+          {
+            header: 'Type',
+            value: (b) =>
+              b.isParent
+                ? 'Parent (multi-branch)'
+                : b.parentBusinessId
+                ? `Branch of ${
+                    typeof b.parentBusinessId === 'object'
+                      ? b.parentBusinessId.name
+                      : b.parentBusinessId
+                  }`
+                : 'Standalone',
+          },
+          { header: 'Branch Label', value: (b) => b.branchLabel || '' },
+          { header: 'Category', value: (b) => getCategoryName(b.categoryId) },
+          { header: 'Subcategory', value: (b) => getSubcategoryName(b.subcategoryId) },
+          { header: 'Location', value: (b) => getLocationName(b.locationId) },
+          { header: 'Owner Name', value: (b) => getOwnerName(b.ownerId) },
+          { header: 'Owner Email', value: (b) => getOwnerEmail(b.ownerId) },
+          { header: 'Business Phone', value: (b) => b.phone || b.contact?.phone || '' },
+          { header: 'Business Email', value: (b) => b.email || b.contact?.email || '' },
+          { header: 'Website', value: (b) => b.contact?.website || '' },
+          {
+            header: 'Address',
+            value: (b) => {
+              if (!b.address) return '';
+              if (typeof b.address === 'string') return b.address;
+              const parts = [
+                b.address.street,
+                b.address.city,
+                b.address.state,
+                b.address.country,
+              ].filter(Boolean);
+              return parts.join(', ');
+            },
+          },
+          { header: 'Avg Rating', value: (b) => b.averageRating ?? 0 },
+          { header: 'Total Reviews', value: (b) => b.totalReviews ?? 0 },
+          { header: 'Orders', value: (b) => b.orderCount ?? 0 },
+          { header: 'Bookings', value: (b) => b.bookingCount ?? 0 },
+          { header: 'Branches', value: (b) => b.branchCount ?? 0 },
+          { header: 'CAC Status', value: (b) => b.cacDocumentStatus || '' },
+          { header: 'CAC Number', value: (b) => b.cacNumber || '' },
+          { header: 'Verified', value: (b) => (b.isVerified ? 'Yes' : 'No') },
+          { header: 'Featured', value: (b) => (b.isFeatured ? 'Yes' : 'No') },
+          { header: 'Claimed', value: (b) => (b.isClaimed ? 'Yes' : 'No') },
+          { header: 'Merchant Code', value: (b) => b.merchantCode || '' },
+          {
+            header: 'Created At',
+            value: (b) => ((b as any).createdAt ? formatDateTime((b as any).createdAt) : ''),
+          },
+        ],
+      });
+      toast.success(`Exported ${rows.length.toLocaleString()} businesses to Excel.`);
+    } catch (err) {
+      const msg =
+        (err as any)?.response?.data?.error?.message ||
+        (err as any)?.message ||
+        'Export failed';
+      toast.error(msg);
+    } finally {
+      setExportLoading(false);
+    }
+  }, [filters, search]);
+
   const getActionConfig = (action: ActionType) => {
     const configs: Record<ActionType, { title: string; description: (name: string) => string; label: string; variant: 'primary' | 'danger'; icon: typeof CheckCircle }> = {
       approve: {
@@ -1000,6 +1104,19 @@ export default function BusinessesPage() {
         description="Review and manage business applications"
         action={
           <div className="flex items-center gap-2">
+            <button
+              className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={handleExportExcel}
+              disabled={exportLoading}
+              title="Download the current filtered list as an Excel spreadsheet"
+            >
+              {exportLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export Excel
+            </button>
             <button
               className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
               onClick={() => {

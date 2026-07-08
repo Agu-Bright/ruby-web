@@ -16,6 +16,8 @@ import {
   ArrowUp, ArrowDown, ArrowUpDown,
   // P140 — Excel export button in the page header.
   Download,
+  // P141 — Map view button + icon.
+  Map as MapIcon,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -1104,6 +1106,37 @@ export default function BusinessesPage() {
         description="Review and manage business applications"
         action={
           <div className="flex items-center gap-2">
+            <button
+              className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={() => {
+                // P141 — forward the CURRENT filters + search to the
+                // map view so an admin who filtered to "PENDING_REVIEW
+                // in Lagos" sees exactly that cohort mapped. The map
+                // page uses `useSearchParams` to re-hydrate them.
+                const sp = new URLSearchParams();
+                for (const [k, v] of Object.entries(filters)) {
+                  if (
+                    v === undefined ||
+                    v === null ||
+                    v === '' ||
+                    k === 'page' ||
+                    k === 'limit'
+                  ) {
+                    continue;
+                  }
+                  sp.set(k, String(v));
+                }
+                if (search) sp.set('search', search);
+                const qs = sp.toString();
+                router.push(
+                  `/ruby-app/admin/businesses/map${qs ? `?${qs}` : ''}`,
+                );
+              }}
+              title="Open cluster map of the current filtered list"
+            >
+              <MapIcon className="w-4 h-4" />
+              Map view
+            </button>
             <button
               className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleExportExcel}

@@ -19,10 +19,14 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-// Marker-cluster styles bundled with the plugin — we import the CSS
-// once here so Next doesn't tree-shake it out.
-import 'react-leaflet-cluster/lib/assets/MarkerCluster.css';
-import 'react-leaflet-cluster/lib/assets/MarkerCluster.Default.css';
+// Marker-cluster styles ship with the underlying `leaflet.markercluster`
+// package. `react-leaflet-cluster` used to re-export them at
+// `react-leaflet-cluster/lib/assets/*`, but v3 dropped that path and
+// Next.js webpack fails the production build ("Module not found"). Use
+// the canonical path from the peer package instead — always works,
+// works for future versions.
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import type { Business, BusinessStatus } from '@/lib/types';
 import {
   getCategoryName,

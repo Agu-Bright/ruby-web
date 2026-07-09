@@ -46,10 +46,16 @@ export const TYPE_ICONS: Record<
  * null when the dispute is untethered (e.g. GENERAL "Help & Support").
  */
 export function getReferenceUrl(d: Dispute): string | null {
+  // P143 — `typeof null === 'object'` in JS, so every ref-object check
+  // in this file needs an explicit truthy guard, otherwise a dispute
+  // whose orderId/bookingId/userId came back null (deleted, unpopulated,
+  // untethered) crashes the whole disputes page on property access.
   const refId =
     d.referenceId ||
-    (typeof d.orderId === 'object' ? d.orderId._id : d.orderId) ||
-    (typeof d.bookingId === 'object' ? d.bookingId._id : d.bookingId);
+    (d.orderId && typeof d.orderId === 'object' ? d.orderId._id : d.orderId) ||
+    (d.bookingId && typeof d.bookingId === 'object'
+      ? d.bookingId._id
+      : d.bookingId);
   if (!refId) return null;
   switch (d.type) {
     case 'ORDER':
@@ -70,15 +76,21 @@ export function getReferenceUrl(d: Dispute): string | null {
 
 export function getReferenceLabel(d: Dispute): string {
   if (d.referenceLabel) return d.referenceLabel;
-  if (typeof d.orderId === 'object' && d.orderId.orderNumber)
+  // P143 — null-safe: `typeof null === 'object'` would otherwise crash on
+  // `d.orderId.orderNumber` when the linked order was deleted.
+  if (d.orderId && typeof d.orderId === 'object' && d.orderId.orderNumber)
     return `Order #${d.orderId.orderNumber}`;
-  if (typeof d.bookingId === 'object' && d.bookingId.bookingRef)
+  if (d.bookingId && typeof d.bookingId === 'object' && d.bookingId.bookingRef)
     return `Booking ${d.bookingId.bookingRef}`;
   return d.type;
 }
 
 export function getCustomerName(d: Dispute): string {
-  if (typeof d.userId === 'object') {
+  // P143 — was `typeof d.userId === 'object'` alone, which accepted null
+  // (typeof null === 'object') and crashed on `u.firstName`. Add explicit
+  // truthy guard so null userIds fall through to the `filedByName`
+  // fallback instead of hard-crashing the disputes page.
+  if (d.userId && typeof d.userId === 'object') {
     const u = d.userId;
     const name = [u.firstName, u.lastName].filter(Boolean).join(' ');
     return name || u.email || 'Customer';
@@ -88,6 +100,8 @@ export function getCustomerName(d: Dispute): string {
 
 export function getBusinessName(d: Dispute): string | null {
   if (!d.businessId) return null;
+  // The `!d.businessId` guard above already catches null, so the object
+  // check here is safe — leaving as-is for consistency with the pattern.
   if (typeof d.businessId === 'object') return d.businessId.name || null;
   return d.againstName || null;
 }

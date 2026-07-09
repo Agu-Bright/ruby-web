@@ -80,12 +80,18 @@ export function DisputeInboxList({
           d.description,
           d.referenceLabel,
           d.reason,
-          typeof d.userId === 'object'
+          // P143 — null-safe: `typeof null === 'object'` was crashing the
+          // page here on `d.userId.firstName` when a dispute's linked
+          // user had been deleted (or the ref came back null for any
+          // other reason). Same pattern for businessId below.
+          d.userId && typeof d.userId === 'object'
             ? `${d.userId.firstName || ''} ${d.userId.lastName || ''} ${
                 d.userId.email || ''
               }`
             : '',
-          typeof d.businessId === 'object' ? d.businessId.name : '',
+          d.businessId && typeof d.businessId === 'object'
+            ? d.businessId.name
+            : '',
         ]
           .filter(Boolean)
           .join(' ')

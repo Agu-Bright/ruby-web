@@ -1257,6 +1257,55 @@ export default function BusinessesPage() {
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           </div>
+          {/* P144 — Category + Subcategory promoted from Row 2 to Row 1.
+              They're primary filters admins reach for constantly (more so
+              than CAC / Pandago status), so keeping them behind a border
+              on Row 2 hid them. Picking a category clears the current
+              subcategory selection AND drives the Subcategory dropdown's
+              option list (`allSubcategories` is fetched keyed on
+              `filters.categoryId`). Subcategory stays disabled until
+              a category is picked, so admins can't accidentally filter
+              by an orphan subcategory. */}
+          <div className="min-w-[180px]">
+            <SearchableSelect
+              options={[
+                { value: '', label: 'All categories' },
+                ...((allCategories ?? []).map((c) => ({ value: c._id, label: c.name }))),
+              ]}
+              value={filters.categoryId ?? ''}
+              onChange={(v) =>
+                setFilters((f) => ({
+                  ...f,
+                  categoryId: v || undefined,
+                  subcategoryId: undefined,
+                  page: 1,
+                }))
+              }
+              placeholder="All categories"
+            />
+          </div>
+          <div className="min-w-[180px]">
+            <SearchableSelect
+              options={[
+                {
+                  value: '',
+                  label: filters.categoryId
+                    ? 'All subcategories'
+                    : 'Pick a category first',
+                },
+                ...((allSubcategories ?? []).map((s) => ({
+                  value: s._id,
+                  label: s.name,
+                }))),
+              ]}
+              value={filters.subcategoryId ?? ''}
+              onChange={(v) =>
+                setFilters((f) => ({ ...f, subcategoryId: v || undefined, page: 1 }))
+              }
+              placeholder="All subcategories"
+              disabled={!filters.categoryId}
+            />
+          </div>
           {/* P119 — Sort by metric dropdown. Off-column sorts (rating,
               reviews, orders, branch count) that don't have a visible
               column to click. Picking a metric overrides any active
@@ -1298,40 +1347,10 @@ export default function BusinessesPage() {
 
         {/* ─── Row 2 — advanced filters (P119) ─── */}
         <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
-          {/* Category */}
-          <div className="min-w-[180px]">
-            <SearchableSelect
-              options={[
-                { value: '', label: 'All categories' },
-                ...((allCategories ?? []).map((c) => ({ value: c._id, label: c.name }))),
-              ]}
-              value={filters.categoryId ?? ''}
-              onChange={(v) =>
-                setFilters((f) => ({
-                  ...f,
-                  categoryId: v || undefined,
-                  subcategoryId: undefined,
-                  page: 1,
-                }))
-              }
-              placeholder="All categories"
-            />
-          </div>
-          {/* Subcategory — disabled until a category is picked */}
-          <div className="min-w-[180px]">
-            <SearchableSelect
-              options={[
-                { value: '', label: filters.categoryId ? 'All subcategories' : 'Pick a category first' },
-                ...((allSubcategories ?? []).map((s) => ({ value: s._id, label: s.name }))),
-              ]}
-              value={filters.subcategoryId ?? ''}
-              onChange={(v) =>
-                setFilters((f) => ({ ...f, subcategoryId: v || undefined, page: 1 }))
-              }
-              placeholder="All subcategories"
-              disabled={!filters.categoryId}
-            />
-          </div>
+          {/* P144 — Category + Subcategory were here; promoted to Row 1
+              since they're primary filters. Row 2 now holds only the
+              lower-frequency advanced filters (location, CAC status,
+              Pandago status, feature/claim flags). */}
           {/* Location */}
           <div className="min-w-[180px]">
             <SearchableSelect

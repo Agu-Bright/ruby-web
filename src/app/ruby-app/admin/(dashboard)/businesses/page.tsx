@@ -64,14 +64,33 @@ const STATUS_OPTIONS: BusinessStatus[] = ['DRAFT', 'PENDING_REVIEW', 'APPROVED',
 // PENDING_REVIEW / REJECTED / SUSPENDED) doesn't match the natural
 // status flow and would mislead admins; status filtering covers it.
 type ColumnSortKey = 'name' | 'createdAt';
-type MetricSortKey = 'averageRating' | 'totalReviews' | 'orderCount' | 'branchCount';
+// P146 — added `isClaimed` so admins can put claimed (or unclaimed)
+// merchants at the top of the list. Ascending puts unclaimed
+// (isClaimed=false) first, descending puts claimed (isClaimed=true)
+// first. Backend BusinessQueryDto has to accept the same key for
+// this to actually reorder rows — matched in the backend patch.
+type MetricSortKey =
+  | 'averageRating'
+  | 'totalReviews'
+  | 'orderCount'
+  | 'branchCount'
+  | 'isClaimed';
 
 const COLUMN_SORT_KEYS: readonly ColumnSortKey[] = ['name', 'createdAt'] as const;
-const METRIC_SORT_OPTIONS: ReadonlyArray<{ key: MetricSortKey; label: string }> = [
+const METRIC_SORT_OPTIONS: ReadonlyArray<{
+  key: MetricSortKey;
+  label: string;
+  hint?: string;
+}> = [
   { key: 'averageRating', label: 'Rating' },
   { key: 'totalReviews', label: 'Reviews' },
   { key: 'orderCount', label: 'Orders' },
   { key: 'branchCount', label: 'Branch count' },
+  {
+    key: 'isClaimed',
+    label: 'Claim status',
+    hint: 'Claimed first (desc) or unclaimed first (asc)',
+  },
 ] as const;
 
 // P119 — vocabulary for the new row-2 dropdowns. Backend mirrors these.
@@ -383,23 +402,34 @@ export default function BusinessesPage() {
     []
   );
 
-  // P119 — Row-2 filter dropdown sources. Categories + locations load
+  // Row-2 filter dropdown sources. Categories + locations load
   // once at mount (small lists, cached). Subcategories load per-selected-
   // category (also small) and clear when the category clears.
+  //
+  // P146 — dropped the `isActive: true` filter. Seeded categories don't
+  // always have an explicit `isActive: true` on the DB doc, so the
+  // filter was returning zero rows and the dropdown showed only
+  // "All categories". Fetch the full list — admins get a complete
+  // picker either way. Same for subcategories.
   const { data: allCategories } = useApi<Category[]>(
-    () => api.categories.list({ isActive: true }),
+    () => api.categories.list(),
     [],
   );
   const { data: allSubcategories } = useApi<Subcategory[]>(
     () =>
       filters.categoryId
-        ? api.subcategories.list({ categoryId: filters.categoryId, isActive: true, limit: 500 })
+        ? api.subcategories.list({ categoryId: filters.categoryId, limit: 500 })
         : Promise.resolve({ success: true, data: [] as Subcategory[] }),
     [filters.categoryId],
     { enabled: !!filters.categoryId },
   );
+  // P146 — was `limit: 500`, but the backend `PaginationDto` caps
+  // `limit` at 100 and returned a 400 validation error, so the
+  // dropdown stayed empty. Use 100 (the enforced max) — plenty for
+  // Nigeria's city list. If we ever exceed that, we'd want a
+  // dedicated `/admin/locations/all` endpoint anyway.
   const { data: allLocations } = useApi<Location[]>(
-    () => api.locations.list({ limit: 500 } as any),
+    () => api.locations.list({ limit: 100 } as any),
     [],
   );
 

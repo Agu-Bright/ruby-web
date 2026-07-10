@@ -1493,6 +1493,9 @@ export interface LocationFilterParams extends PaginationParams {
 
 // P119 — admin businesses page sort surface. Keep in sync with the
 // backend BUSINESS_SORT_KEYS array (dto/index.ts).
+// P146 — added `isClaimed` so admins can sort merchants by claim
+// status (claimed-first / unclaimed-first). Backend accepts the same
+// key.
 export type BusinessSortKey =
   | 'createdAt'
   | 'updatedAt'
@@ -1500,7 +1503,8 @@ export type BusinessSortKey =
   | 'averageRating'
   | 'totalReviews'
   | 'orderCount'
-  | 'branchCount';
+  | 'branchCount'
+  | 'isClaimed';
 
 // P119 — convenience enum mirroring the backend BUSINESS_BRANCH_TYPES.
 // 'all' is treated as no filter; 'brands' = isParent=true; 'branches'

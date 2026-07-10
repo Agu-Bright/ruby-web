@@ -515,10 +515,28 @@ export const api = {
   },
 
   categories: {
-    list: (params?: { groupId?: string; isActive?: boolean }) =>
-      request<import("@/lib/types").Category[]>("/admin/taxonomy/categories", {
+    // P145 — the admin taxonomy backend returns paginated
+    // `{ items, pagination }` from the controller, and the Transform
+    // interceptor wraps it as `{ success: true, data: { items,
+    // pagination } }`. The rest of the app types this endpoint as
+    // `Category[]` and reads `res.data` as an array — so the
+    // businesses page filter dropdown was showing "All categories"
+    // with no options (data.items had the array, but data was the
+    // wrapper). Unwrap `items` here so every caller sees the array
+    // shape they already expect. Same fix applied to subcategories
+    // below.
+    list: async (params?: { groupId?: string; isActive?: boolean }) => {
+      const res = await request<any>("/admin/taxonomy/categories", {
         params: params as Record<string, string | number | boolean | undefined>,
-      }),
+      });
+      if (res?.data && Array.isArray((res.data as any).items)) {
+        return {
+          ...res,
+          data: (res.data as any).items as import("@/lib/types").Category[],
+        };
+      }
+      return res as ApiResponse<import("@/lib/types").Category[]>;
+    },
     get: (id: string) =>
       request<import("@/lib/types").Category>(
         `/admin/taxonomy/categories/${id}`,
@@ -541,16 +559,26 @@ export const api = {
   },
 
   subcategories: {
-    list: (params?: { categoryId?: string; isActive?: boolean; limit?: number }) =>
-      request<import("@/lib/types").Subcategory[]>(
-        "/admin/taxonomy/subcategories",
-        {
-          params: { limit: 500, ...params } as Record<
-            string,
-            string | number | boolean | undefined
-          >,
-        },
-      ),
+    // P145 — same paginated-wrapper unwrap as categories.list.
+    list: async (params?: {
+      categoryId?: string;
+      isActive?: boolean;
+      limit?: number;
+    }) => {
+      const res = await request<any>("/admin/taxonomy/subcategories", {
+        params: { limit: 500, ...params } as Record<
+          string,
+          string | number | boolean | undefined
+        >,
+      });
+      if (res?.data && Array.isArray((res.data as any).items)) {
+        return {
+          ...res,
+          data: (res.data as any).items as import("@/lib/types").Subcategory[],
+        };
+      }
+      return res as ApiResponse<import("@/lib/types").Subcategory[]>;
+    },
     get: (id: string) =>
       request<import("@/lib/types").Subcategory>(
         `/admin/taxonomy/subcategories/${id}`,

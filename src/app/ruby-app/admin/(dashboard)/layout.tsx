@@ -99,6 +99,10 @@ const navGroups: NavGroup[] = [
       { label: "Delivery", href: "/ruby-app/admin/delivery", icon: Truck },
       { label: "Bookings", href: "/ruby-app/admin/bookings", icon: CalendarCheck },
       { label: "Disputes", href: "/ruby-app/admin/disputes", icon: AlertTriangle },
+      // P149 — Ruby+ Support inbox. Customer messages sent from the
+      // mobile "Ruby+ Support" chat land here (separate module from
+      // Disputes, which is order/booking-specific).
+      { label: "Support Inbox", href: "/ruby-app/admin/support-chat", icon: MessageCircle },
       { label: "Campaigns", href: "/ruby-app/admin/campaigns", icon: Megaphone },
       // P120 — Business Ad Subscriptions (Starter / Growth / Prime).
       // Sits in Operations because daily admin work is operational:

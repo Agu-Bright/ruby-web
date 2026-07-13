@@ -105,7 +105,12 @@ const PANDAGO_STATUS_OPTIONS = [
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-type ActionType = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status' | 'edit' | 'verify-deolu' | 'unverify-deolu';
+// P148 — added 'set-live' so admins can push an APPROVED business
+// straight to LIVE without waiting for the merchant to complete the
+// go-live flow. Without this the business is invisible on the customer
+// app even though the admin has approved it — the customer discover
+// filter is `status: LIVE`.
+type ActionType = 'approve' | 'set-live' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status' | 'edit' | 'verify-deolu' | 'unverify-deolu';
 
 // ─── Action Dropdown Component ───
 function ActionDropdown({ business, onAction, onView }: {
@@ -137,6 +142,18 @@ function ActionDropdown({ business, onAction, onView }: {
       { label: 'Approve', icon: CheckCircle, action: () => { onAction(business, 'approve'); setOpen(false); }, variant: 'success' },
       { label: 'Reject', icon: XCircle, action: () => { onAction(business, 'reject'); setOpen(false); }, variant: 'danger' },
     );
+  }
+  // P148 — Set Live shortcut for APPROVED businesses. Without this the
+  // merchant has to log into the business mobile app and hit "Go Live"
+  // themselves — most never learn about the second step, so approved
+  // businesses stay invisible on the customer app.
+  if (business.status === 'APPROVED') {
+    items.push({
+      label: 'Set Live',
+      icon: CheckCircle,
+      action: () => { onAction(business, 'set-live'); setOpen(false); },
+      variant: 'success',
+    });
   }
   if (business.status === 'APPROVED' || business.status === 'LIVE') {
     items.push({ label: 'Suspend', icon: Ban, action: () => { onAction(business, 'suspend'); setOpen(false); }, variant: 'danger' });
@@ -509,6 +526,10 @@ export default function BusinessesPage() {
   const { mutate: approveBusiness, isLoading: approving } = useMutation(
     ({ id, data }: { id: string; data?: { notes?: string } }) => api.businesses.approve(id, data), mutationOpts
   );
+  // P148 — admin-only shortcut to promote an APPROVED business to LIVE.
+  const { mutate: setLiveBusiness, isLoading: settingLive } = useMutation(
+    ({ id }: { id: string }) => api.businesses.setLive(id), mutationOpts
+  );
   const { mutate: rejectBusiness, isLoading: rejecting } = useMutation(
     ({ id, data }: { id: string; data: { reason: string } }) => api.businesses.reject(id, data), mutationOpts
   );
@@ -682,6 +703,13 @@ export default function BusinessesPage() {
       case 'approve':
         result = await approveBusiness({ id: business._id, data: reason ? { notes: reason } : undefined });
         successMsg = `"${business.name}" has been approved`;
+        break;
+      case 'set-live':
+        // P148 — admin-only bypass. Sets APPROVED → LIVE without waiting
+        // for the merchant to complete their own go-live checklist. The
+        // backend service still asserts prev status is APPROVED.
+        result = await setLiveBusiness({ id: business._id });
+        successMsg = `"${business.name}" is now LIVE on the customer app`;
         break;
       case 'reject':
         if (!reason) { toast.error('Rejection reason is required'); return; }
@@ -945,6 +973,14 @@ export default function BusinessesPage() {
         title: 'Approve Business',
         description: (name) => `Approve "${name}"? The business owner will be able to go live.`,
         label: 'Approve',
+        variant: 'primary',
+        icon: CheckCircle,
+      },
+      'set-live': {
+        title: 'Set Business Live',
+        description: (name) =>
+          `Push "${name}" LIVE right now? It will be visible on the customer app immediately. This skips the owner's own go-live checklist (bank account verification, phone verification) — only use it when you know the merchant is ready.`,
+        label: 'Set Live',
         variant: 'primary',
         icon: CheckCircle,
       },

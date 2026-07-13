@@ -8,6 +8,7 @@ import {
   AlertCircle,
   CheckCircle,
   Phone,
+  Briefcase,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -37,6 +38,11 @@ export default function MerchantSupportPage() {
   const [whatsappIntroMessage, setWhatsappIntroMessage] = useState("");
   const [voicePhone, setVoicePhone] = useState("");
   const [isActive, setIsActive] = useState(true);
+  // P153 — CAC registration form state.
+  const [cacRegistrationEnabled, setCacRegistrationEnabled] = useState(false);
+  const [cacRegistrationWhatsAppNumber, setCacRegistrationWhatsAppNumber] =
+    useState("");
+  const [cacRegistrationPitch, setCacRegistrationPitch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +54,10 @@ export default function MerchantSupportPage() {
       setWhatsappIntroMessage(data.whatsappIntroMessage || "");
       setVoicePhone(data.voicePhone || "");
       setIsActive(data.isActive);
+      // P153
+      setCacRegistrationEnabled(!!data.cacRegistrationEnabled);
+      setCacRegistrationWhatsAppNumber(data.cacRegistrationWhatsAppNumber || "");
+      setCacRegistrationPitch(data.cacRegistrationPitch || "");
     } catch (err: any) {
       toast.error(err?.message || "Failed to load merchant support config");
     } finally {
@@ -65,15 +75,28 @@ export default function MerchantSupportPage() {
   const phoneIsValid = /^\d{7,15}$/.test(whatsappPhone);
   const introTooLong = whatsappIntroMessage.length > 280;
   const introIsEmpty = whatsappIntroMessage.trim().length === 0;
+  // P153 — CAC WhatsApp number is optional; empty is fine (falls back
+  // to whatsappPhone on the mobile). When set it must match the same
+  // E.164 shape.
+  const cacPhoneIsValid =
+    cacRegistrationWhatsAppNumber.trim() === "" ||
+    /^\d{7,15}$/.test(cacRegistrationWhatsAppNumber);
+  const cacPitchTooLong = cacRegistrationPitch.length > 140;
   const canSave =
     !saving &&
     phoneIsValid &&
     !introTooLong &&
     !introIsEmpty &&
+    cacPhoneIsValid &&
+    !cacPitchTooLong &&
     (whatsappPhone !== (config?.whatsappPhone || "") ||
       whatsappIntroMessage !== (config?.whatsappIntroMessage || "") ||
       voicePhone !== (config?.voicePhone || "") ||
-      isActive !== (config?.isActive ?? true));
+      isActive !== (config?.isActive ?? true) ||
+      cacRegistrationEnabled !== (config?.cacRegistrationEnabled ?? false) ||
+      cacRegistrationWhatsAppNumber !==
+        (config?.cacRegistrationWhatsAppNumber || "") ||
+      cacRegistrationPitch !== (config?.cacRegistrationPitch || ""));
 
   const handleSave = async () => {
     setSaving(true);
@@ -86,6 +109,14 @@ export default function MerchantSupportPage() {
         // the admin means when they clear the field.
         voicePhone: voicePhone.trim() === "" ? "" : voicePhone.trim(),
         isActive,
+        // P153 — CAC card. Same empty-string-clears idiom.
+        cacRegistrationEnabled,
+        cacRegistrationWhatsAppNumber:
+          cacRegistrationWhatsAppNumber.trim() === ""
+            ? ""
+            : cacRegistrationWhatsAppNumber.trim(),
+        cacRegistrationPitch:
+          cacRegistrationPitch.trim() === "" ? "" : cacRegistrationPitch.trim(),
       };
       const res = await api.merchantSupport.update(payload);
       const data = (res.data || res) as MerchantSupportConfig;
@@ -293,6 +324,111 @@ export default function MerchantSupportPage() {
                 {config.updatedBy ? ` · by admin ${config.updatedBy.slice(-8)}` : ""}
               </p>
             )}
+          </div>
+
+          {/* ═══════════════════════════════════════════════════════════
+              P153 — CAC registration lead-capture card. Separate visual
+              card so ops treats this as its own product decision (turn
+              on when ready, route to a distinct WhatsApp for cleaner
+              lead attribution, iterate the pitch copy independently).
+              ═══════════════════════════════════════════════════════ */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
+            <div className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-violet-600" />
+              <h2 className="text-lg font-semibold text-gray-900">
+                Register-your-business CAC card
+              </h2>
+            </div>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Shown on the business app to merchants without a CAC number.
+              Tap deep-links into WhatsApp with a pre-filled &ldquo;Hi rubyplus team,
+              I want to register [Business] on CAC…&rdquo; message so leads
+              land with full context on first message.
+            </p>
+
+            {/* Enabled toggle — the master switch */}
+            <div className="flex items-start gap-3 pt-2 border-t border-gray-100">
+              <input
+                type="checkbox"
+                checked={cacRegistrationEnabled}
+                onChange={(e) => setCacRegistrationEnabled(e.target.checked)}
+                id="cac-registration-enabled"
+                className="mt-1 rounded border-gray-300"
+              />
+              <label
+                htmlFor="cac-registration-enabled"
+                className="flex-1 cursor-pointer"
+              >
+                <p className="text-sm font-medium text-gray-900">
+                  Show the CAC registration card
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  When off, the card is hidden on every business app (even
+                  for merchants without CAC). Use to pause lead capture
+                  during processing backlogs.
+                </p>
+              </label>
+            </div>
+
+            {/* Dedicated WhatsApp number (optional) */}
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                CAC WhatsApp Number (optional)
+              </label>
+              <input
+                type="text"
+                value={cacRegistrationWhatsAppNumber}
+                onChange={(e) =>
+                  setCacRegistrationWhatsAppNumber(
+                    e.target.value.replace(/\s/g, ""),
+                  )
+                }
+                placeholder="2348012345678"
+                className={`input-field mt-1 font-mono ${
+                  cacRegistrationWhatsAppNumber && !cacPhoneIsValid
+                    ? "border-red-300 focus:ring-red-500/20"
+                    : ""
+                }`}
+              />
+              <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                Route CAC leads to a separate WhatsApp for cleaner attribution.
+                Leave blank to reuse the main support number above.
+              </p>
+              {cacRegistrationWhatsAppNumber && !cacPhoneIsValid && (
+                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Must be 7–15 digits, no formatting characters.
+                </p>
+              )}
+            </div>
+
+            {/* Pitch copy */}
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                Card Headline (Pitch)
+              </label>
+              <textarea
+                value={cacRegistrationPitch}
+                onChange={(e) =>
+                  setCacRegistrationPitch(e.target.value.slice(0, 140))
+                }
+                placeholder="No CAC yet? The Ruby+ team can register your business for you. Tap to chat."
+                rows={2}
+                className="input-field mt-1 resize-none"
+              />
+              <div className="flex items-center justify-between mt-1">
+                <p className="text-xs text-gray-500">
+                  One-line pitch shown on the mobile card. Cap 140 chars.
+                </p>
+                <p
+                  className={`text-xs ${
+                    cacPitchTooLong ? "text-red-600" : "text-gray-400"
+                  }`}
+                >
+                  {cacRegistrationPitch.length}/140
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Help card */}

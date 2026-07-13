@@ -2041,6 +2041,13 @@ export interface MerchantSupportConfig {
   voicePhone?: string;
   /** When false, the business app hides the card entirely (ops blackout). */
   isActive: boolean;
+  // P153 — CAC registration lead capture. Independent from `isActive`.
+  /** Master switch for the "Register your business" card on the business app. */
+  cacRegistrationEnabled: boolean;
+  /** Optional separate WhatsApp for CAC leads. Empty → falls back to `whatsappPhone`. */
+  cacRegistrationWhatsAppNumber?: string;
+  /** Headline / value-prop shown on the mobile card. Cap 140 chars. */
+  cacRegistrationPitch?: string;
   /** Last admin who saved. Shown in the form footer for accountability. */
   updatedBy?: string;
   createdAt: string;
@@ -2052,6 +2059,10 @@ export interface UpdateMerchantSupportConfigPayload {
   whatsappIntroMessage?: string;
   voicePhone?: string;
   isActive?: boolean;
+  // P153
+  cacRegistrationEnabled?: boolean;
+  cacRegistrationWhatsAppNumber?: string;
+  cacRegistrationPitch?: string;
 }
 
 // ============================================================
@@ -2889,4 +2900,60 @@ export interface MessagingTestRequest {
   providerOverride?: MessagingProviderName;
   templateKey?: WhatsAppTemplateKey;
   variables?: Record<string, string>;
+}
+
+// ─── P149: Ruby+ Support inbox (admin surface) ─────────────────────────
+
+export type SupportSenderType = 'USER' | 'BOT' | 'SUPPORT_AGENT';
+
+export interface SupportMessageAttachment {
+  url: string;
+  type: 'IMAGE' | 'FILE';
+  name?: string;
+}
+
+/** One message inside a support thread. */
+export interface SupportMessage {
+  _id: string;
+  conversationId: string;
+  senderType: SupportSenderType;
+  senderId?: string | null;
+  senderEmail?: string | null;
+  senderName?: string | null;
+  text: string;
+  attachments: SupportMessageAttachment[];
+  inboundEmailId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Conversation as returned by the admin list/detail endpoints. The `user`
+ * object is enriched server-side via $lookup so the row can render name +
+ * email without an extra fetch.
+ */
+export interface SupportConversationAdmin {
+  _id: string;
+  userId: string;
+  user?: {
+    _id: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    avatarUrl?: string;
+  };
+  lastMessage?: {
+    text: string;
+    senderType: SupportSenderType;
+    senderName?: string;
+    sentAt: string;
+  } | null;
+  unreadCount: number;
+  adminUnreadCount: number;
+  lastReadAt?: string;
+  adminLastReadAt?: string;
+  isPinned: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

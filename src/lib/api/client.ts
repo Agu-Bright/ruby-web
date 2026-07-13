@@ -686,6 +686,16 @@ export const api = {
         `/admin/businesses/${id}/approve`,
         { method: "POST", body: data },
       ),
+    // P148 — admin bypass to promote an APPROVED business straight to
+    // LIVE without waiting for the merchant to complete their own
+    // go-live flow. Fixes the "no businesses found" symptom on the
+    // customer app when a business is admin-approved but the owner
+    // never manually goes live from the business mobile app.
+    setLive: (id: string) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/set-live`,
+        { method: "POST" },
+      ),
     reject: (id: string, data: { reason: string }) =>
       request<import("@/lib/types").Business>(
         `/admin/businesses/${id}/reject`,
@@ -2533,6 +2543,67 @@ export const api = {
       }),
     delete: (id: string) =>
       request<void>(`/admin/ruby-select/${id}`, { method: "DELETE" }),
+  },
+
+  // P149 — admin support-chat inbox. Same underlying rows as the customer
+  // support-chat surface (POST /user/support-chat/messages) but admins
+  // read + reply here.
+  supportChat: {
+    list: (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      unreadOnly?: boolean;
+    }) => {
+      const query = new URLSearchParams();
+      if (params?.page) query.set("page", String(params.page));
+      if (params?.limit) query.set("limit", String(params.limit));
+      if (params?.search) query.set("search", params.search);
+      if (params?.unreadOnly) query.set("unreadOnly", "true");
+      const qs = query.toString();
+      return request<{
+        items: import("@/lib/types").SupportConversationAdmin[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>(`/admin/support-chat/conversations${qs ? `?${qs}` : ""}`);
+    },
+    get: (id: string) =>
+      request<import("@/lib/types").SupportConversationAdmin>(
+        `/admin/support-chat/conversations/${id}`,
+      ),
+    messages: (id: string, params?: { page?: number; limit?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.page) query.set("page", String(params.page));
+      if (params?.limit) query.set("limit", String(params.limit));
+      const qs = query.toString();
+      return request<{
+        items: import("@/lib/types").SupportMessage[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>(
+        `/admin/support-chat/conversations/${id}/messages${
+          qs ? `?${qs}` : ""
+        }`,
+      );
+    },
+    reply: (id: string, data: { text?: string }) =>
+      request<import("@/lib/types").SupportMessage>(
+        `/admin/support-chat/conversations/${id}/messages`,
+        { method: "POST", body: data },
+      ),
+    markRead: (id: string) =>
+      request<{ success: boolean }>(
+        `/admin/support-chat/conversations/${id}/read`,
+        { method: "PUT" },
+      ),
   },
 };
 

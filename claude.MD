@@ -589,3 +589,127 @@ Added helper functions in `src/utils/format.ts` that handle both new and legacy 
 | `app/(main)/business/[id].tsx` | Fixed addToCart (price/image), service price display (getServicePriceDisplay), service duration display (formatDuration) |
 | `app/(main)/booking/create.tsx` | Fixed services data source (useBusinessServices hook), price calculations, service card display |
 | `src/stores/cart.store.ts` | Updated CartItem for variations/addOns, updated getSubtotal, added cart sanitization on load |
+
+---
+
+## Shipped Feature Phases (index)
+
+The Ruby+ platform ships in numbered phases (P##). Sections above capture the earliest ones in detail; the table below is a one-line index of major shipped work you should be aware of before adding anything new. Every entry composes primitives from earlier ones — check here first before rebuilding infrastructure.
+
+| Phase | Area | What shipped |
+|-------|------|--------------|
+| **P42** | Events discovery | Event schema, `/public/events/near`, mobile events tab (map + bottom sheet + cluster + vibe chips), business+admin venue map picker |
+| **P43 / P75** | Reels playback | Rolling player pool, poster prefetch, multi-quality renditions (`urlLow/Med/High`), Range-GET warmup, STARTED/STALLED analytics |
+| **P48** | Deolu AI (concierge) | Anthropic-backed chat, tool suite (search / details / catalog / ride / parcel / bookings / handoff), 5 rich-card kinds, prompt builder loads `config/prompts/deolu-persona-v1.txt` |
+| **P49 / P77 / P114** | Deolu quality | Hallucination guard, voice filter, category slug hard filter, zero-result vibe expansion + top-for-city fallback, weighted-shuffle recency for sponsored bucket |
+| **P50 / P103** | Ruby+ Select | Editorial + featured + sponsored feed on home; admin CRUD; distinct sponsored (amber) vs featured (purple) badges |
+| **P51 / P59 / P94-P99** | Reviews + Rewards | Weighted rating + tiers, `GeofenceCheckIn`, EXIF, `RewardsService.creditPoints` (idempotent), pay-n-earn cashback, spend-at-checkout, referral, post-n-earn, device fingerprint + cluster alerts + quarantine |
+| **P58** | Business ranking | Shared `BusinessRankingService` (SPONSORED → CLAIMED → UNCLAIMED tiers, hasCatalog tiebreaker), used by discovery + Deolu + what's-hot |
+| **P66-P68** | Events monetisation | Per-tier images, admin browser scanner, business sales analytics, EVENTS row on home |
+| **P70 / P80** | Messaging | Provider abstraction (Termii + Twilio SDK), MessagingLog schema, admin health cards, dedicated SMS/WhatsApp messaging test page |
+| **P81-P86 / P100-P101** | Auth hardening | E.164 phone helpers (mobile + backend), email typo suggest, register/login validation, OTP lockout 3→5 with no attempts leak, DTO regex tightening |
+| **P102** | Analytics | Amplitude wrappers in both mobile apps, identify/reset on auth, event taxonomy (`auth.*`, `discovery.*`, `commerce.*`, `error.api_error`) |
+| **P105-P106 / P108-P109** | Ads catalogue | Uber deep-link migration, PUSH_NOTIFICATION removed then restored with Deolu-recommendation flavour, per-notification IAP pricingMode, v3 SKUs |
+| **P111** | Subscriptions | Paystack Android subscription flow with WebView, webhook handler for subscription events |
+| **P117** | Onboarding | `/(auth)/welcome.tsx` guest routing gate + `ENTRY_CHOICE_MADE` storage flag |
+| **P119** | Admin businesses | Advanced filters, sortable columns, URL-sync, phone column, branchCount, "View all branches" deep-link |
+| **P120 / P124 / P139** | Business ad tiers | `BusinessAdSubscription` (Starter / Growth / Prime), `activeAdTier` cached, PRIORITY_LISTING ad, pause/resume, admin push-blast queue, onboarding review gate |
+| **P121** | Content moderation | ContentReport + UserBlock schemas, report flows, admin queue (in progress) |
+| **P129** | Broadcasts | Extended Broadcast schema (audience / deep-link / platforms / scheduling), test-send, scheduled tab, per-audience recipient resolver |
+| **P132 / P138 / P140** | Home stability + proximity | Cursor feed with `$geoNear`, ErrorBoundary tiers, focal-point store (resident / visitor / picked pin), reverse geocode, 15 km radius cap, NoNearbyBanner |
+| **P135** | Merchant support | `MerchantSupportConfig` singleton, business-mobile "Talk to Ruby+ on WhatsApp" card wired to live config |
+| **P137** | Organic reels | Tag-a-business + external link on Create Reel; chip renders on ReelItem overlay |
+| **P149** | Support chat (admin) | `ADMIN_SUPPORT_MESSAGE_RECEIVED` notif, adminUnreadCount, admin support-chat inbox page |
+| **P150** | Deolu search fix | `resolveDistanceOrigin(userCoords, locationId)` — distance cap uses city center when narrowed by locationId, immunising against far-GPS false negatives |
+| **P151** | Cross-nav back | Business detail `handleBack` honours `?from=<absolute-path>`, Deolu cards pass `usePathname()` — back returns to originating screen |
+| **P152 (in progress)** | Ruby Quest | See `docs/ruby-quest/` — city-wide treasure hunt module composing geofence check-in, wallets, rewards, ads, and events map primitives |
+
+**Rule of thumb:** if a phase in the table above shipped something adjacent to what you're building, read that phase's code before you write anything new. The pattern is almost always applicable — this platform composes primitives more than it invents them.
+
+---
+
+## Cross-cutting patterns (durable engineering)
+
+The following patterns keep coming up and are worth knowing before you touch any related surface. Deviating from them requires justification in the PR description.
+
+### Focal point (resident vs visitor)
+- Mobile: `useFocalPoint()` from [`customer/src/stores/location.store.ts`](../ruby-app-mobile/src/stores/location.store.ts) resolves to `{lat, lng, source}` where source is `gps` / `city-center` / `picked`.
+- **Zustand selectors that construct fresh objects per render will infinite-loop.** Always read primitives from the store and derive the object via `useMemo` (P140 hotfix).
+- Backend: when a caller narrows by `locationId`, distance filters should use the city center as origin, not raw GPS. See `resolveDistanceOrigin()` in [`ask-ruby/services/search.service.ts`](../ruby-plus-backend/src/modules/ask-ruby/services/search.service.ts) (P150).
+
+### Cross-navigator back navigation (`?from=`)
+- Push to `/(tabs)/business/[id]` from any screen outside the tabs group MUST pass `?from=<pathname>` (from `usePathname()`).
+- `handleBack` in [`(tabs)/business/[id].tsx`](../ruby-app-mobile/app/(tabs)/business/[id].tsx) honours it (P151). Skipping this drops the user on Home after back.
+- Same pattern applies to any future cross-group detail screen.
+
+### Idempotent reward writes
+- Every reward that touches wallet or points MUST carry a stable idempotency key (usually the source-doc id — reviewId, orderId, spawnId, etc.).
+- Reference implementation: `RewardsService.creditPoints({ userId, points, source, idempotencyKey })` in [`rewards.service.ts`](../ruby-plus-backend/src/modules/rewards/rewards.service.ts) (P94).
+- Retries return the original response; never double-credit. Clawback (removal) is idempotent on the same key.
+
+### Atomic contention resolution
+- Any "first person wins" write (Legendary ruby claim, Rare check-in, ticket seat) uses a single `findOneAndUpdate({_id, claimedBy: null}, {$set: {...}})`.
+- Never do read → check → write. See ticket-purchase resolution and P152 ruby-claim spec.
+
+### Backward-compat helpers
+- Backend and mobile field names have diverged multiple times (Product: `price`→`basePrice`, `stock`→`stockQuantity`, `media`→`images`; Service: flat→nested `pricing`/`duration`; Order: `type`→`fulfillmentType`, `fees`→flat).
+- Fix on mobile via helpers in `src/utils/format.ts` (`getProductPrice`, `getOrderTotal`, `getItemName`, etc.) — types accept both, helpers pick with `??`.
+- Do NOT patch each call site individually; add a helper.
+
+### Ranking hierarchy (shared)
+- `BusinessRankingService.applyRanking({businesses, locationId, categoryId, innerSort})` in [`business-ranking.service.ts`](../ruby-plus-backend/src/modules/businesses/services/business-ranking.service.ts) (P58).
+- Tiers: SPONSORED (active FEATURED_LISTING ad OR isFeatured) → CLAIMED (isClaimed) → UNCLAIMED. Within-tier: hasCatalog DESC, then rating or distance.
+- Discovery, Deolu, what's-hot, Ruby+ Select all route through this — do not fork ranking logic.
+
+### Focal-point envelope on proximity endpoints
+- Every proximity endpoint returns `{ items, withinRadius, radiusKm, focalPoint, closestBeyondRadiusMeters? }` (P140).
+- Mobile consumes this to render the `NoNearbyBanner` and the "X km away" tag on cards.
+
+### Populate → check `typeof field === 'object'`
+- The backend populates certain ref fields as full objects (`categoryId`, `templateId`, `locationId`, `locationIds`, `parentId`, `parentBusinessId`, `taggedBusinessId`).
+- Frontend types must accept both string and object shapes. Helpers in `lib/utils.ts` / `src/utils/format.ts` take `any` param types and `typeof`-check at runtime.
+
+### CronLockService for scheduled work
+- Every cron guarded by `CronLockService` so multi-replica deploys don't fire the same job twice.
+- Reference: transcoding (P71), leaderboard cut (P152), auto-activate subscriptions (P139).
+
+### AuditService.log on admin actions
+- Every admin create / update / approve / revoke / refund must call `AuditService.log()` with the action, actor, target, and payload snapshot.
+- Enum values added per phase; see `AuditAction` in `common/interfaces/index.ts`.
+
+### DTO whitelist stripping
+- `main.ts` sets `ValidationPipe { whitelist: true }`. Any field not declared on the DTO is silently stripped.
+- Mobile → backend field name change requires BOTH sides updated in the same commit, or you get 400s.
+
+### Analytics event taxonomy
+- Dot-notation, module-prefixed: `discovery.merchant_visit`, `commerce.checkout_started`, `ruby_quest.claim_succeeded` (P102).
+- `error.api_error` fires from the client-side interceptor for all non-2xx responses.
+
+---
+
+## Ruby Quest (P152, in progress)
+
+City-wide treasure hunt module — Pokémon-GO-style. Virtual rubies spawn at partner businesses; customers walk to them, geofence check-in triggers, they claim, wallet reward drops.
+
+- **Source proposal:** `Ruby_Quest_Proposal_v2.pdf` (Digital Crib, 3/06/26)
+- **User flow:** [docs/ruby-quest/user-flow.md](docs/ruby-quest/user-flow.md)
+- **Software requirements:** [docs/ruby-quest/srd.md](docs/ruby-quest/srd.md)
+- **Fresh-session Claude prompt:** [docs/ruby-quest/claude-prompt.md](docs/ruby-quest/claude-prompt.md)
+
+### Key composition (reuse map)
+Ruby Quest is deliberately built by composing existing primitives — the Reuse Map in SRD §4 is authoritative. Highlights:
+- **Geofence:** `GeofenceCheckIn` schema (Phase 51)
+- **Rewards:** `RewardsService.creditPoints()` idempotent (Phase 59, P94)
+- **Ad product:** new `AdType.RUBY_QUEST_SPAWN` on the existing `AdCampaign` schema, IAP + Paystack + wallet flow already handles it (P108, P109)
+- **Push:** `NotificationsService` with new `NotificationType` values
+- **Map + bottom sheet:** same pattern as events tab (P42)
+- **Prime perk:** free Common spawn/week via `BusinessAdSubscription` (P120)
+- **Focal point + distance:** `useFocalPoint()` + `resolveDistanceOrigin()` (P140, P150)
+- **Cross-nav back:** every quest → business push carries `?from=` (P151)
+- **Anti-fraud:** `deviceFingerprintId`, `isQuarantined`, cluster alerts (P99)
+
+### Rollout
+Seven phases (P152-A through P152-G) then verify (P152-V), calibrated so the first shippable slice — customers actually collecting an admin-seeded spawn — lands at end of P152-C, roughly one dev-week in. See SRD §12 for the full schedule.
+
+### Tunables live in `RubyQuestConfig` singleton
+Every constant (radii, timeouts, cadences, rate limits) is admin-editable at runtime — same pattern as `MerchantSupportConfig` (P135). Do not hard-code these values.

@@ -2605,6 +2605,111 @@ export const api = {
         { method: "PUT" },
       ),
   },
+
+  // P152-E — Ruby Quest admin surface. One tabbed page groups the 4
+  // sub-resources (spawns, rewards, prizes, config); all under
+  // /admin/ruby-quest/*.
+  rubyQuest: {
+    // ── Spawns ────────────────────────────────────────────────────
+    listSpawns: (params?: {
+      status?: string;
+      rarity?: string;
+      businessId?: string;
+      page?: number;
+      limit?: number;
+    }) => {
+      const search = new URLSearchParams();
+      if (params?.status) search.set("status", params.status);
+      if (params?.rarity) search.set("rarity", params.rarity);
+      if (params?.businessId) search.set("businessId", params.businessId);
+      if (params?.page) search.set("page", String(params.page));
+      if (params?.limit) search.set("limit", String(params.limit));
+      const qs = search.toString();
+      return request<{
+        items: import("@/lib/types").RubyQuestSpawn[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>(`/admin/ruby-quest/spawns${qs ? `?${qs}` : ""}`);
+    },
+    createSpawn: (data: import("@/lib/types").CreateRubyQuestSpawnRequest) =>
+      request<import("@/lib/types").RubyQuestSpawn>(
+        "/admin/ruby-quest/spawns",
+        { method: "POST", body: data },
+      ),
+    revokeSpawn: (id: string, reason?: string) => {
+      const qs = reason
+        ? `?reason=${encodeURIComponent(reason)}`
+        : "";
+      return request<import("@/lib/types").RubyQuestSpawn>(
+        `/admin/ruby-quest/spawns/${id}${qs}`,
+        { method: "DELETE" },
+      );
+    },
+
+    // ── Reward pool ───────────────────────────────────────────────
+    listRewards: () =>
+      request<{ items: import("@/lib/types").RubyRewardConfig[] }>(
+        "/admin/ruby-quest/rewards",
+      ),
+    createReward: (data: import("@/lib/types").CreateRubyRewardConfigRequest) =>
+      request<import("@/lib/types").RubyRewardConfig>(
+        "/admin/ruby-quest/rewards",
+        { method: "POST", body: data },
+      ),
+    updateReward: (
+      id: string,
+      data: import("@/lib/types").UpdateRubyRewardConfigRequest,
+    ) =>
+      request<import("@/lib/types").RubyRewardConfig>(
+        `/admin/ruby-quest/rewards/${id}`,
+        { method: "PATCH", body: data },
+      ),
+
+    // ── Prize queue ───────────────────────────────────────────────
+    listPrizes: (params?: {
+      status?: string;
+      page?: number;
+      limit?: number;
+    }) => {
+      const search = new URLSearchParams();
+      if (params?.status) search.set("status", params.status);
+      if (params?.page) search.set("page", String(params.page));
+      if (params?.limit) search.set("limit", String(params.limit));
+      const qs = search.toString();
+      return request<{
+        items: import("@/lib/types").AdminPrizeQueueEntry[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>(`/admin/ruby-quest/prizes${qs ? `?${qs}` : ""}`);
+    },
+    updatePrize: (
+      id: string,
+      data: { status?: string; fulfilmentNote?: string },
+    ) =>
+      request<import("@/lib/types").AdminPrizeQueueEntry>(
+        `/admin/ruby-quest/prizes/${id}`,
+        { method: "PATCH", body: data },
+      ),
+
+    // ── Config singleton ──────────────────────────────────────────
+    getConfig: () =>
+      request<import("@/lib/types").RubyQuestConfig>(
+        "/admin/ruby-quest/config",
+      ),
+    updateConfig: (data: Partial<import("@/lib/types").RubyQuestConfig>) =>
+      request<import("@/lib/types").RubyQuestConfig>(
+        "/admin/ruby-quest/config",
+        { method: "PATCH", body: data },
+      ),
+  },
 };
 
 export default api;

@@ -40,6 +40,7 @@ import {
   MessageSquare,
   MessageCircle,
   Bell,
+  Gem,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -148,6 +149,15 @@ const navGroups: NavGroup[] = [
         label: "Cluster Alerts",
         href: "/ruby-app/admin/rewards/clusters",
         icon: ShieldAlert,
+      },
+      // P152-E — Ruby Quest admin. Sits near Rewards because the reward
+      // pool + prize queue reuse the same operational muscle (ops
+      // fulfilment + fraud triage). Tabbed page: Spawns / Rewards / Prizes
+      // / Config.
+      {
+        label: "Ruby Quest",
+        href: "/ruby-app/admin/ruby-quest",
+        icon: Gem,
       },
       // P70 — Messaging test surface. SUPER_ADMIN-only screen for firing
       // a one-off SMS through the live gateway to verify Termii config

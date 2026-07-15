@@ -2957,3 +2957,173 @@ export interface SupportConversationAdmin {
   createdAt: string;
   updatedAt: string;
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// P152-E — Ruby Quest admin types.
+//
+// Mirrors backend schemas (ruby-quest-spawn.schema, ruby-reward-config.schema,
+// ruby-quest-config.schema, admin-prize-queue.schema). Populated fields
+// are typed as either string (ObjectId) OR the populated object shape,
+// following the platform convention documented in CLAUDE.md.
+// ═══════════════════════════════════════════════════════════════════════
+
+export type RubyRarity = "COMMON" | "RARE" | "LEGENDARY";
+
+export type RubySpawnStatus =
+  | "LIVE"
+  | "CLAIMED"
+  | "EXPIRED"
+  | "REVOKED"
+  | "SUPERSEDED";
+
+export type RubySpawnSource =
+  | "ADMIN_EDITORIAL"
+  | "MERCHANT_AD"
+  | "LEADERBOARD_PROMO";
+
+export interface RubyQuestSpawn {
+  _id: string;
+  businessId:
+    | string
+    | { _id: string; name: string; logoUrl?: string; slug?: string };
+  locationId?:
+    | string
+    | { _id: string; name: string; slug?: string }
+    | null;
+  rarity: RubyRarity;
+  status: RubySpawnStatus;
+  source: RubySpawnSource;
+  sourceAdCampaignId?: string | null;
+  rewardConfigId?: string | { _id: string; name: string } | null;
+  geoPoint: { type: "Point"; coordinates: [number, number] };
+  radiusM: number;
+  spawnedAt: string;
+  expiresAt: string;
+  claimedBy?: string | null;
+  claimedAt?: string | null;
+  revokedBy?: string | null;
+  revokedAt?: string | null;
+  revokeReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRubyQuestSpawnRequest {
+  businessId: string;
+  rarity: RubyRarity;
+  rewardConfigId?: string;
+  radiusM?: number;
+  expiresInMinutes?: number;
+}
+
+export type RubyRewardType =
+  | "POINTS"
+  | "WALLET_CREDIT"
+  | "PERCENT_OFF"
+  | "FREE_DELIVERY"
+  | "SCRATCH_CARD"
+  | "MANUAL_PRIZE";
+
+export interface RubyRewardConfig {
+  _id: string;
+  name: string;
+  type: RubyRewardType;
+  rarity: RubyRarity;
+  value: number;
+  weight: number;
+  copy?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRubyRewardConfigRequest {
+  name: string;
+  type: RubyRewardType;
+  rarity: RubyRarity;
+  value: number;
+  weight?: number;
+  copy?: string;
+  isActive?: boolean;
+}
+
+export type UpdateRubyRewardConfigRequest = Partial<
+  CreateRubyRewardConfigRequest
+>;
+
+export type PrizeQueueStatus =
+  | "PENDING"
+  | "CONTACTED"
+  | "FULFILLED"
+  | "REDEEMED"
+  | "CANCELLED";
+
+export type PrizeQueueSource =
+  | "LEADERBOARD_TOP10"
+  | "LEGENDARY_CLAIM"
+  | "MANUAL"
+  | "RUBY_QUEST_CLAIM";
+
+export interface AdminPrizeQueueEntry {
+  _id: string;
+  userId:
+    | string
+    | {
+        _id: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+      };
+  source: PrizeQueueSource;
+  rewardConfigId?:
+    | string
+    | { _id: string; name: string; type: RubyRewardType; value: number }
+    | null;
+  sourceRefId?: string | null;
+  rewardDescription: string;
+  redemptionCode: string;
+  status: PrizeQueueStatus;
+  fulfilmentNote?: string;
+  fulfilledBy?:
+    | string
+    | { _id: string; firstName?: string; lastName?: string; email?: string }
+    | null;
+  fulfilledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * The tunable singleton. Every constant that ops might want to move at
+ * runtime lives here — do NOT hard-code these on the client. Field names
+ * mirror `RubyQuestConfig` schema on the backend exactly.
+ */
+export interface RubyQuestConfig {
+  _id: string;
+  // Discovery
+  mapRadiusKm: number;
+  mapRadiusKmMax: number;
+  // Approach + geofence
+  approachMeters: number;
+  geofenceMeters: number;
+  checkInMaxAgeSeconds: number;
+  // Rate limits
+  maxClaimsPerHour: number;
+  maxClaimsPerDay: number;
+  // Rarity expiry (hours)
+  commonExpiryHours: number;
+  rareExpiryHours: number;
+  legendaryExpiryHours: number;
+  // Cadence
+  commonCadenceDays: number;
+  rareCadenceDays: number;
+  legendaryCadenceDays: number;
+  // Leaderboard
+  leaderboardTopN: number;
+  // Structural
+  oneSpawnPerBusiness: boolean;
+  // Anti-fraud
+  antiSpoofMaxMetersPerSecond: number;
+  updatedAt: string;
+}

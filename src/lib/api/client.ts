@@ -802,6 +802,11 @@ export const api = {
         method: "POST",
         body: data,
       }),
+    debitWallet: (walletId: string, data: { amount: number; currency?: string; reason: string }) =>
+      request<import("@/lib/types").LedgerEntry>(`/admin/wallets/${walletId}/debit`, {
+        method: "POST",
+        body: data,
+      }),
     getWalletTransactions: (walletId: string, params?: { page?: number; limit?: number; type?: string }) =>
       request<import("@/lib/types").LedgerEntry[]>(`/admin/wallets/${walletId}/transactions`, {
         params: params as Record<string, string | number | boolean | undefined>,
@@ -1219,6 +1224,11 @@ export const api = {
       request<import("@/lib/types").Wallet[]>(`/admin/wallets/by-user/${userId}`),
     fundWallet: (walletId: string, data: { amount: number; currency?: string; description?: string }) =>
       request<import("@/lib/types").LedgerEntry>(`/admin/wallets/${walletId}/fund`, {
+        method: "POST",
+        body: data,
+      }),
+    debitWallet: (walletId: string, data: { amount: number; currency?: string; reason: string }) =>
+      request<import("@/lib/types").LedgerEntry>(`/admin/wallets/${walletId}/debit`, {
         method: "POST",
         body: data,
       }),

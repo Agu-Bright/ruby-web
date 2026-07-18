@@ -227,7 +227,7 @@ export default function CustomersPage() {
         break;
       case 'reset-password':
         result = await sendPasswordReset({ id: customer._id });
-        if (result) toast.success(`Password reset code sent to ${customer.email}`);
+        if (result) toast.success(`Password reset link sent to ${customer.email}`);
         break;
     }
 
@@ -521,7 +521,7 @@ export default function CustomersPage() {
                 : actionModal.action === 'deactivate'
                 ? `Deactivate "${actionModal.customer.firstName} ${actionModal.customer.lastName}"? They will lose access immediately.`
                 : actionModal.action === 'reset-password'
-                ? `Send a secure, one-time password reset code to ${actionModal.customer.email}? It expires in 10 minutes and lets the customer choose their own new password.`
+                ? `Send a secure, one-time password reset link to ${actionModal.customer.email}? It expires in 30 minutes and lets the customer choose their own new password on the Ruby+ website.`
                 : `Permanently delete "${actionModal.customer.firstName} ${actionModal.customer.lastName}"? This action cannot be undone.`
               }
             </p>

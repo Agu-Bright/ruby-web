@@ -353,6 +353,12 @@ export const api = {
         { method: "POST", body: { refreshToken }, noAuth: true },
       ),
     me: () => request<import("@/lib/types").AdminUser>("/admin/users/me"),
+    resetCustomerPasswordWithLink: (data: { token: string; password: string }) =>
+      request<{ message: string }>("/auth/user/reset-password/link", {
+        method: "POST",
+        body: data,
+        noAuth: true,
+      }),
     logout: () => {
       // Backend has no logout endpoint — handled client-side
       clearTokens();

@@ -36,8 +36,8 @@ const features = [
   },
   {
     icon: Banknote,
-    title: "Daily auto-payout",
-    body: "Earnings settle to your bank account every day via Paystack. No withdrawal requests. No admin approvals. The money moves itself.",
+    title: "On-demand withdrawals",
+    body: "Earnings settle to your Ruby+ wallet as sales complete. Pull to your bank whenever you want, no approvals — transfers land in minutes via Paystack.",
   },
   {
     icon: Megaphone,

@@ -32,8 +32,8 @@ const steps = [
   {
     n: "04",
     icon: Banknote,
-    title: "Get paid daily",
-    body: "Earnings auto-payout to your bank account each day. No withdrawal requests, no waiting for admin approval.",
+    title: "Get paid on demand",
+    body: "Earnings settle to your Ruby+ wallet. Withdraw to your bank whenever you want — transfers arrive in minutes, no admin approval.",
   },
 ];
 

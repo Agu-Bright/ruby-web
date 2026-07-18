@@ -69,7 +69,7 @@ function getProviderBadge(provider?: string) {
   }
 }
 
-type CustomerAction = 'activate' | 'deactivate' | 'delete';
+type CustomerAction = 'activate' | 'deactivate' | 'delete' | 'reset-password';
 
 // ─── Main Page ──────────────────────────────────────────────
 
@@ -193,7 +193,10 @@ export default function CustomersPage() {
   const { mutate: deleteCustomer, isLoading: deleting } = useMutation(
     ({ id }: { id: string }) => api.customers.delete(id),
   );
-  const isProcessing = activating || deactivating || deleting;
+  const { mutate: sendPasswordReset, isLoading: sendingPasswordReset } = useMutation(
+    ({ id }: { id: string }) => api.customers.sendPasswordReset(id),
+  );
+  const isProcessing = activating || deactivating || deleting || sendingPasswordReset;
 
   // Stats from dedicated backend endpoint
   const { data: customerStats, refetch: refetchStats } = useApi<CustomerStats>(
@@ -222,6 +225,10 @@ export default function CustomersPage() {
         result = await deleteCustomer({ id: customer._id });
         if (result) toast.success(`${name} has been deleted`);
         break;
+      case 'reset-password':
+        result = await sendPasswordReset({ id: customer._id });
+        if (result) toast.success(`Password reset code sent to ${customer.email}`);
+        break;
     }
 
     if (result) {
@@ -233,7 +240,7 @@ export default function CustomersPage() {
         setDetailCustomer(null);
       }
     }
-  }, [actionModal, activateCustomer, deactivateCustomer, deleteCustomer, refetch, refetchStats, detailCustomer]);
+  }, [actionModal, activateCustomer, deactivateCustomer, deleteCustomer, sendPasswordReset, refetch, refetchStats, detailCustomer]);
 
   const openAction = (customer: Customer, action: CustomerAction) => {
     setActionModal({ customer, action });
@@ -344,6 +351,12 @@ export default function CustomersPage() {
             tooltip={c.isActive ? 'Deactivate' : 'Activate'}
             onClick={(e) => { e.stopPropagation(); openAction(c, c.isActive ? 'deactivate' : 'activate'); }}
             variant={c.isActive ? 'red' : 'green'}
+          />
+          <ActionButton
+            icon={Mail}
+            tooltip="Send password reset email"
+            onClick={(e) => { e.stopPropagation(); openAction(c, 'reset-password'); }}
+            variant="blue"
           />
           {isSuperAdmin && (
             <ActionButton icon={Trash2} tooltip="Delete" onClick={(e) => { e.stopPropagation(); openAction(c, 'delete'); }} variant="red" />
@@ -496,6 +509,7 @@ export default function CustomersPage() {
         title={
           actionModal?.action === 'activate' ? 'Activate Customer'
             : actionModal?.action === 'deactivate' ? 'Deactivate Customer'
+            : actionModal?.action === 'reset-password' ? 'Send Password Reset Email'
             : 'Delete Customer'
         }
       >
@@ -506,6 +520,8 @@ export default function CustomersPage() {
                 ? `Activate "${actionModal.customer.firstName} ${actionModal.customer.lastName}"? They will regain access to the platform.`
                 : actionModal.action === 'deactivate'
                 ? `Deactivate "${actionModal.customer.firstName} ${actionModal.customer.lastName}"? They will lose access immediately.`
+                : actionModal.action === 'reset-password'
+                ? `Send a secure, one-time password reset code to ${actionModal.customer.email}? It expires in 10 minutes and lets the customer choose their own new password.`
                 : `Permanently delete "${actionModal.customer.firstName} ${actionModal.customer.lastName}"? This action cannot be undone.`
               }
             </p>
@@ -540,7 +556,7 @@ export default function CustomersPage() {
               </button>
               <button
                 className={
-                  actionModal.action === 'activate'
+                  actionModal.action === 'activate' || actionModal.action === 'reset-password'
                     ? 'btn-primary'
                     : 'px-4 py-2 text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors'
                 }
@@ -553,6 +569,7 @@ export default function CustomersPage() {
                 {isProcessing ? 'Processing...'
                   : actionModal.action === 'activate' ? 'Activate'
                   : actionModal.action === 'deactivate' ? 'Deactivate'
+                  : actionModal.action === 'reset-password' ? 'Send email'
                   : 'Delete'
                 }
               </button>

@@ -48,11 +48,11 @@ import FinalCTA from '@/components/partner/FinalCTA';
 export const metadata = {
   title: 'Sell on Ruby+ | Grow Your Business in Nigeria',
   description:
-    'Sell more, manage less. Daily auto-payout, multi-branch support, live order management, paid promotion via Ruby Ads. No setup fees. No monthly fees.',
+    'Sell more, manage less. On-demand withdrawals, multi-branch support, live order management, paid promotion via Ruby Ads. No setup fees. No monthly fees.',
   openGraph: {
     title: 'Sell on Ruby+ | Grow Your Business in Nigeria',
     description:
-      'Sell more, manage less. Daily auto-payout, multi-branch support, live order management, paid promotion via Ruby Ads.',
+      'Sell more, manage less. On-demand withdrawals, multi-branch support, live order management, paid promotion via Ruby Ads.',
     type: 'website',
   },
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Gem,
   Gift,
@@ -366,7 +366,13 @@ function CreateSpawnModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [businessId, setBusinessId] = useState('');
+  const [selectedBusiness, setSelectedBusiness] = useState<{
+    _id: string;
+    name: string;
+    logoUrl?: string;
+    locationName?: string;
+    hasGeoPoint: boolean;
+  } | null>(null);
   const [rarity, setRarity] = useState<RubyRarity>('COMMON');
   const [rewardConfigId, setRewardConfigId] = useState('');
   const [radiusM, setRadiusM] = useState('50');
@@ -403,17 +409,19 @@ function CreateSpawnModal({
       <div className="p-6 space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-            Business ID
+            Business
           </label>
-          <input
-            value={businessId}
-            onChange={(e) => setBusinessId(e.target.value.trim())}
-            placeholder="65b1..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
+          <BusinessSearchPicker
+            selected={selectedBusiness}
+            onSelect={setSelectedBusiness}
           />
-          <p className="text-[11px] text-gray-500 mt-1">
-            Look up on the Businesses page and paste the _id.
-          </p>
+          {selectedBusiness && !selectedBusiness.hasGeoPoint && (
+            <p className="text-[11px] text-amber-600 mt-1.5 flex items-center gap-1">
+              <span>⚠</span>
+              This business has no geoPoint set — spawn will fail. Set the map
+              pin on the business first.
+            </p>
+          )}
         </div>
 
         <div>
@@ -449,13 +457,21 @@ function CreateSpawnModal({
             onChange={(e) => setRewardConfigId(e.target.value)}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
           >
-            <option value="">Auto — pick from {rewardsForRarity.length} active {rarity} rewards</option>
+            <option value="">
+              Auto — pick from {rewardsForRarity.length} active {rarity} rewards
+            </option>
             {rewardsForRarity.map((r) => (
               <option key={r._id} value={r._id}>
                 {r.name} · {r.type} · {r.value}
               </option>
             ))}
           </select>
+          {rewardsForRarity.length === 0 && (
+            <p className="text-[11px] text-amber-600 mt-1.5 flex items-center gap-1">
+              <span>⚠</span>
+              No active {rarity} rewards. Seed the pool first: <code className="bg-gray-100 px-1 rounded">npx ts-node scripts/seed-ruby-quest-rewards.ts</code>
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -494,10 +510,11 @@ function CreateSpawnModal({
             Cancel
           </button>
           <button
-            disabled={!businessId || isLoading}
+            disabled={!selectedBusiness || isLoading}
             onClick={() =>
+              selectedBusiness &&
               doCreate({
-                businessId,
+                businessId: selectedBusiness._id,
                 rarity,
                 rewardConfigId: rewardConfigId || undefined,
                 radiusM: parseInt(radiusM, 10) || undefined,
@@ -511,6 +528,194 @@ function CreateSpawnModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Debounced live search over LIVE businesses. Backend supports
+ * `?search=` on /admin/businesses; we throttle to 300 ms so a quick
+ * typer doesn't fire a request per keystroke. Restricting to
+ * status=LIVE because a spawn against a non-LIVE business is rejected
+ * server-side anyway — surfacing them here just wastes clicks.
+ */
+function BusinessSearchPicker({
+  selected,
+  onSelect,
+}: {
+  selected: {
+    _id: string;
+    name: string;
+    logoUrl?: string;
+    locationName?: string;
+    hasGeoPoint: boolean;
+  } | null;
+  onSelect: (
+    business: {
+      _id: string;
+      name: string;
+      logoUrl?: string;
+      locationName?: string;
+      hasGeoPoint: boolean;
+    } | null,
+  ) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Debounce — 300ms after last keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const { data: results, isLoading } = useApi(
+    () =>
+      api.businesses.list({
+        search: debouncedQuery || undefined,
+        status: 'LIVE' as any,
+        limit: 10,
+      } as any),
+    [debouncedQuery],
+    { enabled: isOpen && debouncedQuery.length >= 2 },
+  );
+
+  // Close dropdown on outside click.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isOpen]);
+
+  if (selected) {
+    return (
+      <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50">
+        {selected.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={selected.logoUrl}
+            alt=""
+            className="w-10 h-10 rounded-lg object-cover"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
+            {selected.name.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-900 truncate">
+            {selected.name}
+          </div>
+          <div className="text-xs text-gray-500 truncate">
+            {selected.locationName || selected._id.slice(0, 8)}
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            onSelect(null);
+            setQuery('');
+            setIsOpen(true);
+          }}
+          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+        >
+          Change
+        </button>
+      </div>
+    );
+  }
+
+  const items = (results ?? []) as any[];
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => setIsOpen(true)}
+        placeholder="Search LIVE businesses by name…"
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500 focus:border-transparent"
+      />
+      {isOpen && debouncedQuery.length >= 2 && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+          {isLoading && (
+            <div className="p-4 text-center text-sm text-gray-500">
+              Searching…
+            </div>
+          )}
+          {!isLoading && items.length === 0 && (
+            <div className="p-4 text-center text-sm text-gray-500">
+              No LIVE businesses match “{debouncedQuery}”.
+            </div>
+          )}
+          {!isLoading &&
+            items.map((biz: any) => {
+              const hasGeoPoint = Array.isArray(biz?.geoPoint?.coordinates);
+              const locName =
+                typeof biz.locationId === 'object'
+                  ? biz.locationId?.name
+                  : undefined;
+              return (
+                <button
+                  key={biz._id}
+                  onClick={() => {
+                    onSelect({
+                      _id: biz._id,
+                      name: biz.name,
+                      logoUrl: biz.logoUrl,
+                      locationName: locName,
+                      hasGeoPoint,
+                    });
+                    setIsOpen(false);
+                    setQuery('');
+                  }}
+                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 flex items-center gap-3 border-b border-gray-100 last:border-0"
+                >
+                  {biz.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={biz.logoUrl}
+                      alt=""
+                      className="w-8 h-8 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-semibold">
+                      {biz.name?.charAt(0).toUpperCase() || '?'}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {biz.name}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate flex items-center gap-2">
+                      <span>{locName || biz._id.slice(0, 8)}</span>
+                      {!hasGeoPoint && (
+                        <span className="text-amber-600">· no geoPoint</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+      )}
+      {debouncedQuery.length > 0 && debouncedQuery.length < 2 && isOpen && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs text-gray-500">
+          Keep typing — need at least 2 characters.
+        </div>
+      )}
+    </div>
   );
 }
 

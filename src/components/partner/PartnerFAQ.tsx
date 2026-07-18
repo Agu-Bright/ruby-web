@@ -20,7 +20,7 @@ const faqs = [
   },
   {
     q: "When do I get paid?",
-    a: "Earnings auto-payout to your bank account daily. There's no withdrawal request, no admin approval — the money moves itself the next business day after a sale.",
+    a: "Sales settle to your Ruby+ wallet as orders and bookings complete. Withdraw to your bank whenever you want, straight from the Business app — transfers typically arrive within minutes.",
   },
   {
     q: "What does it cost?",

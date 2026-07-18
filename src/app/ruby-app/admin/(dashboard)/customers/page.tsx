@@ -342,9 +342,9 @@ export default function CustomersPage() {
     {
       key: 'actions',
       header: '',
-      className: 'w-32',
+      className: 'w-40',
       render: (c) => (
-        <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        <div className="flex items-center justify-end gap-0.5">
           <ActionButton icon={Eye} tooltip="View details" onClick={(e) => { e.stopPropagation(); setDetailCustomer(c); setDetailTab('profile'); }} variant="blue" />
           <ActionButton
             icon={Power}

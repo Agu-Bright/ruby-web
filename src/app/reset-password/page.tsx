@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, Suspense, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle2, LockKeyhole, ShieldCheck } from 'lucide-react';
@@ -14,13 +14,47 @@ function ResetPasswordForm() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [email, setEmail] = useState('');
+  const [isValidating, setIsValidating] = useState(true);
+  const [isLinkValid, setIsLinkValid] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const validateLink = async () => {
+      if (!token) {
+        if (active) {
+          setError('This password reset link is incomplete. Please request a new link.');
+          setIsValidating(false);
+        }
+        return;
+      }
+
+      try {
+        const response = await api.auth.getCustomerPasswordResetLinkRecipient(token);
+        if (active) {
+          setEmail(response.data.email);
+          setIsLinkValid(true);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'This password reset link is invalid or has expired.');
+        }
+      } finally {
+        if (active) setIsValidating(false);
+      }
+    };
+
+    validateLink();
+    return () => { active = false; };
+  }, [token]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
 
-    if (!token) {
-      setError('This password reset link is incomplete. Please request a new link.');
+    if (!isLinkValid) {
+      setError('This password reset link is invalid or has expired. Please request a new link.');
       return;
     }
     if (password !== confirmPassword) {
@@ -61,7 +95,18 @@ function ResetPasswordForm() {
               Choose a strong new password for your Ruby+ account. This link can only be used once.
             </p>
 
-            <form onSubmit={submit} className="mt-7 space-y-4">
+            {isValidating ? (
+              <p className="mt-5 text-sm text-gray-500">Checking your secure link…</p>
+            ) : isLinkValid ? (
+              <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Resetting password for</p>
+                <p className="mt-1 text-sm font-semibold text-emerald-900">{email}</p>
+              </div>
+            ) : (
+              <p role="alert" className="mt-5 rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</p>
+            )}
+
+            {isLinkValid && <form onSubmit={submit} className="mt-7 space-y-4">
               <div>
                 <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-gray-700">New password</label>
                 <input
@@ -96,7 +141,7 @@ function ResetPasswordForm() {
               <button type="submit" disabled={isSubmitting} className="w-full rounded-xl bg-ruby-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-ruby-700 disabled:cursor-not-allowed disabled:opacity-60">
                 {isSubmitting ? 'Updating password...' : 'Reset password'}
               </button>
-            </form>
+            </form>}
 
             <div className="mt-6 flex gap-2 rounded-xl bg-gray-50 p-3 text-xs leading-5 text-gray-500">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />

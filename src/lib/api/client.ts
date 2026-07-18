@@ -359,6 +359,11 @@ export const api = {
         body: data,
         noAuth: true,
       }),
+    getCustomerPasswordResetLinkRecipient: (token: string) =>
+      request<{ email: string }>("/auth/user/reset-password/link", {
+        params: { token },
+        noAuth: true,
+      }),
     logout: () => {
       // Backend has no logout endpoint — handled client-side
       clearTokens();

@@ -264,6 +264,12 @@ export interface Category {
   isService?: boolean;
   defaultRiskTier?: string;
   themeColor?: string;
+  /**
+   * Ruby+ merchant commission % taken from every order/booking placed
+   * against a business in this category. Undefined = fall back to the
+   * global default. Editable inline from the taxonomy category form.
+   */
+  merchantCommissionPercent?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -283,6 +289,7 @@ export interface CreateCategoryRequest {
   isActive?: boolean;
   isShopping?: boolean;
   isService?: boolean;
+  merchantCommissionPercent?: number;
 }
 
 export interface CustomFieldOption {

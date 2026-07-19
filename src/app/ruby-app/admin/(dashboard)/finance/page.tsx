@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Wallet,
   ArrowUpRight,
@@ -120,17 +120,6 @@ export default function FinancePage() {
     () => api.feeConfigs.list({ page, limit: 20 }),
     [page],
   );
-
-  // Categories drive the CATEGORY-scope commission picker + row rendering.
-  const { data: categories } = useApi<import('@/lib/types').Category[]>(
-    () => api.categories.list({ isActive: true }),
-    [],
-  );
-  const categoryMap = useMemo(() => {
-    const m = new Map<string, string>();
-    (categories || []).forEach(c => m.set(c._id, c.name));
-    return m;
-  }, [categories]);
 
   const { data: payoutStats } = useApi<PayoutStats>(
     () => api.payouts.stats(),
@@ -315,19 +304,7 @@ export default function FinancePage() {
       key: 'feeType',
       header: 'Fee Type',
       render: (f) => (
-        <div>
-          <p className="text-sm font-medium text-gray-900">{getFeeTypeLabel(f.feeType ?? '')}</p>
-          {f.scope === 'CATEGORY' && (
-            <span className="mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
-              {categoryMap.get(typeof f.categoryId === 'string' ? f.categoryId : '') || 'Category'}
-            </span>
-          )}
-          {f.scope === 'GLOBAL' && (
-            <span className="mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
-              Global
-            </span>
-          )}
-        </div>
+        <p className="text-sm font-medium text-gray-900">{getFeeTypeLabel(f.feeType ?? '')}</p>
       ),
     },
     {
@@ -530,7 +507,6 @@ export default function FinancePage() {
       {showFeeModal && (
         <FeeConfigModal
           fee={selectedFee}
-          categories={categories || []}
           isLoading={feeLoading}
           onSave={handleSaveFee}
           onClose={() => { setShowFeeModal(false); setSelectedFee(null); }}
@@ -685,13 +661,11 @@ function LedgerDetailModal({
 
 function FeeConfigModal({
   fee,
-  categories,
   isLoading,
   onSave,
   onClose,
 }: {
   fee: FeeConfig | null;
-  categories: import('@/lib/types').Category[];
   isLoading: boolean;
   onSave: (data: Partial<FeeConfig>) => void;
   onClose: () => void;
@@ -699,10 +673,6 @@ function FeeConfigModal({
   const isEdit = !!fee;
 
   const [feeType, setFeeType] = useState<FeeType>(fee?.feeType || 'ORDER_PLATFORM_FEE');
-  const [scope, setScope] = useState<'GLOBAL' | 'CATEGORY'>(fee?.scope === 'CATEGORY' ? 'CATEGORY' : 'GLOBAL');
-  const [categoryId, setCategoryId] = useState<string>(
-    typeof fee?.categoryId === 'string' ? fee.categoryId : '',
-  );
   const [flatFee, setFlatFee] = useState(fee?.flatFee?.toString() || '');
   // P58-followup — previously the modal only edited flatFee and hardcoded
   // percentage: 0. That meant the EVENT_TICKET_PLATFORM_FEE (5% + ₦200
@@ -714,10 +684,6 @@ function FeeConfigModal({
     fee?.percentage !== undefined ? fee.percentage.toString() : '',
   );
   const [isActive, setIsActive] = useState(fee?.isActive ?? true);
-
-  // CATEGORY scope only makes sense for the per-merchant-commission fee
-  // type (ORDER_PLATFORM_FEE). VAT / event-ticket / delivery are global.
-  const scopePickerEnabled = feeType === 'ORDER_PLATFORM_FEE';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -735,14 +701,9 @@ function FeeConfigModal({
       toast.error('Set a flat fee, a percentage, or both — at least one must be > 0');
       return;
     }
-    if (scope === 'CATEGORY' && !categoryId) {
-      toast.error('Pick a category for CATEGORY-scoped fees');
-      return;
-    }
     onSave({
       feeType,
-      scope: scopePickerEnabled ? scope : 'GLOBAL',
-      categoryId: scope === 'CATEGORY' && scopePickerEnabled ? categoryId : undefined,
+      scope: 'GLOBAL',
       flatFee: flat,
       percentage: pct,
       isActive,
@@ -776,44 +737,15 @@ function FeeConfigModal({
             </select>
           </div>
 
-          {/* Scope — only ORDER_PLATFORM_FEE supports per-category rates
-              (that's the per-merchant commission on order/booking subtotal).
-              Everything else is GLOBAL only. */}
-          {scopePickerEnabled && (
-            <div>
-              <label className={labelCls}>Scope</label>
-              <select
-                value={scope}
-                onChange={(e) => setScope(e.target.value as 'GLOBAL' | 'CATEGORY')}
-                className={inputCls}
-                disabled={isEdit}
-              >
-                <option value="GLOBAL">Global (fallback for all businesses)</option>
-                <option value="CATEGORY">Category (per-category commission %)</option>
-              </select>
-              <p className="text-[10px] text-gray-400 mt-1">
-                Category rates take priority over the Global fallback. If nothing matches, the built-in 10% default applies.
-              </p>
-            </div>
-          )}
-
-          {/* Category picker — required when scope is CATEGORY. */}
-          {scopePickerEnabled && scope === 'CATEGORY' && (
-            <div>
-              <label className={labelCls}>Category</label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className={inputCls}
-                disabled={isEdit}
-              >
-                <option value="">Choose a category…</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+          {/* For per-category merchant commissions, set the rate directly on
+              the Category (Taxonomy → Categories → Edit). This modal only
+              handles GLOBAL fees (VAT, event ticket platform fee, and the
+              GLOBAL commission fallback for categories with no rate set). */}
+          {feeType === 'ORDER_PLATFORM_FEE' && (
+            <div className="text-[11px] text-gray-500 bg-blue-50 border border-blue-100 rounded-lg p-3">
+              This is the platform-wide fallback commission — applied when a
+              business's category has no rate configured. Set per-category
+              rates from <span className="font-semibold">Taxonomy → Categories</span>.
             </div>
           )}
 

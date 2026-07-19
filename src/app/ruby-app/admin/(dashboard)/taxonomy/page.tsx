@@ -6,7 +6,7 @@ import {
   FolderTree, Tag, Layers, Eye, Pencil, Power, PowerOff, Plus, Search,
   RefreshCw, ChevronDown, ChevronLeft, ChevronRight, Activity, Check, Briefcase, Settings, List,
   Package, MapPin, ShoppingBag, Calendar, X, AlertCircle, Hash, FileText,
-  Rocket, Image as ImageIcon,
+  Rocket, Image as ImageIcon, DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApi } from '@/lib/hooks';
@@ -782,6 +782,7 @@ function CategoriesTab() {
       iconUrl: cat.iconUrl,
       defaultGroupType: cat.defaultGroupType, displayOrder: cat.displayOrder,
       isActive: cat.isActive, isShopping: cat.isShopping, isService: cat.isService,
+      merchantCommissionPercent: cat.merchantCommissionPercent,
     });
     setEditCategory(cat);
   };
@@ -859,6 +860,7 @@ function CategoriesTab() {
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Description</th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Group</th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Order</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Commission</th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="text-right px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -866,7 +868,7 @@ function CategoriesTab() {
               <tbody className="divide-y divide-gray-50">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center">
+                    <td colSpan={7} className="px-5 py-12 text-center">
                       <Search className="w-8 h-8 text-gray-300 mx-auto mb-3" />
                       <p className="text-sm font-medium text-gray-500">No categories match your filters</p>
                     </td>
@@ -895,6 +897,15 @@ function CategoriesTab() {
                     </td>
                     <td className="px-5 py-3.5"><GroupTypeBadge type={getGroupName(cat)} /></td>
                     <td className="px-5 py-3.5"><span className="text-sm text-gray-600">{cat.displayOrder}</span></td>
+                    <td className="px-5 py-3.5">
+                      {typeof cat.merchantCommissionPercent === 'number' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {cat.merchantCommissionPercent}%
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">Default</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5"><StatusBadge status={cat.isActive ? 'ACTIVE' : 'INACTIVE'} /></td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
@@ -983,6 +994,36 @@ function CategoriesTab() {
                 <input type="checkbox" checked={form.isActive ?? true} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-ruby-600 focus:ring-ruby-500" />
                 <span className="text-sm text-gray-700">Active</span>
               </label>
+            </div>
+          </div>
+
+          {/* Ruby+ commission — per-category rate merchants in this category
+              pay on every completed order/booking. Leave blank to fall back
+              to the platform-wide default. */}
+          <div className="space-y-4">
+            <SectionHeader icon={DollarSign} title="Merchant Commission" description="What Ruby+ takes on every completed order/booking from businesses in this category. Leave blank for the platform default (10%)." />
+            <div className="max-w-xs">
+              <label className="label-text">Commission %</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={form.merchantCommissionPercent ?? ''}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setForm({
+                      ...form,
+                      merchantCommissionPercent: raw === '' ? undefined : parseFloat(raw),
+                    });
+                  }}
+                  className="input-field pr-8"
+                  placeholder="e.g. 8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">Merchants in this category see this rate on their product/service upload screens and are credited net-of-commission at settlement.</p>
             </div>
           </div>
 
@@ -1135,6 +1176,32 @@ function CategoriesTab() {
                   <input type="checkbox" checked={form.isActive ?? true} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-ruby-600 focus:ring-ruby-500" />
                   <span className="text-sm text-gray-700">Active</span>
                 </label>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <SectionHeader icon={DollarSign} title="Merchant Commission" description="Ruby+'s % cut on every completed order/booking from this category. Blank = platform default (10%). Merchants see this on their upload screens." />
+              <div className="max-w-xs">
+                <label className="label-text">Commission %</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={form.merchantCommissionPercent ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setForm({
+                        ...form,
+                        merchantCommissionPercent: raw === '' ? undefined : parseFloat(raw),
+                      });
+                    }}
+                    className="input-field pr-8"
+                    placeholder="e.g. 8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+                </div>
               </div>
             </div>
 

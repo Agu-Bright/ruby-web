@@ -723,7 +723,7 @@ function EventFormModal({
               required
               value={form.venueAddress}
               onChange={(e) =>
-                setForm({ ...form, venueAddress: e.target.value })
+                setForm({ ...form, venueAddress: e.target.value, geoCoordinates: null })
               }
               className="input"
             />
@@ -746,7 +746,11 @@ function EventFormModal({
                 ? `${c.parentId.name}${c.countryCode ? ` · ${c.countryCode}` : ''}`
                 : c.countryCode || c.type,
             }))}
-            onChange={(value) => setForm({ ...form, locationId: value })}
+            onChange={(value) => setForm({
+              ...form,
+              locationId: value,
+              geoCoordinates: form.venueAddress ? null : form.geoCoordinates,
+            })}
           />
         </Field>
 

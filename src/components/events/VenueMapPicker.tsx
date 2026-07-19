@@ -70,6 +70,8 @@ export const VenueMapPicker: React.FC<Props> = ({
   const [searchValue, setSearchValue] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [autoLocating, setAutoLocating] = useState(false);
+  const lastAutoQuery = useRef('');
 
   // Normalise the country bias once. Defaults to "ng" (Nigeria) since
   // all V1 locations are Nigerian — without this Nominatim happily
@@ -79,6 +81,44 @@ export const VenueMapPicker: React.FC<Props> = ({
   // at [-0.077, 51.539] = London. The countrycodes filter prevents
   // that whole class of error.)
   const cc = (countryCode || 'ng').toLowerCase();
+
+  // Address-first workflow: place the pin automatically from the form
+  // address. The map remains available for fine-tuning a result.
+  useEffect(() => {
+    const address = venueAddress?.trim();
+    if (!address || value) return;
+
+    const query = `${venueName ?? ''} ${address}`.trim();
+    if (lastAutoQuery.current === query) return;
+
+    const timer = window.setTimeout(async () => {
+      lastAutoQuery.current = query;
+      setSearchError(null);
+      setAutoLocating(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=${encodeURIComponent(cc)}&q=${encodeURIComponent(query)}`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+        const json = (await res.json()) as Array<{ lat: string; lon: string }>;
+        if (!json[0]) {
+          setSearchError('We could not locate this address. Check it or use the map to adjust the pin.');
+          return;
+        }
+        const picked = initialCenter
+          ? json.map((r) => ({
+              lat: parseFloat(r.lat), lng: parseFloat(r.lon),
+              d: Math.abs(parseFloat(r.lat) - initialCenter.lat) + Math.abs(parseFloat(r.lon) - initialCenter.lng),
+            })).sort((a, b) => a.d - b.d)[0]
+          : { lat: parseFloat(json[0].lat), lng: parseFloat(json[0].lon) };
+        onChange([picked.lng, picked.lat]);
+      } catch {
+        setSearchError('We could not locate this address right now. Use the map to adjust the pin.');
+      } finally {
+        setAutoLocating(false);
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [venueAddress, venueName, value, cc, initialCenter, onChange]);
 
   // Free-text geocoder via OpenStreetMap's Nominatim — same backend
   // Leaflet uses. No API key. Polite-use: 1 req/sec recommended; the
@@ -170,9 +210,13 @@ export const VenueMapPicker: React.FC<Props> = ({
       </div>
 
       <p className="text-[11px] text-gray-500 leading-relaxed">
-        Click the map to drop a pin, or drag the pin to fine-tune. Use the
-        search box to jump to a venue by address.
+        The pin is placed automatically from the venue address. Drag it or
+        use search below only if you need to fine-tune the location.
       </p>
+
+      {autoLocating && (
+        <p className="text-[11px] text-ruby-600">Finding the venue address and placing the pin…</p>
+      )}
 
       <div className="flex gap-2">
         <input

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Wallet,
   ArrowUpRight,
@@ -120,6 +120,17 @@ export default function FinancePage() {
     () => api.feeConfigs.list({ page, limit: 20 }),
     [page],
   );
+
+  // Categories drive the CATEGORY-scope commission picker + row rendering.
+  const { data: categories } = useApi<import('@/lib/types').Category[]>(
+    () => api.categories.list({ isActive: true }),
+    [],
+  );
+  const categoryMap = useMemo(() => {
+    const m = new Map<string, string>();
+    (categories || []).forEach(c => m.set(c._id, c.name));
+    return m;
+  }, [categories]);
 
   const { data: payoutStats } = useApi<PayoutStats>(
     () => api.payouts.stats(),
@@ -304,8 +315,30 @@ export default function FinancePage() {
       key: 'feeType',
       header: 'Fee Type',
       render: (f) => (
-        <p className="text-sm font-medium text-gray-900">{getFeeTypeLabel(f.feeType ?? '')}</p>
+        <div>
+          <p className="text-sm font-medium text-gray-900">{getFeeTypeLabel(f.feeType ?? '')}</p>
+          {f.scope === 'CATEGORY' && (
+            <span className="mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+              {categoryMap.get(typeof f.categoryId === 'string' ? f.categoryId : '') || 'Category'}
+            </span>
+          )}
+          {f.scope === 'GLOBAL' && (
+            <span className="mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+              Global
+            </span>
+          )}
+        </div>
       ),
+    },
+    {
+      key: 'percentage',
+      header: 'Rate (%)',
+      render: (f) =>
+        (f.percentage ?? 0) > 0 ? (
+          <span className="text-sm font-semibold text-gray-900">{f.percentage}%</span>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        ),
     },
     {
       key: 'flatFee',
@@ -497,6 +530,7 @@ export default function FinancePage() {
       {showFeeModal && (
         <FeeConfigModal
           fee={selectedFee}
+          categories={categories || []}
           isLoading={feeLoading}
           onSave={handleSaveFee}
           onClose={() => { setShowFeeModal(false); setSelectedFee(null); }}
@@ -651,11 +685,13 @@ function LedgerDetailModal({
 
 function FeeConfigModal({
   fee,
+  categories,
   isLoading,
   onSave,
   onClose,
 }: {
   fee: FeeConfig | null;
+  categories: import('@/lib/types').Category[];
   isLoading: boolean;
   onSave: (data: Partial<FeeConfig>) => void;
   onClose: () => void;
@@ -663,6 +699,10 @@ function FeeConfigModal({
   const isEdit = !!fee;
 
   const [feeType, setFeeType] = useState<FeeType>(fee?.feeType || 'ORDER_PLATFORM_FEE');
+  const [scope, setScope] = useState<'GLOBAL' | 'CATEGORY'>(fee?.scope === 'CATEGORY' ? 'CATEGORY' : 'GLOBAL');
+  const [categoryId, setCategoryId] = useState<string>(
+    typeof fee?.categoryId === 'string' ? fee.categoryId : '',
+  );
   const [flatFee, setFlatFee] = useState(fee?.flatFee?.toString() || '');
   // P58-followup — previously the modal only edited flatFee and hardcoded
   // percentage: 0. That meant the EVENT_TICKET_PLATFORM_FEE (5% + ₦200
@@ -674,6 +714,10 @@ function FeeConfigModal({
     fee?.percentage !== undefined ? fee.percentage.toString() : '',
   );
   const [isActive, setIsActive] = useState(fee?.isActive ?? true);
+
+  // CATEGORY scope only makes sense for the per-merchant-commission fee
+  // type (ORDER_PLATFORM_FEE). VAT / event-ticket / delivery are global.
+  const scopePickerEnabled = feeType === 'ORDER_PLATFORM_FEE';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -691,9 +735,14 @@ function FeeConfigModal({
       toast.error('Set a flat fee, a percentage, or both — at least one must be > 0');
       return;
     }
+    if (scope === 'CATEGORY' && !categoryId) {
+      toast.error('Pick a category for CATEGORY-scoped fees');
+      return;
+    }
     onSave({
       feeType,
-      scope: 'GLOBAL',
+      scope: scopePickerEnabled ? scope : 'GLOBAL',
+      categoryId: scope === 'CATEGORY' && scopePickerEnabled ? categoryId : undefined,
       flatFee: flat,
       percentage: pct,
       isActive,
@@ -726,6 +775,47 @@ function FeeConfigModal({
               {FEE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
+
+          {/* Scope — only ORDER_PLATFORM_FEE supports per-category rates
+              (that's the per-merchant commission on order/booking subtotal).
+              Everything else is GLOBAL only. */}
+          {scopePickerEnabled && (
+            <div>
+              <label className={labelCls}>Scope</label>
+              <select
+                value={scope}
+                onChange={(e) => setScope(e.target.value as 'GLOBAL' | 'CATEGORY')}
+                className={inputCls}
+                disabled={isEdit}
+              >
+                <option value="GLOBAL">Global (fallback for all businesses)</option>
+                <option value="CATEGORY">Category (per-category commission %)</option>
+              </select>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Category rates take priority over the Global fallback. If nothing matches, the built-in 10% default applies.
+              </p>
+            </div>
+          )}
+
+          {/* Category picker — required when scope is CATEGORY. */}
+          {scopePickerEnabled && scope === 'CATEGORY' && (
+            <div>
+              <label className={labelCls}>Category</label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className={inputCls}
+                disabled={isEdit}
+              >
+                <option value="">Choose a category…</option>
+                {categories.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Percentage — for the event ticket platform fee (5%), VAT
               (7.5%), etc. Final fee = (transaction × percentage / 100)

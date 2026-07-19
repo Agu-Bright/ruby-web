@@ -614,6 +614,12 @@ export interface Business {
   isFeatured?: boolean;
   featuredUntil?: string;
   isPromoted?: boolean;
+  /**
+   * VIP override for merchant commission. When true, CommissionService
+   * returns a flat 5% for this business regardless of category rate.
+   * SUPER_ADMIN only toggle.
+   */
+  isVip?: boolean;
   // Stats
   viewCount?: number;
   orderCount?: number;

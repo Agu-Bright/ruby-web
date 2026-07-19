@@ -727,6 +727,14 @@ export const api = {
         `/admin/businesses/${id}/feature`,
         { method: "PATCH", body: data },
       ),
+    // Per-category commission override: SUPER_ADMIN sets isVip=true on a
+    // hand-picked merchant and CommissionService returns a flat 5% for that
+    // business regardless of category rate.
+    setVip: (id: string, isVip: boolean) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/vip`,
+        { method: "PATCH", body: { isVip } },
+      ),
     verifyCac: (id: string, data: import("@/lib/types").VerifyCacRequest) =>
       request<import("@/lib/types").Business>(
         `/admin/businesses/${id}/verify-cac`,

@@ -110,7 +110,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 // go-live flow. Without this the business is invisible on the customer
 // app even though the admin has approved it — the customer discover
 // filter is `status: LIVE`.
-type ActionType = 'approve' | 'set-live' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'delete' | 'update-status' | 'edit' | 'verify-deolu' | 'unverify-deolu';
+type ActionType = 'approve' | 'set-live' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'vip' | 'delete' | 'update-status' | 'edit' | 'verify-deolu' | 'unverify-deolu';
 
 // ─── Action Dropdown Component ───
 function ActionDropdown({ business, onAction, onView }: {
@@ -193,6 +193,16 @@ function ActionDropdown({ business, onAction, onView }: {
     label: business.isFeatured ? 'Remove Featured' : 'Set Featured',
     icon: Star,
     action: () => { onAction(business, 'feature'); setOpen(false); },
+    variant: 'warning',
+  });
+
+  // Per-category commission VIP override (5% flat regardless of category).
+  // SUPER_ADMIN only — the row action still fires but the backend enforces
+  // the role at the endpoint.
+  items.push({
+    label: business.isVip ? 'Remove VIP' : 'Mark as VIP (5% commission)',
+    icon: Star,
+    action: () => { onAction(business, 'vip'); setOpen(false); },
     variant: 'warning',
   });
 
@@ -546,6 +556,9 @@ export default function BusinessesPage() {
   const { mutate: featureBusiness, isLoading: featuring } = useMutation(
     ({ id, data }: { id: string; data: { isFeatured: boolean; featuredUntil?: string } }) => api.businesses.feature(id, data), mutationOpts
   );
+  const { mutate: setVipBusiness, isLoading: settingVip } = useMutation(
+    ({ id, isVip }: { id: string; isVip: boolean }) => api.businesses.setVip(id, isVip), mutationOpts,
+  );
   const { mutate: deleteBusiness, isLoading: deleting } = useMutation(
     ({ id }: { id: string }) => api.businesses.delete(id), mutationOpts
   );
@@ -738,6 +751,12 @@ export default function BusinessesPage() {
       case 'feature':
         result = await featureBusiness({ id: business._id, data: { isFeatured: !business.isFeatured } });
         successMsg = business.isFeatured ? 'Business unfeatured' : 'Business featured';
+        break;
+      case 'vip':
+        result = await setVipBusiness({ id: business._id, isVip: !business.isVip });
+        successMsg = business.isVip
+          ? `"${business.name}" is no longer VIP — falls back to category commission rate`
+          : `"${business.name}" marked as VIP — flat 5% commission`;
         break;
       case 'delete':
         result = await deleteBusiness({ id: business._id });
@@ -1023,6 +1042,15 @@ export default function BusinessesPage() {
       feature: {
         title: 'Toggle Featured',
         description: (name) => `Toggle featured status for "${name}"?`,
+        label: 'Confirm',
+        variant: 'primary',
+        icon: Star,
+      },
+      vip: {
+        title: 'Toggle VIP Commission',
+        description: (name) =>
+          `Toggle VIP override for "${name}"? VIP merchants pay a flat 5% ` +
+          `commission regardless of their category rate.`,
         label: 'Confirm',
         variant: 'primary',
         icon: Star,

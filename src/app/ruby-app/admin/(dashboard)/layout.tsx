@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -223,6 +223,43 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, isAuthenticated, router]);
 
+  // Per-admin sidebar allow-list. SUPER_ADMIN is exempt — they always see
+  // every item. For everyone else, when `allowedSidebarItems` is set and
+  // non-empty, we use it as an exclusive filter on top of the existing
+  // role-based rules (`superOnly`, `hiddenForRoles`). Empty/undefined =
+  // fall back to role defaults so nothing changes for pre-existing
+  // admins. Dashboard root is always kept — every admin needs a landing.
+  //
+  // Computed via useMemo (before the early returns) so it participates in
+  // a stable hook order regardless of auth state — the alternative
+  // (computing after the loading/null guards) would fire different hook
+  // counts across renders and trip React error #310.
+  const allowSet = useMemo(() => {
+    if (!admin || isSuperAdmin) return null;
+    if (!admin.allowedSidebarItems || admin.allowedSidebarItems.length === 0) return null;
+    return new Set(admin.allowedSidebarItems);
+  }, [admin, isSuperAdmin]);
+
+  // Route guard — if a support admin types (or deep-links) a URL that
+  // isn't in their allow-list, bounce them to Dashboard. Runs on every
+  // pathname change. Bypassed for super_admins and for admins with no
+  // allow-list configured. Effect stays at the top of the component so
+  // hook order never changes across renders.
+  useEffect(() => {
+    if (!allowSet) return;
+    if (pathname === '/ruby-app/admin' || pathname === '/') return;
+    const allowedInternal = Array.from(allowSet);
+    const allowedClean = allowedInternal.map((h) =>
+      h.replace(/^\/ruby-app\/admin/, '') || '/',
+    );
+    const isAllowed = [...allowedInternal, ...allowedClean].some(
+      (h) => pathname === h || pathname.startsWith(h + '/'),
+    );
+    if (!isAllowed) {
+      router.replace('/ruby-app/admin');
+    }
+  }, [pathname, allowSet, router]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -236,17 +273,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated || !admin) return null;
 
-  // Per-admin sidebar allow-list. SUPER_ADMIN is exempt — they always see
-  // every item. For everyone else, when `allowedSidebarItems` is set and
-  // non-empty, we use it as an exclusive filter on top of the existing
-  // role-based rules (`superOnly`, `hiddenForRoles`). Empty/undefined =
-  // fall back to role defaults so nothing changes for pre-existing
-  // admins. Dashboard root is always kept — every admin needs a landing.
-  const allowSet =
-    !isSuperAdmin && admin.allowedSidebarItems && admin.allowedSidebarItems.length > 0
-      ? new Set(admin.allowedSidebarItems)
-      : null;
-
   const filteredGroups = navGroups.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
@@ -256,27 +282,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       return true;
     }),
   })).filter((group) => group.items.length > 0);
-
-  // Route guard — if a support admin types (or deep-links) a URL that
-  // isn't in their allow-list, bounce them to Dashboard. Runs on every
-  // pathname change. Bypassed for super_admins and for admins with no
-  // allow-list configured.
-  useEffect(() => {
-    if (!allowSet) return;
-    if (pathname === '/ruby-app/admin' || pathname === '/') return;
-    // Match against both the internal form and the subdomain-clean form
-    // (see isActive() below for the same-shape logic).
-    const allowedInternal = Array.from(allowSet);
-    const allowedClean = allowedInternal.map((h) =>
-      h.replace(/^\/ruby-app\/admin/, '') || '/',
-    );
-    const isAllowed = [...allowedInternal, ...allowedClean].some(
-      (h) => pathname === h || pathname.startsWith(h + '/'),
-    );
-    if (!isAllowed) {
-      router.replace('/ruby-app/admin');
-    }
-  }, [pathname, allowSet, router]);
 
   // Highlights the sidebar entry matching the current route.
   //

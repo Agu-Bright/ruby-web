@@ -41,6 +41,7 @@ import {
   MessageCircle,
   Bell,
   Gem,
+  Crown,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ToastProvider } from "@/components/ui";
@@ -61,65 +62,53 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// Sidebar sections — grouped by admin mental model, not by internal team.
+// Order matches daily-use frequency: overview + on-call surfaces first,
+// customer-facing entities next, growth/marketing after, then Finance,
+// with configuration + platform tooling anchored at the bottom.
 const navGroups: NavGroup[] = [
   {
     title: "Overview",
     items: [
       { label: "Dashboard", href: "/ruby-app/admin", icon: LayoutDashboard },
-    ],
-  },
-  {
-    title: "Platform",
-    items: [
-      { label: "Locations", href: "/ruby-app/admin/locations", icon: MapPin, hiddenForRoles: ["location_admin"] },
-      { label: "Admin Users", href: "/ruby-app/admin/users", icon: Users, superOnly: true },
-      { label: "Taxonomy", href: "/ruby-app/admin/taxonomy", icon: FolderTree, hiddenForRoles: ["location_admin"] },
-      { label: "Templates", href: "/ruby-app/admin/templates", icon: FileText, hiddenForRoles: ["location_admin"] },
-      { label: "Home Sections", href: "/ruby-app/admin/home-sections", icon: LayoutGrid, hiddenForRoles: ["location_admin"] },
-      // Phase 50 — Ruby+ Select admin-curated notice-board posts.
-      // Distinct surface from Home Sections (which configures the rows
-      // BELOW the carousel); this controls the carousel ITSELF.
-      { label: "Ruby+ Select", href: "/ruby-app/admin/ruby-select", icon: Sparkles, hiddenForRoles: ["location_admin"] },
-      { label: "Legal", href: "/ruby-app/admin/legal", icon: Scale, hiddenForRoles: ["location_admin"] },
-      // Admin-managed email recipients for platform-wide ops alerts (ad
-      // payments today; payouts + business submissions reserved).
-      // Distinct from the per-domain Events Recipients screen.
-      { label: "System Alerts", href: "/ruby-app/admin/system-alerts", icon: Bell, hiddenForRoles: ["location_admin"] },
-    ],
-  },
-  {
-    title: "Operations",
-    items: [
+      // Emergency SOS lives up top so on-call ops don't hunt for it.
       { label: "Emergency", href: "/ruby-app/admin/emergency", icon: ShieldAlert },
+    ],
+  },
+  {
+    title: "People",
+    items: [
       { label: "Customers", href: "/ruby-app/admin/customers", icon: UserCircle },
       { label: "Businesses", href: "/ruby-app/admin/businesses", icon: Store },
-      { label: "Reviews", href: "/ruby-app/admin/reviews", icon: Star },
-      { label: "Review moderation", href: "/ruby-app/admin/reviews/moderation", icon: Star },
-      { label: "Trust dashboard", href: "/ruby-app/admin/reviews/trust", icon: Star },
+      { label: "Marketers", href: "/ruby-app/admin/marketers", icon: Users },
+      { label: "Admin Users", href: "/ruby-app/admin/users", icon: Users, superOnly: true },
+    ],
+  },
+  {
+    title: "Commerce",
+    items: [
       { label: "Orders", href: "/ruby-app/admin/orders", icon: ShoppingCart },
-      { label: "Delivery", href: "/ruby-app/admin/delivery", icon: Truck },
       { label: "Bookings", href: "/ruby-app/admin/bookings", icon: CalendarCheck },
+      { label: "Delivery", href: "/ruby-app/admin/delivery", icon: Truck },
       { label: "Disputes", href: "/ruby-app/admin/disputes", icon: AlertTriangle },
       // P149 — Ruby+ Support inbox. Customer messages sent from the
       // mobile "Ruby+ Support" chat land here (separate module from
       // Disputes, which is order/booking-specific).
       { label: "Support Inbox", href: "/ruby-app/admin/support-chat", icon: MessageCircle },
-      { label: "Campaigns", href: "/ruby-app/admin/campaigns", icon: Megaphone },
-      // P120 — Business Ad Subscriptions (Starter / Growth / Prime).
-      // Sits in Operations because daily admin work is operational:
-      // moderating banner uploads, marking onboarding perks done,
-      // upgrading/cancelling subs on merchant request.
-      { label: "Ad Subscriptions", href: "/ruby-app/admin/ad-subscriptions", icon: Sparkles },
-      { label: "Promos", href: "/ruby-app/admin/promos", icon: Tag },
-      { label: "Marketers", href: "/ruby-app/admin/marketers", icon: Users },
-      { label: "Broadcasts", href: "/ruby-app/admin/broadcasts", icon: Radio },
     ],
   },
   {
-    // Phase 46 — Events promoted to its own top-level group so the four
-    // related screens (browse, sales report, recipients, scanner) stop
-    // being crammed into Operations with an awkward "Events:" label
-    // prefix. Matches the convention used by every other admin section.
+    title: "Reviews & Trust",
+    items: [
+      { label: "Reviews", href: "/ruby-app/admin/reviews", icon: Star },
+      { label: "Review moderation", href: "/ruby-app/admin/reviews/moderation", icon: Star },
+      { label: "Trust dashboard", href: "/ruby-app/admin/reviews/trust", icon: Star },
+    ],
+  },
+  {
+    // Phase 46 — Events promoted to its own group so the four related
+    // screens (browse, sales report, recipients, scanner) get first-class
+    // navigation. Matches every other admin section's convention.
     title: "Events",
     items: [
       { label: "All events", href: "/ruby-app/admin/events", icon: Ticket },
@@ -129,42 +118,66 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    title: "Finance & System",
+    // Everything that shapes what customers see and how merchants pay to
+    // reach them — the growth surface.
+    title: "Marketing",
+    items: [
+      // Phase 50 — admin-curated notice-board posts on the home carousel.
+      // Distinct surface from Home Sections (which configures the rows
+      // BELOW the carousel); this controls the carousel ITSELF.
+      { label: "Ruby+ Select", href: "/ruby-app/admin/ruby-select", icon: Sparkles, hiddenForRoles: ["location_admin"] },
+      { label: "Home Sections", href: "/ruby-app/admin/home-sections", icon: LayoutGrid, hiddenForRoles: ["location_admin"] },
+      { label: "Campaigns", href: "/ruby-app/admin/campaigns", icon: Megaphone },
+      // P120 — Business Ad Subscriptions (Starter / Growth / Prime).
+      // Grouped with Marketing because it's a growth product from the
+      // merchant's POV — daily admin ops are marketing / revenue work.
+      { label: "Ad Subscriptions", href: "/ruby-app/admin/ad-subscriptions", icon: Crown },
+      { label: "Promos", href: "/ruby-app/admin/promos", icon: Tag },
+      { label: "Broadcasts", href: "/ruby-app/admin/broadcasts", icon: Radio },
+    ],
+  },
+  {
+    title: "Rewards & Quests",
+    items: [
+      // Phase 59 — Review Rewards Engine (points → wallet credit).
+      { label: "Rewards", href: "/ruby-app/admin/rewards", icon: Gift },
+      // P99 — fraud-ring dashboard for reward ledger clusters. Kept next
+      // to Rewards because the queue lives against the same source data.
+      { label: "Cluster Alerts", href: "/ruby-app/admin/rewards/clusters", icon: ShieldAlert },
+      // P152-E — Ruby Quest admin. Reuses the same reward pool +
+      // ops-fulfilment muscle as Rewards, so grouped here.
+      { label: "Ruby Quest", href: "/ruby-app/admin/ruby-quest", icon: Gem },
+    ],
+  },
+  {
+    title: "Finance",
     items: [
       { label: "Finance", href: "/ruby-app/admin/finance", icon: Wallet },
       { label: "VAT Report", href: "/ruby-app/admin/finance/vat-report", icon: Receipt },
-      { label: "App Versions", href: "/ruby-app/admin/app-versions", icon: Smartphone },
+    ],
+  },
+  {
+    title: "Configuration",
+    items: [
+      { label: "Locations", href: "/ruby-app/admin/locations", icon: MapPin, hiddenForRoles: ["location_admin"] },
+      { label: "Taxonomy", href: "/ruby-app/admin/taxonomy", icon: FolderTree, hiddenForRoles: ["location_admin"] },
+      { label: "Templates", href: "/ruby-app/admin/templates", icon: FileText, hiddenForRoles: ["location_admin"] },
+      { label: "Legal", href: "/ruby-app/admin/legal", icon: Scale, hiddenForRoles: ["location_admin"] },
+    ],
+  },
+  {
+    title: "System",
+    items: [
       { label: "Audit Logs", href: "/ruby-app/admin/audit-logs", icon: ScrollText },
+      { label: "App Versions", href: "/ruby-app/admin/app-versions", icon: Smartphone },
       { label: "Deolu health", href: "/ruby-app/admin/deolu", icon: Sparkles },
-      // Phase 59 — Review Rewards Engine. Sits in Finance because the
-      // outstanding-points balance is a real ₦ liability against the
-      // platform; finance reviews it during reconciliation.
-      { label: "Rewards", href: "/ruby-app/admin/rewards", icon: Gift },
-      // P99 — fraud-ring dashboard (device + IP clusters across reward
-      // ledger rows). Same finance/super_admin RBAC as the parent
-      // Rewards screen; surfaced separately because the queue is
-      // monitored on a different cadence than the main rewards dash.
-      {
-        label: "Cluster Alerts",
-        href: "/ruby-app/admin/rewards/clusters",
-        icon: ShieldAlert,
-      },
-      // P152-E — Ruby Quest admin. Sits near Rewards because the reward
-      // pool + prize queue reuse the same operational muscle (ops
-      // fulfilment + fraud triage). Tabbed page: Spawns / Rewards / Prizes
-      // / Config.
-      {
-        label: "Ruby Quest",
-        href: "/ruby-app/admin/ruby-quest",
-        icon: Gem,
-      },
-      // P70 — Messaging test surface. SUPER_ADMIN-only screen for firing
-      // a one-off SMS through the live gateway to verify Termii config
-      // after an env change, without needing to do a full signup flow.
+      // Admin-managed email recipients for platform-wide ops alerts.
+      { label: "System Alerts", href: "/ruby-app/admin/system-alerts", icon: Bell, hiddenForRoles: ["location_admin"] },
+      // P70 — Messaging test surface. Fires a one-off SMS through the
+      // live gateway to verify config after an env change.
       { label: "Messaging", href: "/ruby-app/admin/messaging", icon: MessageSquare, superOnly: true },
-      // P135 — Merchant support contact singleton. SUPER_ADMIN-only edit
-      // surface for the WhatsApp number + intro message the business app's
-      // "Talk to Ruby+" card uses.
+      // P135 — Merchant support contact singleton. WhatsApp number +
+      // intro message the business app's "Talk to Ruby+" card uses.
       { label: "Merchant Support", href: "/ruby-app/admin/merchant-support", icon: MessageCircle, superOnly: true },
     ],
   },
@@ -208,31 +221,38 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   // Highlights the sidebar entry matching the current route.
   //
-  // Subtlety: when we run on the `xyzadmin.rubyplus.net` subdomain,
-  // middleware rewrites the browser URL to a clean form — so
-  // `/home-sections` is what `usePathname()` returns, NOT the
-  // internal `/ruby-app/admin/home-sections` that the sidebar hrefs
-  // point at. We compare against BOTH forms so the highlight works
-  // identically on the subdomain and on the legacy main-domain path.
-  //
-  // We also use `===` or `startsWith(href + '/')` instead of a bare
-  // `startsWith(href)` — otherwise `/business` would falsely match
-  // when we're on `/businesses`.
-  const isActive = (href: string) => {
-    const cleanHref = href.replace(/^\/ruby-app\/admin/, "") || "/";
-
-    // Dashboard root needs strict equality — every other href starts
-    // with it and would otherwise greedy-match every page.
+  // Subtleties:
+  //  1. When we run on the `xyzadmin.rubyplus.net` subdomain, middleware
+  //     rewrites the browser URL to a clean form — `/home-sections` is
+  //     what `usePathname()` returns, NOT `/ruby-app/admin/home-sections`.
+  //     We compare against BOTH forms so highlight works on both hosts.
+  //  2. We use `===` or `startsWith(href + '/')` (not bare `startsWith`)
+  //     — otherwise `/business` would falsely match `/businesses`.
+  //  3. Nested-route parents used to double-highlight: on `/reviews/moderation`
+  //     both "Reviews" (`/reviews`) AND "Review moderation" would light up
+  //     because both matched. Fix: compute the SINGLE longest-matching href
+  //     among all sidebar items and mark only that one active. The more
+  //     specific route wins because its href is longer.
+  const matchesHref = (href: string): boolean => {
     if (href === "/ruby-app/admin") {
       return pathname === href || pathname === "/";
     }
-
-    const matchesInternal =
-      pathname === href || pathname.startsWith(href + "/");
-    const matchesClean =
-      pathname === cleanHref || pathname.startsWith(cleanHref + "/");
-    return matchesInternal || matchesClean;
+    const cleanHref = href.replace(/^\/ruby-app\/admin/, "") || "/";
+    return (
+      pathname === href ||
+      pathname.startsWith(href + "/") ||
+      pathname === cleanHref ||
+      pathname.startsWith(cleanHref + "/")
+    );
   };
+
+  // Longest matching href wins. Compute once per render.
+  const activeHref = filteredGroups
+    .flatMap((g) => g.items.map((i) => i.href))
+    .filter(matchesHref)
+    .sort((a, b) => b.length - a.length)[0];
+
+  const isActive = (href: string) => href === activeHref;
 
   return (
     <div className="min-h-screen bg-gray-50/80">

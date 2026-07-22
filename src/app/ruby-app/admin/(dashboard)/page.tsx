@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Store, ShoppingCart, CalendarCheck, AlertTriangle,
   Wallet, MapPin, Clock, TrendingUp, TrendingDown, Activity,
-  Users, Gem, ArrowUpRight, Zap, Signal,
+  Users, Gem, ArrowUpRight,
   ChevronRight, Radio, Sparkles, Crown, Bell,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
@@ -68,13 +68,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* ═══ Hero + Live Pulse Strip ═══ */}
+      {/* ═══ Hero ═══ */}
       <HeroLivePulse
         firstName={admin?.firstName || 'Admin'}
         isSuperAdmin={isSuperAdmin}
         locationCount={admin?.locationIds?.length || 0}
-        pulse={pulse ?? undefined}
-        loading={pulseLoading}
       />
 
       {/* Error banner */}
@@ -219,14 +217,10 @@ function HeroLivePulse({
   firstName,
   isSuperAdmin,
   locationCount,
-  pulse,
-  loading,
 }: {
   firstName: string;
   isSuperAdmin: boolean;
   locationCount: number;
-  pulse?: LivePulseData;
-  loading: boolean;
 }) {
   return (
     <div
@@ -274,76 +268,6 @@ function HeroLivePulse({
           <LiveClock />
         </div>
 
-        {/* Live pulse strip */}
-        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <PulseCell
-            label="Customers online"
-            value={pulse?.onlineUsers ?? 0}
-            icon={Signal}
-            live
-            loading={loading}
-          />
-          <PulseCell
-            label="Businesses online"
-            value={pulse?.onlineBusinessOwners ?? 0}
-            icon={Store}
-            live
-            loading={loading}
-          />
-          <PulseCell
-            label="Active 24h"
-            value={pulse?.activeUsers24h ?? 0}
-            icon={Activity}
-            loading={loading}
-          />
-          <PulseCell
-            label="Window"
-            value={`${pulse?.windowMinutes ?? 15}m`}
-            icon={Zap}
-            loading={loading}
-            small
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PulseCell({
-  label, value, icon: Icon, live, loading, small,
-}: {
-  label: string;
-  value: number | string;
-  icon: React.ElementType;
-  live?: boolean;
-  loading?: boolean;
-  small?: boolean;
-}) {
-  return (
-    <div className="relative rounded-xl bg-white/[0.06] backdrop-blur-sm border border-white/10 px-4 py-3 hover:bg-white/[0.09] transition-colors group">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">
-          {label}
-        </span>
-        <Icon className="w-3.5 h-3.5 text-white/40" />
-      </div>
-      <div className="flex items-baseline gap-2">
-        {loading ? (
-          <span className="inline-block h-6 w-14 bg-white/10 animate-pulse rounded" />
-        ) : (
-          <span className={`font-bold text-white ${small ? 'text-lg' : 'text-2xl'}`}>
-            {typeof value === 'number' ? value.toLocaleString() : value}
-          </span>
-        )}
-        {live && !loading && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 font-semibold">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
-            </span>
-            LIVE
-          </span>
-        )}
       </div>
     </div>
   );

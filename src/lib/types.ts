@@ -1386,6 +1386,56 @@ export interface DashboardAnalytics {
   currency: string;
 }
 
+// Live pulse payload for the dashboard's real-time strip. Sourced from
+// GET /admin/analytics/live — one round-trip, all live metrics.
+export interface LivePulseData {
+  onlineUsers: number;
+  onlineBusinessOwners: number;
+  activeUsers24h: number;
+  windowMinutes: number;
+  counts24h: {
+    orders: number;
+    ordersDeltaPct: number;
+    bookings: number;
+    bookingsDeltaPct: number;
+    signups: number;
+    signupsDeltaPct: number;
+  };
+  revenue: {
+    thisWeek: number;
+    lastWeek: number;
+    deltaPct: number;
+  };
+  revenue7dSeries: Array<{ date: string; value: number }>;
+  businessTierDistribution: {
+    prime: number;
+    growth: number;
+    starter: number;
+    none: number;
+  };
+  timestamp: string;
+}
+
+export interface CategoryRanking {
+  categoryId: string;
+  categoryName: string;
+  views?: number;
+  searchHits?: number;
+  orders: number;
+  bookings: number;
+  revenue: number;
+  score: number;
+}
+
+export interface LocationPerformance {
+  locationId: string;
+  locationName: string;
+  orders: number;
+  bookings: number;
+  revenue: number;
+  score?: number;
+}
+
 // ============================================================
 // Media Upload
 // ============================================================

@@ -1270,6 +1270,38 @@ export const api = {
           >,
         },
       ),
+    // Live pulse — dashboard's real-time strip (online counts + 24h deltas
+    // + 7d revenue sparkline + business tier distribution). Single call.
+    live: (params?: { locationId?: string }) =>
+      request<import("@/lib/types").LivePulseData>(
+        "/admin/analytics/live",
+        {
+          params: params as Record<
+            string,
+            string | number | boolean | undefined
+          >,
+        },
+      ),
+    topCategories: (params?: { locationId?: string; limit?: number }) =>
+      request<import("@/lib/types").CategoryRanking[]>(
+        "/admin/analytics/top-categories",
+        {
+          params: params as Record<
+            string,
+            string | number | boolean | undefined
+          >,
+        },
+      ),
+    locations: (params?: { locationId?: string }) =>
+      request<import("@/lib/types").LocationPerformance[]>(
+        "/admin/analytics/locations",
+        {
+          params: params as Record<
+            string,
+            string | number | boolean | undefined
+          >,
+        },
+      ),
   },
 
   // Promos

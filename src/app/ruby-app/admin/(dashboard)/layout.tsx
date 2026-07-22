@@ -62,6 +62,32 @@ interface NavGroup {
   items: NavItem[];
 }
 
+/**
+ * Flat catalog of every sidebar item, derived from `navGroups` below.
+ * Exported so the Admin Users create/edit modal can render the same list
+ * as a checklist for per-admin sidebar access control. Keyed by href so
+ * the checklist + the runtime filter agree on identity.
+ *
+ * The Dashboard root (`/ruby-app/admin`) is excluded — every admin needs
+ * a landing page after login, and gating it would create a login → 403
+ * → nowhere-to-go loop.
+ */
+export interface SidebarCatalogItem {
+  href: string;
+  label: string;
+  section: string;
+}
+export function getSidebarCatalog(): SidebarCatalogItem[] {
+  const out: SidebarCatalogItem[] = [];
+  for (const g of navGroups) {
+    for (const i of g.items) {
+      if (i.href === '/ruby-app/admin') continue;
+      out.push({ href: i.href, label: i.label, section: g.title });
+    }
+  }
+  return out;
+}
+
 // Sidebar sections — grouped by admin mental model, not by internal team.
 // Order matches daily-use frequency: overview + on-call surfaces first,
 // customer-facing entities next, growth/marketing after, then Finance,
@@ -210,14 +236,47 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated || !admin) return null;
 
+  // Per-admin sidebar allow-list. SUPER_ADMIN is exempt — they always see
+  // every item. For everyone else, when `allowedSidebarItems` is set and
+  // non-empty, we use it as an exclusive filter on top of the existing
+  // role-based rules (`superOnly`, `hiddenForRoles`). Empty/undefined =
+  // fall back to role defaults so nothing changes for pre-existing
+  // admins. Dashboard root is always kept — every admin needs a landing.
+  const allowSet =
+    !isSuperAdmin && admin.allowedSidebarItems && admin.allowedSidebarItems.length > 0
+      ? new Set(admin.allowedSidebarItems)
+      : null;
+
   const filteredGroups = navGroups.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
       if (item.superOnly && !isSuperAdmin) return false;
       if (item.hiddenForRoles && admin.roles?.some((r) => item.hiddenForRoles!.includes(r))) return false;
+      if (allowSet && item.href !== '/ruby-app/admin' && !allowSet.has(item.href)) return false;
       return true;
     }),
   })).filter((group) => group.items.length > 0);
+
+  // Route guard — if a support admin types (or deep-links) a URL that
+  // isn't in their allow-list, bounce them to Dashboard. Runs on every
+  // pathname change. Bypassed for super_admins and for admins with no
+  // allow-list configured.
+  useEffect(() => {
+    if (!allowSet) return;
+    if (pathname === '/ruby-app/admin' || pathname === '/') return;
+    // Match against both the internal form and the subdomain-clean form
+    // (see isActive() below for the same-shape logic).
+    const allowedInternal = Array.from(allowSet);
+    const allowedClean = allowedInternal.map((h) =>
+      h.replace(/^\/ruby-app\/admin/, '') || '/',
+    );
+    const isAllowed = [...allowedInternal, ...allowedClean].some(
+      (h) => pathname === h || pathname.startsWith(h + '/'),
+    );
+    if (!isAllowed) {
+      router.replace('/ruby-app/admin');
+    }
+  }, [pathname, allowSet, router]);
 
   // Highlights the sidebar entry matching the current route.
   //

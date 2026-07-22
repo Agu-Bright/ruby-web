@@ -71,6 +71,10 @@ export interface AdminUser {
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
+  // Per-admin sidebar allow-list (hrefs from the sidebar catalog).
+  // Empty/undefined = fall back to role defaults. SUPER_ADMIN ignores this
+  // (they always see every item).
+  allowedSidebarItems?: string[];
 }
 
 export interface CreateAdminRequest {
@@ -81,6 +85,7 @@ export interface CreateAdminRequest {
   roles: AdminRole[];
   scope: AdminScope;
   locationIds: string[];
+  allowedSidebarItems?: string[];
 }
 
 export interface UpdateAdminRequest {
@@ -91,6 +96,7 @@ export interface UpdateAdminRequest {
   roles?: AdminRole[];
   scope?: AdminScope;
   locationIds?: string[];
+  allowedSidebarItems?: string[];
   isActive?: boolean;
 }
 

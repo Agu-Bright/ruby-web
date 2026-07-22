@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   Shield, Search, Plus, Eye, Pencil, Power, PowerOff, Copy, Check,
   Users, Clock, Globe, ChevronDown, X, MapPin, RefreshCw,
-  KeyRound, ExternalLink, AlertCircle, EyeOff, Activity,
+  KeyRound, ExternalLink, AlertCircle, EyeOff, Activity, LayoutGrid,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
@@ -18,6 +18,7 @@ import type {
   AdminUser, AdminRole, AdminScope, CreateAdminRequest, UpdateAdminRequest,
   PaginationParams, Location, ApiResponse,
 } from '@/lib/types';
+import { getSidebarCatalog, type SidebarCatalogItem } from '../layout';
 
 /** Fetch all CITY locations across pages (backend max limit=100) */
 async function fetchAllCityLocations(): Promise<ApiResponse<Location[]>> {
@@ -193,6 +194,166 @@ function CredentialRow({
       >
         {isCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
       </button>
+    </div>
+  );
+}
+
+// ─── Sidebar Access Checklist ───────────────────────────────
+//
+// Shared between Create + Edit modals so both flows show identical UX.
+// SUPER_ADMIN always sees every sidebar item at runtime; showing this
+// picker for that role would be a lie, so it's hidden by the caller.
+//
+// Semantics:
+//   - Empty selection = "no override" → falls back to role defaults on
+//     the sidebar (existing `superOnly` / `hiddenForRoles` filter).
+//   - Non-empty selection = exclusive allow-list; only checked items
+//     appear in the sidebar. Everything else is also blocked from
+//     direct-URL access via the route guard in the dashboard layout.
+//   - Dashboard root is always accessible and not shown here.
+function SidebarAccessChecklist({
+  value,
+  onChange,
+  role,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+  role: AdminRole;
+}) {
+  const catalog = useMemo<SidebarCatalogItem[]>(() => getSidebarCatalog(), []);
+  const grouped = useMemo(() => {
+    const map = new Map<string, SidebarCatalogItem[]>();
+    for (const item of catalog) {
+      if (!map.has(item.section)) map.set(item.section, []);
+      map.get(item.section)!.push(item);
+    }
+    return Array.from(map.entries());
+  }, [catalog]);
+  const selectedSet = useMemo(() => new Set(value), [value]);
+
+  if (role === 'super_admin') {
+    return (
+      <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <p className="text-xs text-purple-700 flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 shrink-0" />
+          Super Admin always has access to <strong>every sidebar item</strong> — no restriction needed.
+        </p>
+      </div>
+    );
+  }
+
+  const allHrefs = catalog.map((c) => c.href);
+  const allSelected = allHrefs.every((h) => selectedSet.has(h));
+  const noneSelected = value.length === 0;
+
+  const toggle = (href: string) => {
+    if (selectedSet.has(href)) {
+      onChange(value.filter((h) => h !== href));
+    } else {
+      onChange([...value, href]);
+    }
+  };
+  const toggleSection = (items: SidebarCatalogItem[]) => {
+    const allChecked = items.every((i) => selectedSet.has(i.href));
+    if (allChecked) {
+      onChange(value.filter((h) => !items.some((i) => i.href === h)));
+    } else {
+      const add = items.filter((i) => !selectedSet.has(i.href)).map((i) => i.href);
+      onChange([...value, ...add]);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-xs text-blue-700 leading-relaxed">
+          Pick exactly which sidebar sections this admin can see and open. Unchecked
+          items are also blocked from direct URL access. <strong>Leaving everything unchecked</strong> falls
+          back to the role&apos;s default sidebar — use that when you want normal access.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-gray-500">
+          {noneSelected
+            ? 'Using role defaults'
+            : `${value.length} of ${allHrefs.length} items selected`}
+        </span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onChange(allHrefs)}
+            disabled={allSelected}
+            className="text-blue-600 hover:text-blue-800 font-medium disabled:text-gray-300 disabled:cursor-not-allowed"
+          >
+            Select all
+          </button>
+          <span className="text-gray-300">|</span>
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            disabled={noneSelected}
+            className="text-gray-600 hover:text-gray-800 font-medium disabled:text-gray-300 disabled:cursor-not-allowed"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div className="max-h-72 overflow-y-auto pr-1 rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
+        {grouped.map(([section, items]) => {
+          const allChecked = items.every((i) => selectedSet.has(i.href));
+          const someChecked = items.some((i) => selectedSet.has(i.href));
+          return (
+            <div key={section} className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.12em]">
+                    {section}
+                  </span>
+                  {someChecked && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold">
+                      {items.filter((i) => selectedSet.has(i.href)).length}/{items.length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(items)}
+                  className="text-[11px] text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  {allChecked ? 'Uncheck section' : 'Check section'}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                {items.map((item) => {
+                  const checked = selectedSet.has(item.href);
+                  return (
+                    <label
+                      key={item.href}
+                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
+                        checked ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(item.href)}
+                        className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                      />
+                      <span
+                        className={`text-xs ${checked ? 'text-blue-900 font-medium' : 'text-gray-700'}`}
+                      >
+                        {item.label}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -583,6 +744,7 @@ function CreateAdminModal({
   const [form, setForm] = useState<CreateAdminRequest>({
     email: '', password: '', firstName: '', lastName: '',
     roles: ['location_admin'], scope: 'LOCATION', locationIds: [],
+    allowedSidebarItems: [],
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -654,6 +816,7 @@ function CreateAdminModal({
     setForm({
       email: '', password: '', firstName: '', lastName: '',
       roles: ['location_admin'], scope: 'LOCATION', locationIds: [],
+      allowedSidebarItems: [],
     });
     setShowPassword(false);
   }, []);
@@ -883,6 +1046,20 @@ function CreateAdminModal({
           </div>
         </div>
 
+        {/* Sidebar Access */}
+        <div className="space-y-4">
+          <SectionHeader
+            icon={LayoutGrid}
+            title="Sidebar Access"
+            description="Choose which admin pages this account can see and open"
+          />
+          <SidebarAccessChecklist
+            value={form.allowedSidebarItems || []}
+            onChange={(next) => setForm({ ...form, allowedSidebarItems: next })}
+            role={selectedRole}
+          />
+        </div>
+
         {/* Submit */}
         <div className="flex items-center justify-between pt-5 border-t border-gray-200">
           <p className="text-[11px] text-gray-400 flex items-center gap-1">
@@ -1056,6 +1233,7 @@ function EditAdminModal({
     roles: admin.roles,
     scope: admin.scope,
     locationIds: getRawLocationIds(admin.locationIds || []),
+    allowedSidebarItems: admin.allowedSidebarItems || [],
   });
   const [password, setPassword] = useState('');
   const [showPasswordSection, setShowPasswordSection] = useState(false);
@@ -1316,6 +1494,20 @@ function EditAdminModal({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Sidebar Access */}
+        <div className="space-y-4">
+          <SectionHeader
+            icon={LayoutGrid}
+            title="Sidebar Access"
+            description="Choose which admin pages this account can see and open"
+          />
+          <SidebarAccessChecklist
+            value={form.allowedSidebarItems || []}
+            onChange={(next) => setForm({ ...form, allowedSidebarItems: next })}
+            role={selectedRole}
+          />
         </div>
 
         {/* Submit */}

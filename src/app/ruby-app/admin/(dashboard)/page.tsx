@@ -39,6 +39,28 @@ export default function DashboardPage() {
     ? toLocationId(admin.locationIds[0])
     : undefined;
 
+  // Dashboard sections gate against the admin's sidebar allow-list.
+  // SUPER_ADMIN sees everything. An admin with no allow-list configured
+  // also sees everything (falls back to role defaults). Support / limited
+  // admins only see cards whose feature area they can access via the
+  // sidebar — so their dashboard mirrors what they can actually navigate to.
+  const canSee = useMemo(() => {
+    if (isSuperAdmin) return () => true;
+    const list = admin?.allowedSidebarItems;
+    if (!list || list.length === 0) return () => true;
+    const allow = new Set(list);
+    return (path: string) =>
+      allow.has(path) || allow.has(`/ruby-app/admin${path}`);
+  }, [isSuperAdmin, admin?.allowedSidebarItems]);
+
+  const canRevenue = canSee('/finance');
+  const canOrders = canSee('/orders');
+  const canBookings = canSee('/bookings');
+  const canCustomers = canSee('/customers');
+  const canBusinesses = canSee('/businesses');
+  const canDisputes = canSee('/disputes');
+  const canAuditLogs = canSee('/audit-logs');
+
   const { data: summary, isLoading: summaryLoading, error } = useApi<DashboardAnalytics>(
     () => api.analytics.dashboard({ locationId }),
     [locationId],
@@ -60,8 +82,10 @@ export default function DashboardPage() {
   );
 
   const { data: recentLogs, isLoading: logsLoading } = useApi<AuditLog[]>(
-    () => api.auditLogs.list({ limit: 8, page: 1 }),
-    [],
+    () => (canAuditLogs
+      ? api.auditLogs.list({ limit: 8, page: 1 })
+      : Promise.resolve({ success: true, data: [] })),
+    [canAuditLogs],
   );
 
   const totalRevenue = (summary?.orderRevenue ?? 0) + (summary?.bookingRevenue ?? 0);
@@ -83,126 +107,155 @@ export default function DashboardPage() {
       )}
 
       {/* ═══ Headline KPI Ring (with deltas) ═══ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <HeadlineKpi
-          title="Revenue (this week)"
-          value={formatCurrency(pulse?.revenue.thisWeek ?? 0)}
-          deltaPct={pulse?.revenue.deltaPct}
-          icon={Wallet}
-          tint="emerald"
-          loading={pulseLoading}
-          href="/ruby-app/admin/finance"
-        />
-        <HeadlineKpi
-          title="Orders (24h)"
-          value={pulse?.counts24h.orders ?? 0}
-          deltaPct={pulse?.counts24h.ordersDeltaPct}
-          icon={ShoppingCart}
-          tint="blue"
-          loading={pulseLoading}
-          href="/ruby-app/admin/orders"
-        />
-        <HeadlineKpi
-          title="Bookings (24h)"
-          value={pulse?.counts24h.bookings ?? 0}
-          deltaPct={pulse?.counts24h.bookingsDeltaPct}
-          icon={CalendarCheck}
-          tint="teal"
-          loading={pulseLoading}
-          href="/ruby-app/admin/bookings"
-        />
-        <HeadlineKpi
-          title="Signups (24h)"
-          value={pulse?.counts24h.signups ?? 0}
-          deltaPct={pulse?.counts24h.signupsDeltaPct}
-          icon={Users}
-          tint="indigo"
-          loading={pulseLoading}
-          href="/ruby-app/admin/customers"
-        />
-      </div>
+      {(canRevenue || canOrders || canBookings || canCustomers) && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {canRevenue && (
+            <HeadlineKpi
+              title="Revenue (this week)"
+              value={formatCurrency(pulse?.revenue.thisWeek ?? 0)}
+              deltaPct={pulse?.revenue.deltaPct}
+              icon={Wallet}
+              tint="emerald"
+              loading={pulseLoading}
+              href="/ruby-app/admin/finance"
+            />
+          )}
+          {canOrders && (
+            <HeadlineKpi
+              title="Orders (24h)"
+              value={pulse?.counts24h.orders ?? 0}
+              deltaPct={pulse?.counts24h.ordersDeltaPct}
+              icon={ShoppingCart}
+              tint="blue"
+              loading={pulseLoading}
+              href="/ruby-app/admin/orders"
+            />
+          )}
+          {canBookings && (
+            <HeadlineKpi
+              title="Bookings (24h)"
+              value={pulse?.counts24h.bookings ?? 0}
+              deltaPct={pulse?.counts24h.bookingsDeltaPct}
+              icon={CalendarCheck}
+              tint="teal"
+              loading={pulseLoading}
+              href="/ruby-app/admin/bookings"
+            />
+          )}
+          {canCustomers && (
+            <HeadlineKpi
+              title="Signups (24h)"
+              value={pulse?.counts24h.signups ?? 0}
+              deltaPct={pulse?.counts24h.signupsDeltaPct}
+              icon={Users}
+              tint="indigo"
+              loading={pulseLoading}
+              href="/ruby-app/admin/customers"
+            />
+          )}
+        </div>
+      )}
 
       {/* ═══ Revenue chart + Tier distribution ═══ */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="xl:col-span-2">
-          <RevenueChartCard
-            series={pulse?.revenue7dSeries}
-            thisWeek={pulse?.revenue.thisWeek ?? 0}
-            deltaPct={pulse?.revenue.deltaPct}
-            loading={pulseLoading}
-          />
+      {(canRevenue || canBusinesses) && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          {canRevenue && (
+            <div className={canBusinesses ? 'xl:col-span-2' : 'xl:col-span-3'}>
+              <RevenueChartCard
+                series={pulse?.revenue7dSeries}
+                thisWeek={pulse?.revenue.thisWeek ?? 0}
+                deltaPct={pulse?.revenue.deltaPct}
+                loading={pulseLoading}
+              />
+            </div>
+          )}
+          {canBusinesses && (
+            <TierDistributionCard
+              distribution={pulse?.businessTierDistribution}
+              loading={pulseLoading}
+            />
+          )}
         </div>
-        <TierDistributionCard
-          distribution={pulse?.businessTierDistribution}
-          loading={pulseLoading}
-        />
-      </div>
+      )}
 
       {/* ═══ Secondary KPIs (compact grid) ═══ */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <MiniStat
-          label="Businesses"
-          value={summary?.totalBusinesses ?? 0}
-          sub={`${summary?.liveBusinesses ?? 0} live`}
-          icon={Store}
-          tint="ruby"
-          loading={summaryLoading}
-        />
-        <MiniStat
-          label="Pending"
-          value={summary?.pendingBusinesses ?? 0}
-          sub="approval"
-          icon={Clock}
-          tint="amber"
-          loading={summaryLoading}
-        />
-        <MiniStat
-          label="Users"
-          value={summary?.totalUsers ?? 0}
-          sub={`+${summary?.newUsers ?? 0} (30d)`}
-          icon={Users}
-          tint="indigo"
-          loading={summaryLoading}
-        />
-        <MiniStat
-          label="Total revenue"
-          value={formatCurrency(totalRevenue)}
-          sub={summary?.currency || 'NGN'}
-          icon={TrendingUp}
-          tint="emerald"
-          loading={summaryLoading}
-        />
-        <MiniStat
-          label="Open disputes"
-          value={summary?.openDisputes ?? 0}
-          sub={`${summary?.totalDisputes ?? 0} total`}
-          icon={AlertTriangle}
-          tint="orange"
-          loading={summaryLoading}
-        />
-        <MiniStat
-          label="Payouts"
-          value={summary?.totalPayouts ?? 0}
-          sub={formatCurrency(summary?.payoutAmount ?? 0)}
-          icon={Wallet}
-          tint="violet"
-          loading={summaryLoading}
-        />
+        {canBusinesses && (
+          <MiniStat
+            label="Businesses"
+            value={summary?.totalBusinesses ?? 0}
+            sub={`${summary?.liveBusinesses ?? 0} live`}
+            icon={Store}
+            tint="ruby"
+            loading={summaryLoading}
+          />
+        )}
+        {canBusinesses && (
+          <MiniStat
+            label="Pending"
+            value={summary?.pendingBusinesses ?? 0}
+            sub="approval"
+            icon={Clock}
+            tint="amber"
+            loading={summaryLoading}
+          />
+        )}
+        {canCustomers && (
+          <MiniStat
+            label="Users"
+            value={summary?.totalUsers ?? 0}
+            sub={`+${summary?.newUsers ?? 0} (30d)`}
+            icon={Users}
+            tint="indigo"
+            loading={summaryLoading}
+          />
+        )}
+        {canRevenue && (
+          <MiniStat
+            label="Total revenue"
+            value={formatCurrency(totalRevenue)}
+            sub={summary?.currency || 'NGN'}
+            icon={TrendingUp}
+            tint="emerald"
+            loading={summaryLoading}
+          />
+        )}
+        {canDisputes && (
+          <MiniStat
+            label="Open disputes"
+            value={summary?.openDisputes ?? 0}
+            sub={`${summary?.totalDisputes ?? 0} total`}
+            icon={AlertTriangle}
+            tint="orange"
+            loading={summaryLoading}
+          />
+        )}
+        {canRevenue && (
+          <MiniStat
+            label="Payouts"
+            value={summary?.totalPayouts ?? 0}
+            sub={formatCurrency(summary?.payoutAmount ?? 0)}
+            icon={Wallet}
+            tint="violet"
+            loading={summaryLoading}
+          />
+        )}
       </div>
 
-      {/* ═══ Top categories + top locations ═══ */}
+      {/* ═══ Top categories + top locations / recent activity ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TopCategoriesCard categories={topCategories ?? []} loading={catsLoading} />
         {isSuperAdmin ? (
           <TopLocationsCard locations={locationPerf ?? []} loading={locsLoading} />
-        ) : (
+        ) : canAuditLogs ? (
           <RecentActivityCard logs={recentLogs ?? []} loading={logsLoading} />
-        )}
+        ) : null}
       </div>
 
-      {/* Recent activity — full width when super_admin (already showed
-          locations above); location admins get it in the pair above. */}
-      {isSuperAdmin && (
+      {/* Recent activity — full width for super_admin (Locations already
+          showed above). Location/support admins already have it in the
+          pair above when they can see audit logs. */}
+      {isSuperAdmin && canAuditLogs && (
         <RecentActivityCard logs={recentLogs ?? []} loading={logsLoading} />
       )}
     </div>

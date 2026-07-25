@@ -404,6 +404,646 @@ export const api = {
       ),
   },
 
+  // ============================================================
+  // Business owner auth (M0 of business web port)
+  //
+  // Endpoints mirror the mobile business app's `ApiEndpoints.auth.*` map.
+  // Tokens are stored under the `ruby_business_*` localStorage keys by
+  // `BusinessAuthContext`, kept separate from admin tokens on purpose so
+  // the two sessions never collide when both are open in the same
+  // browser (e.g. admin ops running a merchant test account side-by-side).
+  //
+  // No `noAuth` on `me()` / `changePassword()` / `updateProfile()` — the
+  // business dashboard callsite passes its own bearer via a request
+  // override (see `business-api/client-adapter.ts` when the parallel
+  // client lands). For M0, the login flow itself only needs public POSTs.
+  // ============================================================
+  businessAuth: {
+    login: (data: { email: string; password: string }) =>
+      request<{
+        accessToken?: string;
+        refreshToken?: string;
+        tokens?: { accessToken: string; refreshToken: string };
+        user: {
+          id?: string;
+          _id?: string;
+          email: string;
+          firstName?: string;
+          lastName?: string;
+          phone?: string;
+          isEmailVerified?: boolean;
+          isPhoneVerified?: boolean;
+          phoneVerifiedAt?: string;
+        };
+        hasBusinesses?: boolean;
+        business?: { id: string; _id?: string; name: string; status?: string };
+      }>("/auth/business/login", { method: "POST", body: data, noAuth: true }),
+
+    // Google + Apple sign-in (identity token exchange). Web sends the
+    // ID token from Google Identity Services (or Apple JS SDK on Safari)
+    // and the backend either creates the merchant account or logs them in.
+    googleAuth: (data: { idToken: string }) =>
+      request<{
+        accessToken?: string;
+        refreshToken?: string;
+        tokens?: { accessToken: string; refreshToken: string };
+        user: {
+          id?: string;
+          _id?: string;
+          email: string;
+          firstName?: string;
+          lastName?: string;
+        };
+        hasBusinesses?: boolean;
+        business?: { id: string; _id?: string; name: string; status?: string };
+      }>("/auth/business/google", { method: "POST", body: data, noAuth: true }),
+
+    appleAuth: (data: {
+      identityToken: string;
+      firstName?: string;
+      lastName?: string;
+    }) =>
+      request<{
+        accessToken?: string;
+        refreshToken?: string;
+        tokens?: { accessToken: string; refreshToken: string };
+        user?: { id?: string; _id?: string; email: string; firstName?: string; lastName?: string };
+        hasBusinesses?: boolean;
+        business?: { id: string; _id?: string; name: string; status?: string };
+      }>("/auth/business/apple", { method: "POST", body: data, noAuth: true }),
+
+    forgotPassword: (data: { email: string }) =>
+      request<{ message?: string }>(
+        "/auth/business/forgot-password",
+        { method: "POST", body: data, noAuth: true },
+      ),
+
+    resetPassword: (data: { email: string; otp: string; newPassword: string }) =>
+      request<{ message?: string }>(
+        "/auth/business/reset-password",
+        { method: "POST", body: data, noAuth: true },
+      ),
+
+    // Refresh is shared across roles (backend uses the same endpoint for
+    // admin, user, business). The BusinessAuthContext calls this with the
+    // business-scoped refresh token from its own localStorage key.
+    refresh: (refreshToken: string) =>
+      request<{ accessToken: string; refreshToken: string }>(
+        "/auth/refresh",
+        { method: "POST", body: { refreshToken }, noAuth: true },
+      ),
+
+    // `me()` returns the authoritative business-user profile from the
+    // server — always call after login to settle the verification gate.
+    // Uses `noAuth: false` so the shared bearer flows; the business
+    // context wires its own token via a per-request header override.
+    me: () =>
+      request<{
+        _id: string;
+        id?: string;
+        email: string;
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        isEmailVerified?: boolean;
+        isPhoneVerified?: boolean;
+        phoneVerifiedAt?: string;
+      }>("/auth/me"),
+
+    // Client-side clear; backend has no logout endpoint (JWT is stateless).
+    // BusinessAuthContext also flips the store + clears its own localStorage
+    // keys — this is only for symmetry with the admin `logout()` shape.
+    logout: () => Promise.resolve({ success: true, data: undefined as unknown as void }),
+  },
+
+  // ============================================================
+  // Business identity / profile (owner view).
+  //
+  // Used by the auth context to hydrate the SelectedBusiness with the
+  // populated `subcategoryId.businessModel` and `sellsProducts` after
+  // login — the login response only returns _id + name + status, but we
+  // need the business model to decide whether the sidebar shows Products
+  // vs Services (M5 visibility gate).
+  //
+  // Also used by the future BranchSwitcher (M12) via `listMyBusinesses`.
+  // ============================================================
+  businessMe: {
+    // GET /business/my-businesses — owner-only list of owned brands +
+    // branches. Subcategory populated with businessModel field so the
+    // client can decide catalog visibility per business.
+    listMyBusinesses: () =>
+      request<
+        Array<{
+          _id: string;
+          name: string;
+          slug?: string;
+          status?: string;
+          isParent?: boolean;
+          parentBusinessId?: string;
+          logoUrl?: string;
+          sellsProducts?: boolean;
+          subcategoryId?:
+            | string
+            | {
+                _id: string;
+                name?: string;
+                slug?: string;
+                businessModel?: 'ORDER_DELIVERY' | 'VISIT_ONLY' | 'BOOKING_VISIT';
+                productFields?: unknown[];
+                serviceFields?: unknown[];
+                allowedFulfillmentModes?: string[];
+              };
+          categoryId?: string | { _id: string; name?: string; slug?: string };
+          locationId?: string | { _id: string; name?: string; slug?: string };
+        }>
+      >('/business/my-businesses'),
+
+    // GET /business/:id — owner view of a single business, subcategory
+    // populated. Called during login for enrichment.
+    getBusinessProfile: (id: string) =>
+      request<{
+        _id: string;
+        name: string;
+        slug?: string;
+        status?: string;
+        isParent?: boolean;
+        parentBusinessId?: string;
+        logoUrl?: string;
+        sellsProducts?: boolean;
+        subcategoryId?:
+          | string
+          | {
+              _id: string;
+              name?: string;
+              slug?: string;
+              businessModel?: 'ORDER_DELIVERY' | 'VISIT_ONLY' | 'BOOKING_VISIT';
+              productFields?: unknown[];
+              serviceFields?: unknown[];
+              allowedFulfillmentModes?: string[];
+            };
+        categoryId?: string | { _id: string; name?: string; slug?: string };
+        locationId?: string | { _id: string; name?: string; slug?: string };
+      }>(`/business/${id}`),
+  },
+
+  // ============================================================
+  // Business daily-operations (M1)
+  //
+  // Mirror of mobile `dailyOperationsApi` — merchants use these to open/close
+  // the shop for the day + manage today's stock. `today` doubles as the
+  // "am I open right now?" query for the StoreStatusBar and the dashboard
+  // header banners.
+  // ============================================================
+  businessDailyOperations: {
+    getTodayStatus: (businessId: string) =>
+      request<{
+        isOpen: boolean;
+        openedAt?: string;
+        closedAt?: string;
+        autoOpen?: boolean;
+        productCount?: number;
+        activeProducts?: number;
+        services?: unknown[];
+        hoursToday?: { open: string; close: string } | null;
+      }>("/business/daily-operations/today", { params: { businessId } }),
+
+    openDay: (data: {
+      businessId: string;
+      productIds?: string[];
+      closeTime?: string;
+    }) =>
+      request<{ success: boolean; openedAt: string }>(
+        "/business/daily-operations/open",
+        { method: "POST", body: data },
+      ),
+
+    goOffline: (data: { businessId: string }) =>
+      request<{ success: boolean; closedAt: string }>(
+        "/business/daily-operations/offline",
+        { method: "POST", body: data },
+      ),
+
+    updateInventory: (data: {
+      businessId: string;
+      productIds?: string[];
+      outOfStockIds?: string[];
+    }) =>
+      request<{ success: boolean }>(
+        "/business/daily-operations/inventory",
+        { method: "POST", body: data },
+      ),
+  },
+
+  // ============================================================
+  // Business analytics (M1 + M11)
+  //
+  // Endpoints for dashboard KPI cards, engagement chart (7/14/30 day
+  // chips), and review-stats card. Full analytics dashboard lands in M11;
+  // M1 uses only the top-line counts.
+  // ============================================================
+  businessAnalytics: {
+    // High-level counts + revenue for the dashboard header + StatCards.
+    getBusiness: (businessId: string, startDate?: string, endDate?: string) =>
+      request<{
+        totalOrders?: number;
+        totalBookings?: number;
+        totalRevenue?: number;
+        activeCustomers?: number;
+        averageRating?: number;
+        totalReviews?: number;
+      }>("/business/analytics", { params: { businessId, startDate, endDate } }),
+
+    // Time-series engagement (views, contacts, saves) with optional range.
+    getEngagement: (
+      businessId: string,
+      startDate?: string,
+      endDate?: string,
+    ) =>
+      request<{
+        views?: number;
+        contacts?: number;
+        saves?: number;
+        series?: { date: string; views: number }[];
+      }>("/business/analytics/engagement", {
+        params: { businessId, startDate, endDate },
+      }),
+
+    getReviewStats: (businessId: string) =>
+      request<{
+        averageRating?: number;
+        totalReviews?: number;
+        recent?: { _id: string; rating: number; comment?: string }[];
+      }>("/business/analytics/reviews", { params: { businessId } }),
+
+    // Dashboard stats — orders today, active bookings, wallet balance.
+    // Mobile maps this to `orders.stats/dashboard`.
+    getDashboardStats: (businessId: string) =>
+      request<{
+        ordersToday?: number;
+        pendingOrders?: number;
+        activeBookings?: number;
+        pendingBookings?: number;
+        newOrdersToday?: number;
+        revenueToday?: number;
+        walletBalance?: number;
+      }>("/business/orders/stats/dashboard", { params: { businessId } }),
+  },
+
+  // ============================================================
+  // Business orders (M2)
+  //
+  // 1:1 mirror of mobile `ordersApi`. Every mobile endpoint has a matching
+  // method here so downstream milestones (M11 notifications deep-linking
+  // into orders, M6 wallet transactions cross-linked to source orders,
+  // etc.) don't strand hooks.
+  //
+  // The Order shape carries backend↔frontend field mismatches (nested
+  // `fees` vs flat `subtotal/total`, `type` vs `fulfillmentType`,
+  // `statusHistory` vs `statusTimeline`) — the response type below keeps
+  // both forms optional so `src/lib/business-format.ts` helpers can
+  // pick with `??` fallbacks. See docs/business-web-port/PLAN.md rule
+  // on backend↔frontend field mismatches.
+  // ============================================================
+  businessOrders: {
+    list: (params: {
+      businessId: string;
+      page?: number;
+      limit?: number;
+      status?: string;
+    }) =>
+      request<import("@/lib/business-api/orders").BusinessOrder[]>(
+        "/business/orders",
+        { params: params as Record<string, string | number | boolean | undefined> },
+      ),
+
+    recent: (businessId: string, limit = 10) =>
+      request<import("@/lib/business-api/orders").BusinessOrder[]>(
+        "/business/orders/recent",
+        { params: { businessId, limit } },
+      ),
+
+    pendingCount: (businessId: string) =>
+      request<{ count: number }>("/business/orders/pending-count", {
+        params: { businessId },
+      }),
+
+    detail: (id: string, businessId: string) =>
+      request<import("@/lib/business-api/orders").BusinessOrder>(
+        `/business/orders/${id}`,
+        { params: { businessId } },
+      ),
+
+    accept: (id: string, businessId: string, estimatedPrepTime?: number) =>
+      request<import("@/lib/business-api/orders").BusinessOrder>(
+        `/business/orders/${id}/accept`,
+        {
+          method: "POST",
+          body: { estimatedPrepTime },
+          params: { businessId },
+        },
+      ),
+
+    reject: (id: string, businessId: string, reason: string) =>
+      request<import("@/lib/business-api/orders").BusinessOrder>(
+        `/business/orders/${id}/reject`,
+        { method: "POST", body: { reason }, params: { businessId } },
+      ),
+
+    updateStatus: (id: string, businessId: string, status: string) =>
+      request<import("@/lib/business-api/orders").BusinessOrder>(
+        `/business/orders/${id}/status`,
+        { method: "PUT", body: { status }, params: { businessId } },
+      ),
+
+    cancel: (id: string, businessId: string, reason: string) =>
+      request<import("@/lib/business-api/orders").BusinessOrder>(
+        `/business/orders/${id}/cancel`,
+        { method: "POST", body: { reason }, params: { businessId } },
+      ),
+
+    stats: (businessId: string, startDate?: string, endDate?: string) =>
+      request<{
+        totalOrders?: number;
+        totalRevenue?: number;
+        avgOrderValue?: number;
+      }>("/business/orders/stats/summary", {
+        params: { businessId, startDate, endDate },
+      }),
+  },
+
+  businessProducts: {
+    create: (data: import("@/lib/business-api/products").CreateProductPayload) => request<import("@/lib/business-api/products").BusinessProduct>("/business/products", { method: "POST", body: data }),
+    list: (params: { businessId: string; page?: number; limit?: number; category?: string; status?: string; search?: string }) => request<import("@/lib/business-api/products").BusinessProduct[]>("/business/products", { params }),
+    detail: (id: string) => request<import("@/lib/business-api/products").BusinessProduct>(`/business/products/${id}`),
+    update: (id: string, data: import("@/lib/business-api/products").UpdateProductPayload) => request<import("@/lib/business-api/products").BusinessProduct>(`/business/products/${id}`, { method: "PUT", body: data }),
+    remove: (id: string) => request<void>(`/business/products/${id}`, { method: "DELETE" }),
+    bulkUpdateStock: (updates: { productId: string; stockQuantity: number }[]) => request<unknown>("/business/products/bulk/stock", { method: "POST", body: { updates } }),
+    bulkUpdateStatus: (businessId: string, productIds: string[], status: string) => request<unknown>("/business/products/bulk/status", { method: "POST", params: { businessId }, body: { productIds, status } }),
+    updateOrder: (id: string, order: number) => request<import("@/lib/business-api/products").BusinessProduct>(`/business/products/${id}/order`, { method: "PUT", body: { order } }),
+  },
+  businessServices: {
+    create: (data: import("@/lib/business-api/services").CreateServicePayload) => request<import("@/lib/business-api/services").BusinessService>("/business/services", { method: "POST", body: data }),
+    list: (businessId: string, status?: string) => request<import("@/lib/business-api/services").BusinessService[]>("/business/services", { params: { businessId, status } }),
+    detail: (id: string) => request<import("@/lib/business-api/services").BusinessService>(`/business/services/${id}`),
+    update: (id: string, data: import("@/lib/business-api/services").UpdateServicePayload) => request<import("@/lib/business-api/services").BusinessService>(`/business/services/${id}`, { method: "PUT", body: data }),
+    remove: (id: string) => request<void>(`/business/services/${id}`, { method: "DELETE" }),
+    activate: (id: string) => request<import("@/lib/business-api/services").BusinessService>(`/business/services/${id}/activate`, { method: "POST" }),
+    deactivate: (id: string) => request<import("@/lib/business-api/services").BusinessService>(`/business/services/${id}/deactivate`, { method: "POST" }),
+    stats: (id: string) => request<{ viewCount:number; totalBookings:number; averageRating:number; totalReviews:number }>(`/business/services/${id}/stats`),
+    businessStats: (businessId: string) => request<unknown>("/business/services/stats", { params: { businessId } }),
+  },
+  businessWallets: {
+    list: (businessId:string) => request<any[]>(`/business/wallets/${businessId}`),
+    detail: (id:string) => request<any>(`/business/wallets/${id}`),
+    transactions: (id:string, params?:Record<string,string|number|undefined>) => request<any[]>(`/business/wallets/${id}/transactions`,{params}),
+    stats: (id:string) => request<any>(`/business/wallets/${id}/stats`),
+    periodStats: (id:string) => request<any>(`/business/wallets/${id}/period-stats`),
+    fund: (id:string, amount:number) => request<any>(`/business/wallets/${id}/fund`,{method:'POST',body:{amount}}),
+    merchantCode: (businessId:string) => request<{merchantCode:string;businessId:string;businessName:string}>(`/businesses/${businessId}/merchant-code`),
+  },
+  businessBankAccounts: {
+    create:(data:any)=>request<any>('/business/bank-accounts',{method:'POST',body:data}), list:(businessId:string,currency?:string)=>request<any[]>('/business/bank-accounts',{params:{businessId,currency}}), detail:(id:string)=>request<any>(`/business/bank-accounts/${id}`), update:(id:string,data:any)=>request<any>(`/business/bank-accounts/${id}`,{method:'PUT',body:data}), remove:(id:string,businessId:string)=>request<void>(`/business/bank-accounts/${id}`,{method:'DELETE',params:{businessId}}), resolve:(accountNumber:string,bankCode:string)=>request<any>('/business/bank-accounts/resolve',{method:'POST',body:{accountNumber,bankCode}}), banks:()=>request<any[]>('/business/bank-accounts/banks'),
+  },
+  businessPayouts: {
+    create:(data:any)=>request<any>('/business/payouts',{method:'POST',body:data}), secureWithdraw:(data:any)=>request<any>('/business/payouts/secure-withdraw',{method:'POST',body:data}), list:(params:any)=>request<any[]>('/business/payouts',{params}), detail:(id:string)=>request<any>(`/business/payouts/${id}`), cancel:(id:string,reason:string)=>request<any>(`/business/payouts/${id}/cancel`,{method:'POST',body:{reason}}),
+  },
+  businessAds: {
+    list:(params:any)=>request<any[]>('/business/ads',{params}), create:(businessId:string,data:any)=>request<any>('/business/ads',{method:'POST',params:{businessId},body:data}), detail:(id:string,businessId:string)=>request<any>(`/business/ads/${id}`,{params:{businessId}}), pause:(id:string,businessId:string)=>request<any>(`/business/ads/${id}/pause`,{method:'POST',params:{businessId}}), resume:(id:string,businessId:string)=>request<any>(`/business/ads/${id}/resume`,{method:'POST',params:{businessId}}), cancel:(id:string,businessId:string)=>request<any>(`/business/ads/${id}/cancel`,{method:'POST',params:{businessId}}), rerun:(id:string,businessId:string)=>request<any>(`/business/ads/${id}/rerun`,{method:'POST',params:{businessId},body:{paymentSource:'WALLET'}}), stats:(businessId:string)=>request<any>('/business/ads/stats',{params:{businessId}}), products:()=>request<any[]>('/business/ads/products'), createReel:(businessId:string,data:any)=>request<any>('/business/ads/reels',{method:'POST',params:{businessId},body:data}), reels:(businessId:string,page=1)=>request<any[]>('/business/ads/reels/my',{params:{businessId,page,limit:20}}),
+  },
+
+  businessAdSubscriptions: {
+    tiers: () => request<any[]>('/business/ads/subscription/tiers'),
+    status: () => request<any>('/business/ads/subscription/status'),
+    subscribe: (data: any) => request<any>('/business/ads/subscription', { method: 'POST', body: data }),
+    initializePaystack: (data: any) => request<any>('/business/ads/subscription/paystack/initialize', { method: 'POST', body: data }),
+    changeTierPaystack: (data: any) => request<any>('/business/ads/subscription/paystack/change-tier', { method: 'POST', body: data }),
+    previewTierSwitch: (data: any) => request<any>('/business/ads/subscription/preview-tier-switch', { method: 'POST', body: data }),
+    scheduleDowngrade: (data: any) => request<any>('/business/ads/subscription/schedule-downgrade', { method: 'POST', body: data }),
+    cancelPendingDowngrade: () => request<any>('/business/ads/subscription/cancel-pending-downgrade', { method: 'POST', body: {} }),
+    savedCard: () => request<any>('/business/ads/subscription/saved-card'),
+    subscribeWithSavedCard: (data: any) => request<any>('/business/ads/subscription/paystack/subscribe-with-saved-card', { method: 'POST', body: data }),
+    changeTierWallet: (data: any) => request<any>('/business/ads/subscription/wallet/change-tier', { method: 'POST', body: data }),
+    verifyPaystack: (data: any) => request<any>('/business/ads/subscription/paystack/verify', { method: 'POST', body: data }),
+    setAutoRenew: (data: { autoRenew: boolean }) => request<any>('/business/ads/subscription/auto-renew', { method: 'POST', body: data }),
+    pause: (data: { reason?: string }) => request<any>('/business/ads/subscription/pause', { method: 'POST', body: data }),
+    resume: () => request<any>('/business/ads/subscription/resume', { method: 'POST', body: {} }),
+    requestPushBlast: (data: { message: string; radiusKm: number }) =>
+      request<any>('/business/ads/subscription/push-blast-request', { method: 'POST', body: data }),
+    listPushBlastRequests: () =>
+      request<any[]>('/business/ads/subscription/push-blast-requests'),
+    setBanner: (data: { imageUrl: string; ctaText?: string }) => request<any>('/business/ads/subscription/banner', { method: 'PUT', body: data }),
+  },
+  businessRubyQuest: {
+    subscribe: (data: any) => request<any>('/business/ruby-quest/subscribe', { method: 'POST', body: data }),
+    pause: (id: string) => request<any>(`/business/ruby-quest/pause/${id}`, { method: 'POST', body: {} }),
+    resume: (id: string) => request<any>(`/business/ruby-quest/resume/${id}`, { method: 'POST', body: {} }),
+    analytics: (businessId: string) => request<any>('/business/ruby-quest/analytics', { params: { businessId } }),
+    campaigns: (businessId: string) => request<any>('/business/ruby-quest/campaigns', { params: { businessId } }),
+  },
+  businessEvents: {
+    list: (params: any) => request<any[]>('/business/events', { params }),
+    detail: (id: string) => request<any>(`/business/events/${id}`),
+    create: (data: any) => request<any>('/business/events', { method: 'POST', body: data }),
+    update: (id: string, data: any) => request<any>(`/business/events/${id}`, { method: 'PUT', body: data }),
+    submit: (id: string) => request<any>(`/business/events/${id}/submit`, { method: 'POST', body: {} }),
+    withdraw: (id: string) => request<any>(`/business/events/${id}/withdraw`, { method: 'POST', body: {} }),
+    cancel: (id: string) => request<any>(`/business/events/${id}/cancel`, { method: 'POST', body: {} }),
+    tickets: (id: string) => request<any[]>(`/business/events/${id}/tickets`),
+    analytics: (id: string) => request<any>(`/business/events/${id}/analytics`),
+    scan: (id: string, qrCode: string) => request<any>(`/business/events/${id}/scan`, { method: 'POST', body: { qrCode } }),
+    platformFee: (locationId?: string) => request<any>('/business/events/platform-fee', { params: locationId ? { locationId } : undefined }),
+  },
+  businessChat: {
+    conversations: (params: any) => request<any>('/business/chat/conversations', { params }), conversation: (id: string) => request<any>(`/business/chat/conversations/${id}`), messages: (id: string, params?: any) => request<any>(`/business/chat/conversations/${id}/messages`, { params }), create: (data: any) => request<any>('/business/chat/conversations', { method: 'POST', body: data }), send: (id: string, data: any) => request<any>(`/business/chat/conversations/${id}/messages`, { method: 'POST', body: data }), markRead: (id: string) => request<void>(`/business/chat/conversations/${id}/read`, { method: 'POST', body: {} }), unread: (businessId?: string) => request<number>('/business/chat/unread-total', { params: businessId ? { businessId } : undefined }), delete: (id: string) => request<void>(`/business/chat/conversations/${id}`, { method: 'DELETE' }),
+  },
+  businessDisputes: {
+    list: (params: any) => request<any[]>('/business/disputes', { params }), detail: (id: string) => request<any>(`/business/disputes/${id}`), addMessage: (id: string, data: any) => request<any>(`/business/disputes/${id}/messages`, { method: 'POST', body: data }), createGeneral: (data: any) => request<any>('/business/disputes/general', { method: 'POST', body: data }), byRef: (type: string, referenceId: string) => request<any>('/business/disputes/by-ref', { params: { type, referenceId } }),
+  },
+  // NOTE: merchantSupport `get`/`update` (admin) is defined further down; the
+  // business-facing public config lives on `businessMerchantSupport.config()`
+  // so the two namespaces don't collide.
+  businessMerchantSupport: { config: () => request<{ whatsappNumber?: string; whatsappMessage?: string; supportEmail?: string; supportPhone?: string }>('/public/merchant-support') },
+  businessReviews: { list:(params:any)=>request<any[]>('/business/reviews',{params}), stats:()=>request<any>('/business/reviews/stats'), reply:(id:string,text:string)=>request<any>(`/business/reviews/${id}/reply`,{method:'POST',body:{text}}) },
+  businessNotifications: { list:(params?:any)=>request<any>('/business/notifications',{params}), unreadCount:()=>request<{count:number}>('/business/notifications/unread-count'), markRead:(ids:string[])=>request<any>('/business/notifications/mark-read',{method:'POST',body:{ids}}), markAllRead:()=>request<any>('/business/notifications/mark-all-read',{method:'POST',body:{}}), registerDevice:(token:string,platform:'web')=>request<any>('/business/notifications/device',{method:'POST',body:{token,platform}}), removeDevice:(token:string)=>request<any>('/business/notifications/device',{method:'DELETE',body:{token}}) },
+  businessOrganization: { branches:(id:string)=>request<any[]>(`/business/${id}/branches`), enableMultiBranch:(id:string,data:any)=>request<any>(`/business/${id}/enable-multi-branch`,{method:'POST',body:data}), createBranch:(id:string,data:any)=>request<any>(`/business/${id}/branches`,{method:'POST',body:data}), catalogMode:(id:string,data:any)=>request<any>(`/business/${id}/catalog-mode`,{method:'PATCH',body:data}), staff:(id:string)=>request<any[]>(`/business/${id}/staff`), assignStaff:(id:string,data:any)=>request<any>(`/business/${id}/staff`,{method:'POST',body:data}), updateStaff:(id:string,staffId:string,data:any)=>request<any>(`/business/${id}/staff/${staffId}`,{method:'PATCH',body:data}), removeStaff:(id:string,staffId:string)=>request<any>(`/business/${id}/staff/${staffId}`,{method:'DELETE'}), referral:(id:string)=>request<any>(`/business/${id}/referrals/me`) },
+  businessSettings:{ changePassword:(data:any)=>request<any>('/auth/change-password',{method:'POST',body:data}), updateProfile:(data:any)=>request<any>('/auth/profile',{method:'PUT',body:data}), requestEmailChange:(newEmail:string)=>request<any>('/auth/email-change/request',{method:'POST',body:{newEmail}}), verifyEmailChange:(otp:string)=>request<any>('/auth/email-change/verify',{method:'POST',body:{otp}}), resendEmailChange:()=>request<any>('/auth/email-change/resend',{method:'POST',body:{}}), cancelEmailChange:()=>request<any>('/auth/email-change/cancel',{method:'POST',body:{}}), sendPhoneOtp:(phone?:string)=>request<any>('/auth/phone/send-code',{method:'POST',body:phone?{phone}:{}}), verifyPhoneOtp:(otp:string)=>request<any>('/auth/phone/verify',{method:'POST',body:{otp}}), notificationPreferences:(id:string)=>request<any>(`/business/${id}/notification-preferences`), updateNotificationPreferences:(id:string,data:any)=>request<any>(`/business/${id}/notification-preferences`,{method:'PATCH',body:data}) },
+  businessOnboarding:{ profile:(id:string)=>request<any>(`/business/${id}`), update:(id:string,data:any)=>request<any>(`/business/${id}`,{method:'PUT',body:data}), locations:(type?:string)=>request<any[]>('/locations/public',{params:type?{type}:undefined}), validateCoordinates:(locationId:string,latitude:number,longitude:number)=>request<{valid:boolean;message:string}>('/locations/public/validate-coordinates',{method:'POST',body:{locationId,latitude,longitude}}), categories:()=>request<any[]>('/public/taxonomy/categories'), subcategories:(categorySlug:string,locationId?:string)=>request<any[]>(`/public/taxonomy/categories/${categorySlug}/subcategories`,{params:locationId?{locationId}:undefined}), checkName:(name:string)=>request<{available:boolean;slug:string;suggestion?:string}>('/public/businesses/check-name',{params:{name}}), legalDocument:(type:string)=>request<any>(`/public/legal-documents/${type}`), submit:(id:string)=>request<any>(`/business/${id}/submit-for-review`,{method:'POST',body:{}}), verifyLocation:(id:string,data:any)=>request<any>(`/business/${id}/verify-location`,{method:'PATCH',body:data}) },
+
+  // ============================================================
+  // Business delivery (M2 stretch)
+  //
+  // Complete mirror of mobile `deliveryApi`. Public job reads stay under
+  // `/public/delivery` while a merchant's mutations use `/business/delivery`.
+  // ============================================================
+  businessDelivery: {
+    listJobs: (params?: { status?: string; page?: number; limit?: number }) =>
+      request<import("@/lib/business-api/delivery").DeliveryJob[]>(
+        "/business/delivery/jobs",
+        { params },
+      ),
+
+    getJob: (id: string) =>
+      request<import("@/lib/business-api/delivery").DeliveryJob>(
+        `/public/delivery/jobs/${id}`,
+      ),
+
+    getJobByOrder: (orderId: string) =>
+      request<import("@/lib/business-api/delivery").DeliveryJob>(
+        `/public/delivery/jobs/order/${orderId}`,
+      ),
+
+    createJob: (data: import("@/lib/business-api/delivery").CreateDeliveryJobPayload) =>
+      request<import("@/lib/business-api/delivery").DeliveryJob>(
+        "/business/delivery/jobs",
+        { method: "POST", body: data },
+      ),
+
+    assignRider: (
+      id: string,
+      data: import("@/lib/business-api/delivery").AssignRiderPayload,
+    ) =>
+      request<import("@/lib/business-api/delivery").DeliveryJob>(
+        `/business/delivery/jobs/${id}/rider`,
+        { method: "PUT", body: data },
+      ),
+
+    updateStatus: (
+      id: string,
+      data: import("@/lib/business-api/delivery").UpdateDeliveryStatusPayload,
+    ) =>
+      request<import("@/lib/business-api/delivery").DeliveryJob>(
+        `/business/delivery/jobs/${id}/status`,
+        { method: "PUT", body: data },
+      ),
+
+    updateLocation: (id: string, lat: number, lng: number) =>
+      request<import("@/lib/business-api/delivery").DeliveryJob>(
+        `/business/delivery/jobs/${id}/location`,
+        { method: "PUT", body: { lat, lng } },
+      ),
+
+    trackJob: (id: string) =>
+      request<{
+        status?: string;
+        lastKnownLocation?: { lat: number; lng: number; updatedAt?: string };
+        estimatedDeliveryAt?: string;
+      }>(`/public/delivery/jobs/${id}/track`),
+  },
+
+  // ============================================================
+  // Business bookings (M3)
+  //
+  // Mirror of mobile `bookingsApi`. Backend infers businessId from JWT
+  // on POST/PUT routes; list/stats/dashboard-stats/pending-count still
+  // accept it as query param.
+  // ============================================================
+  businessBookings: {
+    list: (params: {
+      status?: string;
+      statuses?: string[];
+      page?: number;
+      limit?: number;
+      dateFrom?: string;
+      dateTo?: string;
+    }) => {
+      // `statuses` is an array — flatten to CSV so the axios-style
+      // query param encoding stays consistent with the rest of the client.
+      const { statuses, ...rest } = params;
+      const q: Record<string, string | number | boolean | undefined> = {
+        ...rest,
+      };
+      if (statuses && statuses.length) q.statuses = statuses.join(',');
+      return request<import("@/lib/business-api/bookings").BusinessBooking[]>(
+        "/business/bookings",
+        { params: q },
+      );
+    },
+
+    stats: (dateFrom?: string, dateTo?: string) =>
+      request<{
+        totalBookings?: number;
+        totalRevenue?: number;
+        completedBookings?: number;
+      }>("/business/bookings/stats", {
+        params: { dateFrom, dateTo },
+      }),
+
+    detail: (id: string) =>
+      request<import("@/lib/business-api/bookings").BusinessBooking>(
+        `/business/bookings/${id}`,
+      ),
+
+    confirm: (id: string, data?: { notes?: string }) =>
+      request<import("@/lib/business-api/bookings").BusinessBooking>(
+        `/business/bookings/${id}/confirm`,
+        { method: "POST", body: data ?? {} },
+      ),
+
+    updateStatus: (id: string, status: string) =>
+      request<import("@/lib/business-api/bookings").BusinessBooking>(
+        `/business/bookings/${id}/status`,
+        { method: "PUT", body: { status } },
+      ),
+
+    cancel: (id: string, reason: string) =>
+      request<import("@/lib/business-api/bookings").BusinessBooking>(
+        `/business/bookings/${id}/cancel`,
+        { method: "POST", body: { reason } },
+      ),
+
+    reschedule: (
+      id: string,
+      data: { bookingDate: string; startTime: string; reason?: string },
+    ) =>
+      request<import("@/lib/business-api/bookings").BusinessBooking>(
+        `/business/bookings/${id}/reschedule`,
+        { method: "POST", body: data },
+      ),
+
+    safetyCheckIn: (
+      id: string,
+      data: { eventType: string; location?: { lat: number; lng: number }; notes?: string },
+    ) =>
+      request<import("@/lib/business-api/bookings").BusinessBooking>(
+        `/business/bookings/${id}/safety-checkin`,
+        { method: "POST", body: data },
+      ),
+
+    updateProviderLocation: (id: string, data: { lat: number; lng: number }) =>
+      request<{ bookingRef: string; providerLastLocation?: { lat: number; lng: number } }>(
+        `/business/bookings/${id}/location`,
+        { method: "PUT", body: data },
+      ),
+
+    chatCreate: (data: {
+      conversationId: string;
+      customAmount: number;
+      customDescription: string;
+      serviceListingId?: string;
+      bookingDate?: string;
+      startTime?: string;
+    }) =>
+      request<{ booking: import("@/lib/business-api/bookings").BusinessBooking; messageId: string }>(
+        "/business/bookings/chat-create",
+        { method: "POST", body: data },
+      ),
+
+    // Dashboard KPI card — mirrors mobile getDashboardStats
+    getDashboardStats: (businessId: string) =>
+      request<{
+        todayBookings?: number;
+        todayBookingRevenue?: number;
+        bookingsChangePercent?: number;
+        revenueChangePercent?: number;
+        pendingBookings?: number;
+      }>("/business/bookings/stats/dashboard", { params: { businessId } }),
+
+    getPendingCount: (businessId: string) =>
+      request<{ count: number }>("/business/bookings/pending-count", {
+        params: { businessId },
+      }),
+  },
+
   // Media
   media: {
     upload: (file: File, folder?: string) =>

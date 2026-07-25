@@ -63,11 +63,11 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <BusinessSocketsProvider>
-      <div className="flex h-dvh overflow-hidden bg-gray-50">
+      <div data-business-dashboard-shell className="fixed inset-0 flex h-[100dvh] overflow-hidden bg-gray-50">
         <BusinessSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <BusinessTopbar />
-          <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</main>
         </div>
       </div>
     </BusinessSocketsProvider>

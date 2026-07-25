@@ -209,20 +209,20 @@ export function BusinessSidebar() {
   }, [visibility.showProducts, visibility.showServices]);
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
+    <aside aria-label="Business dashboard navigation" className="flex h-full w-16 shrink-0 flex-col border-r border-gray-200 bg-white sm:w-64">
       {/* Logo */}
-      <div className="h-16 px-6 flex items-center border-b border-gray-100">
+      <div className="flex h-16 items-center justify-center border-b border-gray-100 px-2 sm:justify-start sm:px-6">
         <Link href="/business/dashboard" className="flex items-center gap-2" aria-label="Ruby+ Business dashboard">
-          <img src="/images/logo.png" alt="Ruby+" className="h-6 w-auto" />
-          <span className="text-sm font-bold text-gray-900">Business</span>
+          <img src="/images/logo.png" alt="Ruby+" className="h-5 w-auto sm:h-6" />
+          <span className="hidden text-sm font-bold text-gray-900 sm:inline">Business</span>
         </Link>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2">
+      <nav className="flex-1 overflow-y-auto overscroll-contain px-2 py-4">
         {groups.map((group) => (
           <div key={group.title} className="mb-4">
-            <p className="px-3 mb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+            <p className="mb-1 hidden px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 sm:block">
               {group.title}
             </p>
             <ul>
@@ -233,14 +233,14 @@ export function BusinessSidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
+                      className={`flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm transition sm:justify-start ${
                         isActive
                           ? 'bg-ruby-red/10 text-ruby-red font-semibold'
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
-                      <span>{item.label}</span>
+                      <span className="hidden sm:inline">{item.label}</span>
                     </Link>
                   </li>
                 );

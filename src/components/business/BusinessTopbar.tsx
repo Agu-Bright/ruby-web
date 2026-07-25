@@ -73,12 +73,12 @@ export function BusinessTopbar() {
   const initials = initialsFromDisplay(displayName || user?.email || '?');
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6">
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 sm:gap-4 sm:px-6">
       {/* Business identity */}
       {business ? (
         <div className="flex items-center gap-2 min-w-0">
           {business.logoUrl ? <img src={business.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" /> : <div aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ruby-red text-xs font-bold text-white">{business.name?.trim().charAt(0).toUpperCase() || 'R'}</div>}
-          <div className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-gray-900">{business.name}</span>{business.status && <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${STATUS_TINT[business.status] || 'bg-gray-100 text-gray-800'}`}>{business.status.replace('_', ' ')}</span>}</div>
+          <div className="flex min-w-0 items-center gap-2"><span className="max-w-[110px] truncate text-sm font-semibold text-gray-900 sm:max-w-none">{business.name}</span>{business.status && <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider sm:inline-flex ${STATUS_TINT[business.status] || 'bg-gray-100 text-gray-800'}`}>{business.status.replace('_', ' ')}</span>}</div>
         </div>
       ) : (
         <div className="text-sm text-gray-400">No business selected</div>
@@ -119,7 +119,7 @@ export function BusinessTopbar() {
           <div className="w-8 h-8 rounded-full bg-ruby-red text-white flex items-center justify-center text-xs font-semibold">
             {initials}
           </div>
-          <ChevronDown size={14} className="text-gray-500" />
+          <ChevronDown size={14} className="hidden text-gray-500 sm:block" />
         </button>
 
         {menuOpen && (

@@ -44,6 +44,18 @@
 
 ## Session log (append-only)
 
+### 2026-07-25 — Dashboard fixed shell and responsive pass
+
+**What works:** The authenticated business dashboard is now a viewport-fixed shell, so the browser page cannot scroll the sidebar or topbar. The content pane is the sole page-level vertical scroller and uses overscroll containment to prevent touch-scroll chaining. The desktop sidebar remains fully visible and fixed; on small screens it becomes a compact fixed icon rail, with the business name safely truncated in the fixed top bar. The chat workspace now has bounded, independent conversation/message panes on phones rather than stacking a long conversation list above the composer. The Services list now has a stacked mobile header and filters, a full-width mobile status selector, and truncation-safe cards.
+
+**Design decisions:** The mobile icon rail preserves access to every business route without a separate drawer or a bottom bar that would conflict with the web dashboard's fixed shell. Existing responsive grids already collapse at `sm`/`md`/`lg`; the audit specifically corrected the pages that did not.
+
+**Files touched:** `src/app/business/dashboard/layout.tsx`, `src/app/business/dashboard/chat/page.tsx`, `src/app/business/dashboard/services/page.tsx`, `src/components/business/BusinessSidebar.tsx`, `src/components/business/BusinessTopbar.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Deferred:** Authenticated visual checks at phone/tablet/desktop breakpoints require a merchant test session; the unauthenticated guard can be tested locally without one.
+
+**Next task for next agent:** With an authenticated merchant, verify the dashboard at 375px, 768px and desktop width: sidebar/topbar must remain static, only content scrolls, and chat messages/composer remain reachable.
+
 ### 2026-07-25 — Admin legal-document actions
 
 **What works:** Admin Legal Documents now opens its three-dot actions in a viewport-level menu that cannot be clipped by the table’s horizontal-scroll wrapper. Corrected the legal-document activate/deactivate client contract from `POST` to the backend’s required `PUT` endpoints. The list client also now sends the supported `isActive` and `search` filters rather than an ignored `status` parameter.

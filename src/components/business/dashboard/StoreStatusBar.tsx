@@ -41,7 +41,7 @@ export function StoreStatusBar() {
       // Web flow — open the store without pre-selecting products.
       // The mobile app opens the inventory picker here; web routes
       // merchants to the products page instead once M4 ships.
-      openDay.mutate({});
+      openDay.mutate({ closingTime: data?.hoursToday?.close ?? '18:00' });
     }
   };
 

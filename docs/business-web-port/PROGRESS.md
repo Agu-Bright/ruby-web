@@ -6,9 +6,15 @@
 
 **M14:** The DRAFT-only onboarding hub now supports versioned merchant/discount agreement acceptance, public category/subcategory selection, business-name availability checking, profile/contact/address, hours/operation, bank-account handoff, logo/cover/gallery uploads, CAC/ID/licence uploads with owner-visible review state, public Ruby+ city selection, server coordinate validation, Leaflet location verification and review submission. The remaining gate is real DRAFT-browser/TypeScript verification. It is not marked complete.
 
-**M15:** The PWA update listener cleanup is fixed and the registered worker is rechecked on dashboard route changes. Amplitude configuration, VAPID browser push and the required Node/browser responsive, accessibility, Lighthouse, TypeScript and cross-app checks remain externally blocked. It is not marked complete. `git diff --check` passes aside from repository-wide Git warnings.
+**M15:** The PWA update listener cleanup is fixed and the registered worker is rechecked on dashboard route changes. The shared modal now has dialog semantics, focus trapping and focus restoration; the account dropdown now exposes correct menu ARIA state and Escape-key focus restoration. Amplitude configuration, VAPID browser push and the required Node/browser responsive, accessibility, Lighthouse, TypeScript and cross-app checks remain externally blocked. It is not marked complete. `git diff --check` passes aside from repository-wide Git warnings.
 
-**Next task:** Run M14's authenticated DRAFT browser flow in a Node-capable environment, then reuse the city selector in M12 branch creation. Run M15's complete test matrix in the same environment.
+**M12/M13 follow-up:** Branch creation now uses the public city selector instead of raw location IDs, retaining the required coordinates and full address. Post-onboarding Settings now has the same owner-safe CAC/ID/licence upload and review-status surface as DRAFT onboarding.
+
+**2026-07-25 verification retry:** Recovered a local Node runtime from Visual Studio, then ran a focused TypeScript check covering every touched business file with zero diagnostics. Started a clean Next server: Dashboard, Login, Branches and Onboarding compiled with no server errors. Browser smoke confirmed the unauthenticated Dashboard guard redirects to `/business/login?next=%2Fbusiness%2Fdashboard`. Authenticated/DRAFT-only actions still require a business test session, and the full repository check remains too slow for the 60-second execution window.
+
+**2026-07-25 daily operations fix:** Corrected the web daily-operations request contract to match the mobile/backend DTO: `closingTime`, `inventory[{ productId, isAvailable }]`, and `services[{ serviceId, isAvailable }]`. The dashboard Open store action now sends the configured closing time or a valid `18:00` fallback instead of an invalid empty payload. Focused TypeScript check passed.
+
+**Next task:** Run M12–M14 authenticated browser flows in a Node-capable environment. Run M15's complete test matrix in the same environment.
 
 ## Milestone status table
 
@@ -22,8 +28,8 @@
 | M4 | Catalog: Products | 🟢 Core done | Codex | 2026-07-24 | 2026-07-24 (core) | Full mobile-parity product API, searchable grid, CRUD, 8-image gallery, repeatable variations/add-ons, stock, availability and nutrition are implemented. Local browser/TS verification remains blocked. |
 | M5 | Catalog: Services | 🟡 Core + gate done | Codex, Claude | 2026-07-24 | 2026-07-25 (gate) | Service API plus searchable list, create/edit/delete, status toggle, media, pricing, duration, fulfilment, cancellation, detail fields, availability slots and template fields are live. `useBusinessVisibility()` now hides Products/Services in the sidebar per populated `subcategoryId.businessModel` + `sellsProducts`. Remaining: wire hydrated `locationId`/`categoryId` into the service create payload. |
 | M6 | Wallet, DVA, Bank Accounts, Payouts, Payments, Merchant QR | 🟡 Core UI done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Wallet, payout request/history, bank account create/list, Paystack Inline helper and merchant QR are implemented. Live payment/DVA verification remains blocked locally. |
-| M7 | Ad Campaigns (create, list, push blast, reels) | 🟢 Core done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Wallet-only campaign CRUD/lifecycle, reviewed push-blast requests, organic reel upload and campaign detail are implemented. Live wallet debit, R2 upload/transcoding and browser checks remain pending. |
-| M8 | Ad Subscriptions + Ruby Quest | 🔴 Blocked after core UI | Codex | 2026-07-24 | — | Full subscription/Ruby Quest API contract, plan status/manage UI, saved-card subscription path, banner submission and wallet Ruby Quest lifecycle are implemented. First-time Paystack Inline subscription requires a web-safe backend contract. |
+| M7 | Ad Campaigns (legacy history, push blast, reels) | 🟢 Core done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Product decision 2026-07-25: campaigns are retired from the primary Ruby Ads experience. Their records remain as an optional Past campaigns history; supported lifecycle, push-blast and organic-reel routes remain available. Live wallet debit, R2 upload/transcoding and browser checks remain pending. |
+| M8 | Ad Subscriptions + Ruby Quest | 🟡 Core UI in progress | Codex | 2026-07-24 | — | The Ruby Ads home now matches mobile’s subscription-led model: tier state/manage CTA, pending/paused state, optional performance, Ruby Quest and collapsed legacy history. Full subscription/Ruby Quest API contract, plan status/manage UI, saved-card subscription path, banner submission and wallet Ruby Quest lifecycle are implemented. First-time Paystack Inline subscription requires a web-safe backend contract. |
 | M9 | Events + ticket scanner | 🟢 Core done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Full mobile-parity event API, list/create/edit/detail lifecycle, Leaflet venue pin, ticket roster, sales analytics, browser scanner and browser media upload are implemented. Live validation remains pending. |
 | M10 | Chat + Disputes + Support | 🟢 Core done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Merchant chat now uses the correct `/business/chat` contract with socket refresh, browser attachments and stable read acknowledgements; dispute list/detail replies and support ticket/contact entry are implemented. Live multi-client validation remains pending. |
 | M11 | Notifications + Reviews + Analytics | 🟡 Core UI in progress | Codex | 2026-07-24 | — | Business notification inbox/read actions, review replies, mobile-parity 7/30/90-day analytics and local browser-permission/service-worker setup are implemented. Remote browser push is blocked on VAPID/web-push backend support. |
@@ -37,6 +43,27 @@
 ---
 
 ## Session log (append-only)
+
+### 2026-07-25 — Dashboard shell scrolling
+
+**What works:** The authenticated dashboard shell is now constrained to the viewport. The sidebar and top bar stay in place; only the page-content pane scrolls vertically. The sidebar retains its own internal navigation scroll for shorter screens.
+
+**Files touched:** `src/app/business/dashboard/layout.tsx`, `src/components/business/BusinessSidebar.tsx`, `src/components/business/BusinessTopbar.tsx`.
+
+**Next task for next agent:** Verify the dashboard shell at desktop and short-height breakpoints with an authenticated session.
+
+### 2026-07-25 — Ruby Ads subscription-led home
+
+**What works:**
+- Replaced the retired campaign-first Ruby Ads dashboard with the mobile app’s current tier-first experience: Starter/Growth/Prime subscription state, a single tier-management or tier-selection action, pending-review and paused notices, subscription performance when available, and a Ruby Quest entry point.
+- One-off campaign cards, campaign status filters, campaign totals and the create-campaign action are no longer primary marketing UI. Existing one-off records are retained in a collapsed **Past campaigns** history with links to their detail routes.
+- Updated the approved M7 plan to record the product decision before implementation; existing legacy campaign, push-blast and reel routes remain intact for history and supported operations.
+
+**Verification:** Focused TypeScript check covering the Ruby Ads page and its ads/subscription contracts completed with zero diagnostics. The local Next server compiled `/business/dashboard/ruby-ads` successfully and returned HTTP 200. Browser navigation timed out after that response, and authenticated subscription states still require a safe merchant test session.
+
+**Files touched:** `docs/business-web-port/PLAN.md`, `docs/business-web-port/PROGRESS.md`, `src/app/business/dashboard/ruby-ads/page.tsx`.
+
+**Next task for next agent:** Sign in with a non-production merchant and verify no-tier, ACTIVE, PAUSED and PENDING_ONBOARDING_REVIEW variants; confirm legacy campaigns are only visible after expanding Past campaigns. Then complete the web-safe first-time Paystack Inline subscription contract for M8.
 
 ### 2026-07-25 — M14 onboarding hub and M15 PWA update UX
 

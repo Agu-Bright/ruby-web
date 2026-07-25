@@ -230,6 +230,8 @@ Each milestone lists (a) scope, (b) screens/routes, (c) critical files to create
 
 ### M7 — Ad Campaigns (create, list, detail, push blast, organic reels)
 
+**Product decision (2026-07-25):** Ruby+ Ads is now subscription-led. The dashboard home must lead with the merchant's Starter, Growth, or Prime tier and Ruby Quest; retired one-off campaigns are available only as an optional **Past campaigns** history. Do not present campaign creation, campaign totals, or campaign status cards as the primary Ruby Ads experience. Existing campaign routes remain for records that are still running or need review.
+
 **Scope:** Standalone ad-campaign creation (FEATURED_LISTING, SLIDESHOW_AD, EXPLORE_REELS_AD, FEATURED_REVIEWS, PUSH_NOTIFICATION), campaign list, detail, pause/resume/cancel/rerun. Push-blast composer with radius on Leaflet map + 180-char body + quota meter. Organic reel upload (video via file input, `<video>` preview).
 
 **Screens:** `(dashboard)/ruby-ads/page.tsx` (subscription hub + campaigns), `(dashboard)/ads/create/page.tsx`, `[id]/page.tsx`, `push-blast/page.tsx`, `(dashboard)/reels/create/page.tsx`.

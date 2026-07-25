@@ -22,6 +22,8 @@ const sizeClasses = {
 
 export function Modal({ isOpen, onClose, title, children, size = 'md', subtitle }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -47,6 +49,23 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', subtitle 
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    previouslyFocused.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? []).filter((element) => !element.hasAttribute('hidden'));
+    const initialFocus = window.setTimeout(() => focusable()[0]?.focus(), 0);
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const elements = focusable();
+      if (!elements.length) { event.preventDefault(); return; }
+      const first = elements[0], last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', trapFocus);
+    return () => { window.clearTimeout(initialFocus); window.removeEventListener('keydown', trapFocus); previouslyFocused.current?.focus(); };
+  }, [isOpen]);
+
   if (!isOpen || !mounted) return null;
 
   return createPortal(
@@ -57,13 +76,13 @@ export function Modal({ isOpen, onClose, title, children, size = 'md', subtitle 
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} animate-slide-up max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="modal-title" className={`bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} animate-slide-up max-h-[95vh] sm:max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-100 shrink-0">
           <div className="min-w-0 pr-2">
-            <h2 className="text-base font-semibold text-gray-900 truncate">{title}</h2>
+            <h2 id="modal-title" className="text-base font-semibold text-gray-900 truncate">{title}</h2>
             {subtitle && <p className="text-xs text-gray-500 mt-0.5 truncate">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors -mr-1 shrink-0">
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors -mr-1 shrink-0">
             <X className="w-4 h-4 text-gray-400" />
           </button>
         </div>

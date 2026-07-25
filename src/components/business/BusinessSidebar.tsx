@@ -209,16 +209,12 @@ export function BusinessSidebar() {
   }, [visibility.showProducts, visibility.showServices]);
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
       {/* Logo */}
       <div className="h-16 px-6 flex items-center border-b border-gray-100">
-        <Link href="/business/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-ruby-red flex items-center justify-center">
-            <span className="text-white text-sm font-bold">R+</span>
-          </div>
-          <span className="text-sm font-bold text-gray-900">
-            Ruby+ Business
-          </span>
+        <Link href="/business/dashboard" className="flex items-center gap-2" aria-label="Ruby+ Business dashboard">
+          <img src="/images/logo.png" alt="Ruby+" className="h-6 w-auto" />
+          <span className="text-sm font-bold text-gray-900">Business</span>
         </Link>
       </div>
 

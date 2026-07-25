@@ -35,7 +35,7 @@ export function useTodayStatus() {
 
 export function useOpenDay(onSuccess?: () => void) {
   const { business } = useBusinessAuth();
-  return useMutation<unknown, { productIds?: string[]; closeTime?: string }>(
+  return useMutation<unknown, { closingTime: string; inventory?: Array<{ productId: string; isAvailable: boolean }>; services?: Array<{ serviceId: string; isAvailable: boolean }> }>(
     (input) =>
       api.businessDailyOperations.openDay({
         businessId: business?._id ?? '',
@@ -60,7 +60,7 @@ export function useUpdateInventory(onSuccess?: () => void) {
   const { business } = useBusinessAuth();
   return useMutation<
     unknown,
-    { productIds?: string[]; outOfStockIds?: string[] }
+    { inventory: Array<{ productId: string; isAvailable: boolean }> }
   >(
     (input) =>
       api.businessDailyOperations.updateInventory({

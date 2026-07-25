@@ -12,8 +12,9 @@ The web client safely supports the saved-card path (`/paystack/subscribe-with-sa
 
 ## 2026-07-25 status update
 
-- **M12 location selector:** partially resolved. `GET /locations/public?type=CITY` plus `POST /locations/public/validate-coordinates` are now used by M14's shared `LocationSelector`; reuse it in branch creation next.
-- **M13 KYC surface:** owner document uploads are resolved for DRAFT onboarding. The existing authenticated media upload plus owner business update writes CAC, government-ID and licence URLs, while returned admin-only review statuses remain read-only. Add the same component to post-onboarding Settings next.
+- **M12 location selector:** resolved in code. `GET /locations/public?type=CITY` plus `POST /locations/public/validate-coordinates` are now reused by branch creation; it retains required coordinates and address fields.
+- **M13 KYC surface:** resolved in code. The existing authenticated media upload plus owner business update writes CAC, government-ID and licence URLs, while returned admin-only review statuses remain read-only in both DRAFT onboarding and Settings.
+- **M15 environment retry:** the PATH remains incomplete, but a usable Visual Studio Node 20.13.1 runtime was recovered. Focused TypeScript and unauthenticated browser/server checks now run. The full repository check still exceeds the 60-second execution window; Lighthouse, authenticated cross-client and VAPID checks remain outstanding.
 
 ## What is blocked
 

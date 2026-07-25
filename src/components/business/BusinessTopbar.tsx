@@ -13,7 +13,7 @@
  * multiple branches; for M0 it's a static single-business display.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, LogOut, ChevronDown } from 'lucide-react';
 import { useBusinessAuth } from '@/lib/business-auth';
@@ -50,10 +50,22 @@ export function BusinessTopbar() {
   const router = useRouter();
   const { user, business, logout } = useBusinessAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const unreadFetcher = useCallback(() => api.businessNotifications.unreadCount(), []);
   const unread = useBusinessQuery<{ count: number }>(unreadFetcher, []);
   useNotificationsRealtime(() => { void unread.refetch(); });
   const unreadCount = unread.data?.count ?? 0;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setMenuOpen(false);
+      menuTriggerRef.current?.focus();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [menuOpen]);
 
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email
@@ -61,22 +73,12 @@ export function BusinessTopbar() {
   const initials = initialsFromDisplay(displayName || user?.email || '?');
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-4">
+    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-gray-200 bg-white px-6">
       {/* Business identity */}
       {business ? (
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-semibold text-gray-900 truncate">
-            {business.name}
-          </span>
-          {business.status && (
-            <span
-              className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                STATUS_TINT[business.status] || 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              {business.status.replace('_', ' ')}
-            </span>
-          )}
+          {business.logoUrl ? <img src={business.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" /> : <div aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ruby-red text-xs font-bold text-white">{business.name?.trim().charAt(0).toUpperCase() || 'R'}</div>}
+          <div className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-gray-900">{business.name}</span>{business.status && <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${STATUS_TINT[business.status] || 'bg-gray-100 text-gray-800'}`}>{business.status.replace('_', ' ')}</span>}</div>
         </div>
       ) : (
         <div className="text-sm text-gray-400">No business selected</div>
@@ -105,9 +107,14 @@ export function BusinessTopbar() {
       {/* Profile menu */}
       <div className="relative">
         <button
+          ref={menuTriggerRef}
           type="button"
           onClick={() => setMenuOpen((s) => !s)}
           className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-lg hover:bg-gray-50 transition"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-controls="business-profile-menu"
+          aria-label="Open account menu"
         >
           <div className="w-8 h-8 rounded-full bg-ruby-red text-white flex items-center justify-center text-xs font-semibold">
             {initials}
@@ -122,7 +129,7 @@ export function BusinessTopbar() {
               className="fixed inset-0 z-40"
               onClick={() => setMenuOpen(false)}
             />
-            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+            <div id="business-profile-menu" role="menu" aria-label="Account menu" className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
               <div className="px-3 py-2 border-b border-gray-100">
                 <p className="text-xs font-medium text-gray-900 truncate">
                   {displayName || user?.email}
@@ -140,6 +147,7 @@ export function BusinessTopbar() {
                   router.push('/business/dashboard/profile');
                 }}
                 className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition"
+                role="menuitem"
               >
                 Profile
               </button>
@@ -150,6 +158,7 @@ export function BusinessTopbar() {
                   logout();
                 }}
                 className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition flex items-center gap-2"
+                role="menuitem"
               >
                 <LogOut size={12} />
                 Log out

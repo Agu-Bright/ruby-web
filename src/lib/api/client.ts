@@ -609,8 +609,9 @@ export const api = {
 
     openDay: (data: {
       businessId: string;
-      productIds?: string[];
-      closeTime?: string;
+      closingTime: string;
+      inventory?: Array<{ productId: string; isAvailable: boolean }>;
+      services?: Array<{ serviceId: string; isAvailable: boolean }>;
     }) =>
       request<{ success: boolean; openedAt: string }>(
         "/business/daily-operations/open",
@@ -625,8 +626,7 @@ export const api = {
 
     updateInventory: (data: {
       businessId: string;
-      productIds?: string[];
-      outOfStockIds?: string[];
+      inventory: Array<{ productId: string; isAvailable: boolean }>;
     }) =>
       request<{ success: boolean }>(
         "/business/daily-operations/inventory",
@@ -799,7 +799,7 @@ export const api = {
     stats: (id:string) => request<any>(`/business/wallets/${id}/stats`),
     periodStats: (id:string) => request<any>(`/business/wallets/${id}/period-stats`),
     fund: (id:string, amount:number) => request<any>(`/business/wallets/${id}/fund`,{method:'POST',body:{amount}}),
-    merchantCode: (businessId:string) => request<{merchantCode:string;businessId:string;businessName:string}>(`/businesses/${businessId}/merchant-code`),
+    merchantCode: (businessId:string) => request<{merchantCode:string;businessId:string;businessName:string}>(`/business/${businessId}/merchant-code`),
   },
   businessBankAccounts: {
     create:(data:any)=>request<any>('/business/bank-accounts',{method:'POST',body:data}), list:(businessId:string,currency?:string)=>request<any[]>('/business/bank-accounts',{params:{businessId,currency}}), detail:(id:string)=>request<any>(`/business/bank-accounts/${id}`), update:(id:string,data:any)=>request<any>(`/business/bank-accounts/${id}`,{method:'PUT',body:data}), remove:(id:string,businessId:string)=>request<void>(`/business/bank-accounts/${id}`,{method:'DELETE',params:{businessId}}), resolve:(accountNumber:string,bankCode:string)=>request<any>('/business/bank-accounts/resolve',{method:'POST',body:{accountNumber,bankCode}}), banks:()=>request<any[]>('/business/bank-accounts/banks'),

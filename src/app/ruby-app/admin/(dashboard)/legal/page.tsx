@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Scale, Search, Plus, Pencil, Trash2, Eye,
   MoreHorizontal, ChevronDown, CheckCircle, XCircle,
@@ -95,6 +95,8 @@ export default function LegalDocumentsPage() {
   const [viewModal, setViewModal] = useState<LegalDocument | null>(null);
   const [editorMode, setEditorMode] = useState<'text' | 'form'>('text');
   const [editorText, setEditorText] = useState('');
+  const [actionMenuDoc, setActionMenuDoc] = useState<LegalDocument | null>(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
   const { data: docsData, meta: docsMeta, isLoading, refetch } = useApi(
     () => api.legalDocuments.list(filters),
@@ -189,6 +191,7 @@ export default function LegalDocumentsPage() {
 
   // Toggle active
   const handleToggleActive = async (doc: LegalDocument) => {
+    setActionMenuDoc(null);
     const result = doc.isActive
       ? await deactivateMutation.mutate(doc._id)
       : await activateMutation.mutate(doc._id);
@@ -211,6 +214,12 @@ export default function LegalDocumentsPage() {
     } else {
       toast.error('Failed to delete');
     }
+  };
+
+  const openActionMenu = (doc: LegalDocument, button: HTMLButtonElement) => {
+    const rect = button.getBoundingClientRect();
+    setActionMenuPosition({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    setActionMenuDoc(doc);
   };
 
   // Section builders
@@ -316,41 +325,17 @@ export default function LegalDocumentsPage() {
       key: 'actions',
       header: '',
       render: (doc) => (
-        <div className="relative group">
-          <button className="p-1.5 rounded-md hover:bg-gray-100">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            aria-label={`Actions for ${doc.title}`}
+            aria-haspopup="menu"
+            aria-expanded={actionMenuDoc?._id === doc._id}
+            onClick={(event) => openActionMenu(doc, event.currentTarget)}
+            className="rounded-md p-1.5 hover:bg-gray-100"
+          >
             <MoreHorizontal className="w-4 h-4 text-gray-500" />
           </button>
-          <div className="absolute right-0 top-8 z-20 hidden group-hover:block bg-white border rounded-lg shadow-lg py-1 min-w-[160px]">
-            <button
-              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-              onClick={() => setViewModal(doc)}
-            >
-              <Eye className="w-4 h-4" /> View
-            </button>
-            <button
-              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-              onClick={() => openEdit(doc)}
-            >
-              <Pencil className="w-4 h-4" /> Edit
-            </button>
-            <button
-              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-              onClick={() => handleToggleActive(doc)}
-            >
-              {doc.isActive ? (
-                <><XCircle className="w-4 h-4 text-amber-500" /> <span className="text-amber-600">Deactivate</span></>
-              ) : (
-                <><CheckCircle className="w-4 h-4 text-green-500" /> <span className="text-green-600">Activate</span></>
-              )}
-            </button>
-            <hr className="my-1" />
-            <button
-              className="w-full px-3 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-              onClick={() => setDeleteModal(doc)}
-            >
-              <Trash2 className="w-4 h-4" /> Delete
-            </button>
-          </div>
         </div>
       ),
     },
@@ -425,6 +410,19 @@ export default function LegalDocumentsPage() {
         currentPage={filters.page}
         onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
       />
+
+      {actionMenuDoc && actionMenuPosition && (
+        <>
+          <button type="button" aria-label="Close actions menu" className="fixed inset-0 z-[90] cursor-default" onClick={() => setActionMenuDoc(null)} />
+          <div role="menu" aria-label={`Actions for ${actionMenuDoc.title}`} className="fixed z-[100] min-w-[172px] rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl" style={actionMenuPosition}>
+            <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setActionMenuDoc(null); setViewModal(actionMenuDoc); }}><Eye className="w-4 h-4" /> View</button>
+            <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setActionMenuDoc(null); openEdit(actionMenuDoc); }}><Pencil className="w-4 h-4" /> Edit</button>
+            <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" onClick={() => void handleToggleActive(actionMenuDoc)}>{actionMenuDoc.isActive ? <><XCircle className="w-4 h-4 text-amber-500" /><span className="text-amber-700">Deactivate</span></> : <><CheckCircle className="w-4 h-4 text-green-500" /><span className="text-green-700">Activate</span></>}</button>
+            <div className="my-1 border-t border-gray-100" />
+            <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50" onClick={() => { setActionMenuDoc(null); setDeleteModal(actionMenuDoc); }}><Trash2 className="w-4 h-4" /> Delete</button>
+          </div>
+        </>
+      )}
 
       {/* Create/Edit Modal */}
       <Modal

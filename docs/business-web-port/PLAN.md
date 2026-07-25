@@ -56,7 +56,7 @@ src/app/business/
 
 | Native API (mobile) | Web replacement | Milestones affected |
 |---|---|---|
-| `expo-iap` (StoreKit / Play) | Paystack Inline JS + wallet only | M7, M8 |
+| `expo-iap` (StoreKit / Play) | Paystack secure hosted checkout in the browser (callback + server verification) + wallet only. Use Inline JS when the backend exposes a browser-safe inline configuration; never use a WebView or iframe. | M7, M8 |
 | `expo-notifications` | Web Push (VAPID + service worker) | M0 (foundation), M11 |
 | `expo-camera` (QR scanner) | `html5-qrcode` (already used on admin events scanner) | M9 |
 | `react-native-maps` | Leaflet + `react-leaflet` (already in web repo, used by `MapLocationPicker` + `BusinessesClusterMap`) | M0 (branch pin), M2, M3, M7 (push-blast radius preview), M9, M14 |
@@ -72,7 +72,7 @@ src/app/business/
 | `@react-native-community/datetimepicker` (in bottom sheet) | `<input type="datetime-local">` on desktop; `flatpickr` or `react-day-picker` for polish | M9, M12 |
 | `expo-video` (notification embeds, splash) | `<video>` HTML5 | M11 |
 | `react-native-qrcode-svg` (merchant QR) | `qrcode.react` (already used on admin) | M6 |
-| `react-native-webview` (Paystack 3DS + subscription checkout) | Paystack Inline JS — no iframe/WebView needed on web | M6, M8 |
+| `react-native-webview` (Paystack 3DS + subscription checkout) | Full-page Paystack hosted checkout with return callback + server verification; evolve to Paystack Inline JS when browser-safe initialization config is exposed. No iframe/WebView. | M6, M8 |
 | `expo-file-system` (`File(uri).arrayBuffer()`) | Direct `Blob` from `<input>` + presigned R2 PUT | M0 (upload service), M4-M14 uploaders |
 | `react-native-google-places-autocomplete` | Google Places JS API Autocomplete | M0 (business location), M14 |
 | `expo-location` (`reverseGeocodeAsync`) | Browser `navigator.geolocation.getCurrentPosition` + Google Geocoding JS | M0, M14 |

@@ -597,15 +597,16 @@ export const api = {
   businessDailyOperations: {
     getTodayStatus: (businessId: string) =>
       request<{
-        isOpen: boolean;
-        openedAt?: string;
-        closedAt?: string;
-        autoOpen?: boolean;
-        productCount?: number;
-        activeProducts?: number;
-        services?: unknown[];
-        hoursToday?: { open: string; close: string } | null;
-      }>("/business/daily-operations/today", { params: { businessId } }),
+        _id: string;
+        businessId: string;
+        date: string;
+        closingTime: string;
+        isOnline: boolean;
+        onlineAt?: string;
+        offlineAt?: string;
+        inventorySnapshot: Array<{ productId: string; productName: string; isAvailable: boolean }>;
+        serviceSnapshot?: Array<{ serviceId: string; serviceName: string; isAvailable: boolean }>;
+      } | null>("/business/daily-operations/today", { params: { businessId } }),
 
     openDay: (data: {
       businessId: string;
@@ -2432,12 +2433,13 @@ export const api = {
   },
 
   legalDocuments: {
-    list: (params?: { page?: number; limit?: number; type?: string; status?: string }) => {
+    list: (params?: { page?: number; limit?: number; type?: string; isActive?: string; search?: string }) => {
       const searchParams = new URLSearchParams();
       if (params?.page) searchParams.set("page", String(params.page));
       if (params?.limit) searchParams.set("limit", String(params.limit));
       if (params?.type) searchParams.set("type", params.type);
-      if (params?.status) searchParams.set("status", params.status);
+      if (params?.isActive !== undefined) searchParams.set("isActive", params.isActive);
+      if (params?.search) searchParams.set("search", params.search);
       const qs = searchParams.toString();
       return request<any>(`/admin/legal-documents${qs ? `?${qs}` : ""}`);
     },
@@ -2446,9 +2448,9 @@ export const api = {
     update: (id: string, data: any) =>
       request<any>(`/admin/legal-documents/${id}`, { method: "PUT", body: data }),
     activate: (id: string) =>
-      request<any>(`/admin/legal-documents/${id}/activate`, { method: "POST" }),
+      request<any>(`/admin/legal-documents/${id}/activate`, { method: "PUT" }),
     deactivate: (id: string) =>
-      request<any>(`/admin/legal-documents/${id}/deactivate`, { method: "POST" }),
+      request<any>(`/admin/legal-documents/${id}/deactivate`, { method: "PUT" }),
     delete: (id: string) =>
       request<any>(`/admin/legal-documents/${id}`, { method: "DELETE" }),
   },

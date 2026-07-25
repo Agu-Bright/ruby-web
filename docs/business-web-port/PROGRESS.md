@@ -29,7 +29,7 @@
 | M5 | Catalog: Services | 🟡 Core + gate done | Codex, Claude | 2026-07-24 | 2026-07-25 (gate) | Service API plus searchable list, create/edit/delete, status toggle, media, pricing, duration, fulfilment, cancellation, detail fields, availability slots and template fields are live. `useBusinessVisibility()` now hides Products/Services in the sidebar per populated `subcategoryId.businessModel` + `sellsProducts`. Remaining: wire hydrated `locationId`/`categoryId` into the service create payload. |
 | M6 | Wallet, DVA, Bank Accounts, Payouts, Payments, Merchant QR | 🟡 Core UI done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Wallet, payout request/history, bank account create/list, Paystack Inline helper and merchant QR are implemented. Live payment/DVA verification remains blocked locally. |
 | M7 | Ad Campaigns (legacy history, push blast, reels) | 🟢 Core done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Product decision 2026-07-25: campaigns are retired from the primary Ruby Ads experience. Their records remain as an optional Past campaigns history; supported lifecycle, push-blast and organic-reel routes remain available. Live wallet debit, R2 upload/transcoding and browser checks remain pending. |
-| M8 | Ad Subscriptions + Ruby Quest | 🟡 Core UI in progress | Codex | 2026-07-24 | — | The Ruby Ads home now matches mobile’s subscription-led model: tier state/manage CTA, pending/paused state, optional performance, Ruby Quest and collapsed legacy history. Full subscription/Ruby Quest API contract, plan status/manage UI, saved-card subscription path, banner submission and wallet Ruby Quest lifecycle are implemented. First-time Paystack Inline subscription requires a web-safe backend contract. |
+| M8 | Ad Subscriptions + Ruby Quest | 🟡 Core UI in progress | Codex | 2026-07-24 | — | The Ruby Ads home now matches mobile’s subscription-led model: tier state/manage CTA, pending/paused state, optional performance, Ruby Quest and collapsed legacy history. Plan selection now starts the existing secure Paystack checkout, returns to a server-verification callback and saves display-safe card metadata for future charges. Full change-tier preview/scheduled-downgrade UI and authenticated checkout verification remain. |
 | M9 | Events + ticket scanner | 🟢 Core done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Full mobile-parity event API, list/create/edit/detail lifecycle, Leaflet venue pin, ticket roster, sales analytics, browser scanner and browser media upload are implemented. Live validation remains pending. |
 | M10 | Chat + Disputes + Support | 🟢 Core done, verification pending | Codex | 2026-07-24 | 2026-07-24 (core) | Merchant chat now uses the correct `/business/chat` contract with socket refresh, browser attachments and stable read acknowledgements; dispute list/detail replies and support ticket/contact entry are implemented. Live multi-client validation remains pending. |
 | M11 | Notifications + Reviews + Analytics | 🟡 Core UI in progress | Codex | 2026-07-24 | — | Business notification inbox/read actions, review replies, mobile-parity 7/30/90-day analytics and local browser-permission/service-worker setup are implemented. Remote browser push is blocked on VAPID/web-push backend support. |
@@ -43,6 +43,64 @@
 ---
 
 ## Session log (append-only)
+
+### 2026-07-25 — Admin legal-document actions
+
+**What works:** Admin Legal Documents now opens its three-dot actions in a viewport-level menu that cannot be clipped by the table’s horizontal-scroll wrapper. Corrected the legal-document activate/deactivate client contract from `POST` to the backend’s required `PUT` endpoints. The list client also now sends the supported `isActive` and `search` filters rather than an ignored `status` parameter.
+
+**Verification:** Focused TypeScript check for the admin Legal Documents screen and API client completed with zero diagnostics.
+
+**Files touched:** `src/app/ruby-app/admin/(dashboard)/legal/page.tsx`, `src/lib/api/client.ts`, `docs/business-web-port/PROGRESS.md`.
+
+**Next task for next agent:** Authenticated admin smoke test: open every action menu near the table edge, activate and deactivate a Merchant Agreement, then confirm the list refreshes with the new status.
+
+### 2026-07-25 — Branch network state gate
+
+**What works:** The Branches page now uses the authenticated business’s authoritative `isParent` / `parentBusinessId` state to decide whether multi-branch is enabled, rather than treating an empty child-branch list as disabled. Enabled networks with zero additional locations show **Add branch**, never **Enable**. Branch creation and branch listing now resolve the parent network ID when the merchant is currently viewing a child branch.
+
+**Files touched:** `src/app/business/dashboard/branches/page.tsx`, `src/lib/business-api/organization.ts`, `docs/business-web-port/PROGRESS.md`.
+
+**Next task for next agent:** Authenticated test: an enabled parent with zero children must show Add branch; a standalone business must show Enable; a child branch must manage its parent network.
+
+### 2026-07-25 — Ruby Quest rollout parity
+
+**What works:** Reviewed the current mobile Ruby Quest screen before changing web. The web tier cards now match the active mobile rollout: tiers/pricing remain visible, but their calls to action are disabled and labelled **Coming soon**. Existing Ruby Quest campaign history and pause/resume controls remain available for pre-existing campaigns.
+
+**Files touched:** `src/app/business/dashboard/ruby-ads/ruby-quest/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Next task for next agent:** Keep checking `ruby-business-app/app/(main)/ads/ruby-quest.tsx` before changing any Ruby Quest availability or purchase action on web.
+
+### 2026-07-25 — Ruby Ads active-tier visual refinement
+
+**What works:** Redesigned the active Ruby Ads tier summary into a responsive membership card with an explicit live-status badge, tier-specific benefit chips, renewal context, and a dedicated weekly-investment panel. Subscription management is available in both the renewal context and payment panel without competing with the dashboard header action.
+
+**Verification:** Focused TypeScript check for the Ruby Ads home and subscription contracts completed with zero diagnostics.
+
+**Files touched:** `src/app/business/dashboard/ruby-ads/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Next task for next agent:** Visually test ACTIVE, PAUSED and IN_GRACE_PERIOD cards with an authenticated merchant to confirm status-copy contrast and tier-perk wrapping at tablet widths.
+
+### 2026-07-25 — Ruby Ads subscription checkout and saved card
+
+**What works:**
+- Rebuilt the tier-selection page around the merchant’s real subscription and payment-card state: current tier/renewal, safe card-on-file details, clear security copy, and appropriate actions instead of disabled “saved card required” buttons.
+- A merchant without a saved card can choose a tier and start the existing secure Paystack subscription checkout. On completion, Paystack returns to the new dashboard callback page, which verifies the server-side reference before confirming the tier. The successful first subscription payment saves only display-safe card metadata for future one-tap renewals/changes.
+- Merchants who already have a card on file see the masked card and can charge it directly; the backend never exposes Paystack authorization codes to the browser.
+- Updated the native-to-web payment substitution in `PLAN.md` to reflect the current backend contract: browser hosted checkout with callback + server verification, never a WebView or iframe.
+
+**Verification:** Focused TypeScript check covering the tier screen, checkout callback, subscription hooks and client contract completed with zero diagnostics. Live Paystack checkout still requires a non-production merchant and configured Paystack callback allowlist.
+
+**Files touched:** `src/app/business/dashboard/ruby-ads/subscribe/page.tsx`, `src/app/business/dashboard/ruby-ads/subscribe/complete/page.tsx`, `src/lib/business-api/ad-subscriptions.ts`, `src/lib/business-api/index.ts`, `docs/business-web-port/{PLAN,PROGRESS}.md`.
+
+**Next task for next agent:** Validate first-card checkout through Paystack sandbox, including callback URL allowlisting and server verification; then test the saved-card one-tap action and declined-card fallback.
+
+### 2026-07-25 — Dashboard store-status contract correction
+
+**What works:** Corrected the web dashboard’s store-status display to use the actual shared mobile/backend `DailyOperation` response: `isOnline`, `onlineAt`, `offlineAt`, and `closingTime`. The previous web-only `isOpen`, `openedAt` and `hoursToday` assumptions were never returned by `GET /business/daily-operations/today`, which caused a live store to appear offline.
+
+**Files touched:** `src/lib/api/client.ts`, `src/components/business/dashboard/StoreStatusBar.tsx`.
+
+**Next task for next agent:** Verify an already-open merchant dashboard shows **Store is open for today**, then use the dashboard control to take it offline and open it again.
 
 ### 2026-07-25 — Dashboard shell scrolling
 

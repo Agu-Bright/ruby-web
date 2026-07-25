@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Gem, Megaphone, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, ChevronRight, CircleCheck, Gem, Megaphone, Sparkles } from 'lucide-react';
 import { useAdCampaigns, useAdStats } from '@/lib/business-api/ads';
 import { useAdSubscriptionStatus } from '@/lib/business-api/ad-subscriptions';
 import type { AdCampaign } from '@/lib/types';
@@ -60,25 +60,33 @@ export default function AdsPage() {
           <div className="mt-3 h-4 w-80 max-w-full rounded bg-gray-100" />
         </section>
       ) : hasActiveSubscription && status ? (
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#2d103b] via-[#6d1d55] to-[#fd362f] p-6 text-white shadow-lg sm:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-5">
-            <div className="flex max-w-xl gap-4">
-              <div className="rounded-2xl bg-white/15 p-3"><Sparkles size={26} /></div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">Your Ruby+ Ads tier</p>
-                <h2 className="mt-1 text-3xl font-bold">{status.tier.displayName}</h2>
-                <p className="mt-2 text-sm leading-6 text-white/85">Your visibility benefits, ranking and featured placements are working in the background.</p>
+        <section className="relative overflow-hidden rounded-[28px] bg-[#2b1038] p-1 shadow-[0_18px_45px_rgba(65,18,63,0.18)]">
+          <div className="pointer-events-none absolute -right-24 -top-36 h-80 w-80 rounded-full bg-ruby-red/70 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-40 left-1/3 h-72 w-72 rounded-full bg-fuchsia-500/30 blur-3xl" />
+          <div className="relative grid overflow-hidden rounded-[24px] bg-gradient-to-br from-[#3c1248] via-[#62164d] to-[#9d2047] lg:grid-cols-[minmax(0,1fr)_270px]">
+            <div className="p-6 text-white sm:p-8">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20"><Sparkles size={25} /></div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/65">Your Ruby+ Ads tier</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2.5"><h2 className="text-3xl font-bold tracking-tight">{status.tier.displayName}</h2><span className="inline-flex items-center gap-1 rounded-full bg-emerald-300/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-100 ring-1 ring-emerald-100/20"><CircleCheck size={13} /> {formatStatus(subscriptionStatus)}</span></div>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-6 max-w-xl text-sm leading-6 text-white/80">Your visibility benefits are active across Ruby+. We automatically apply your tier’s eligible ranking and discovery placements.</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {status.tier.perkBullets.slice(0, 2).map((perk) => <span key={perk} className="rounded-full bg-black/15 px-3 py-1.5 text-xs font-medium text-white/85 ring-1 ring-white/10">{perk}</span>)}
+              </div>
+              <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-white/15 pt-5 text-sm">
+                <div><p className="text-xs text-white/55">Next renewal</p><p className="mt-1 font-semibold text-white">{new Date(status.subscription.currentPeriodEnd).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
+                <Link href="/business/dashboard/ruby-ads/manage" className="inline-flex items-center gap-1.5 font-semibold text-white transition hover:text-white/75">Manage tier <ArrowUpRight size={16} /></Link>
               </div>
             </div>
-            <div className="rounded-2xl bg-white/15 px-4 py-3 text-right">
-              <p className="text-xs text-white/70">Weekly plan</p>
-              <p className="mt-1 text-lg font-bold">{formatCurrency(status.subscription.weeklyAmountNgn)}<span className="text-sm font-medium text-white/70"> / week</span></p>
-              <p className="mt-1 text-xs text-white/70">{formatStatus(subscriptionStatus)}</p>
-            </div>
-          </div>
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/20 pt-5 text-sm">
-            <p className="text-white/80">Current period ends {new Date(status.subscription.currentPeriodEnd).toLocaleDateString('en-NG')}</p>
-            <Link href="/business/dashboard/ruby-ads/manage" className="font-semibold text-white underline-offset-4 hover:underline">View tier details</Link>
+            <aside className="flex flex-col justify-between border-t border-white/15 bg-[#1f0c2b]/30 p-6 text-white backdrop-blur-sm lg:border-l lg:border-t-0 sm:p-7">
+              <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/55">Weekly investment</p><p className="mt-3 text-3xl font-bold tracking-tight">{formatCurrency(status.subscription.weeklyAmountNgn)}</p><p className="mt-1 text-sm text-white/65">billed every 7 days</p></div>
+              <Link href="/business/dashboard/ruby-ads/manage" className="mt-8 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#50163f] transition hover:bg-white/90">View subscription <ArrowUpRight size={16} /></Link>
+            </aside>
           </div>
         </section>
       ) : (

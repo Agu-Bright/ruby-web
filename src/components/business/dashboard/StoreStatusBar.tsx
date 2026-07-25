@@ -30,7 +30,10 @@ export function StoreStatusBar() {
     refetch();
   });
 
-  const isOpen = !!data?.isOpen;
+  // The daily-operations endpoint returns the same `DailyOperation`
+  // document used by mobile: `isOnline`, `onlineAt`, and `closingTime`.
+  // Do not infer this from business profile hours or a separate field.
+  const isOpen = data?.isOnline === true;
   const busy = openDay.isLoading || goOffline.isLoading;
 
   const handleToggle = () => {
@@ -41,7 +44,7 @@ export function StoreStatusBar() {
       // Web flow — open the store without pre-selecting products.
       // The mobile app opens the inventory picker here; web routes
       // merchants to the products page instead once M4 ships.
-      openDay.mutate({ closingTime: data?.hoursToday?.close ?? '18:00' });
+      openDay.mutate({ closingTime: data?.closingTime ?? '18:00' });
     }
   };
 
@@ -84,8 +87,8 @@ export function StoreStatusBar() {
           </p>
           <p className="text-xs text-gray-500 truncate">
             {isOpen
-              ? data?.openedAt
-                ? `Opened at ${new Date(data.openedAt).toLocaleTimeString([], {
+              ? data?.onlineAt
+                ? `Opened at ${new Date(data.onlineAt).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
                   })}`

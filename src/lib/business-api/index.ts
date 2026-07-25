@@ -79,7 +79,7 @@ export { useBankAccounts, useCreateBankAccount, usePayouts, useCreatePayout } fr
 export type { BankAccount, Payout } from './payouts';
 export { useAdCampaigns, useAdCampaign, useAdStats, useCreateAdCampaign, useCreateOrganicReel, useMyOrganicReels, useRequestPushBlast, usePushBlastRequests, useAdAction } from './ads';
 export type { AdCampaign } from '@/lib/types';
-export { useAdSubscriptionTiers, useAdSubscriptionStatus, useSavedAdCard, useSubscribeWithSavedCard, useChangeTierWallet, usePreviewTierSwitch, useScheduleDowngrade, useCancelPendingDowngrade, useSetAdSubAutoRenew, usePauseAdSubscription, useResumeAdSubscription, useSetAdSubscriptionBanner } from './ad-subscriptions';
+export { useAdSubscriptionTiers, useAdSubscriptionStatus, useSavedAdCard, useInitializePaystackAdSubscription, useVerifyPaystackAdSubscription, useSubscribeWithSavedCard, useChangeTierWallet, usePreviewTierSwitch, useScheduleDowngrade, useCancelPendingDowngrade, useSetAdSubAutoRenew, usePauseAdSubscription, useResumeAdSubscription, useSetAdSubscriptionBanner } from './ad-subscriptions';
 export type { AdTier, AdTierDefinition, AdSubscriptionStatus } from './ad-subscriptions';
 export { useRubyQuestCampaigns, useRubyQuestAnalytics, useSubscribeRubyQuest, usePauseRubyQuest, useResumeRubyQuest } from './ruby-quest';
 export type { RubyRarity, RubyQuestCampaign } from './ruby-quest';

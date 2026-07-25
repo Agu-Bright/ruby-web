@@ -12,6 +12,8 @@ export interface AdSubscriptionStatus { subscription: { _id: string; tier: AdTie
 export function useAdSubscriptionTiers() { const fetcher = useCallback(() => api.businessAdSubscriptions.tiers(), []); return useBusinessQuery<AdTierDefinition[]>(fetcher, []); }
 export function useAdSubscriptionStatus() { const fetcher = useCallback(() => api.businessAdSubscriptions.status(), []); return useBusinessQuery<AdSubscriptionStatus | null>(fetcher, []); }
 export function useSavedAdCard() { const fetcher = useCallback(() => api.businessAdSubscriptions.savedCard(), []); return useBusinessQuery<any>(fetcher, []); }
+export function useInitializePaystackAdSubscription() { return useMutation<{ authorizationUrl: string; reference: string }, { tier: AdTier; email?: string; callbackUrl?: string }>((data) => api.businessAdSubscriptions.initializePaystack(data)); }
+export function useVerifyPaystackAdSubscription(onSuccess?: () => void) { return useMutation<any, { reference: string }>((data) => api.businessAdSubscriptions.verifyPaystack(data), { onSuccess }); }
 export function useSubscribeWithSavedCard(onSuccess?: () => void) { return useMutation<any, { tier: AdTier }>((data) => api.businessAdSubscriptions.subscribeWithSavedCard(data), { onSuccess }); }
 export function useChangeTierWallet(onSuccess?: () => void) { return useMutation<any, { tier: AdTier }>((data) => api.businessAdSubscriptions.changeTierWallet(data), { onSuccess }); }
 export function usePreviewTierSwitch() { return useMutation<any, { tier: AdTier }>((data) => api.businessAdSubscriptions.previewTierSwitch(data)); }

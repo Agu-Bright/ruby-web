@@ -3073,6 +3073,8 @@ export interface AdminPrizeQueueEntry {
  */
 export interface RubyQuestConfig {
   _id: string;
+  // Customer availability
+  customerTabEnabled: boolean;
   // Discovery
   mapRadiusKm: number;
   mapRadiusKmMax: number;

@@ -1338,6 +1338,9 @@ function ConfigTab() {
 
   const merged: Partial<RubyQuestConfig> = { ...data, ...form };
   const isDirty = Object.keys(form).length > 0;
+  // Existing singleton rows pre-date this field. Treat an absent value as
+  // enabled so a deployment cannot unexpectedly hide a live customer tab.
+  const customerTabEnabled = merged.customerTabEnabled !== false;
 
   const numberField = (
     key: keyof RubyQuestConfig,
@@ -1362,6 +1365,33 @@ function ConfigTab() {
 
   return (
     <div className="space-y-4">
+      <div className="card p-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-gray-800">Customer app tab</h3>
+          <p className="mt-1 text-sm text-gray-600">
+            {customerTabEnabled
+              ? 'Ruby Quest is visible in the customer app tab bar.'
+              : 'Ruby Quest is hidden from the customer app tab bar.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setForm({ ...form, customerTabEnabled: !customerTabEnabled })}
+          className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition ${
+            customerTabEnabled ? 'bg-emerald-500' : 'bg-gray-300'
+          }`}
+          role="switch"
+          aria-checked={customerTabEnabled}
+          aria-label="Toggle Ruby Quest customer app tab"
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 translate-y-1 rounded-full bg-white shadow transition ${
+              customerTabEnabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+
       <div className="card p-4">
         <p className="text-sm text-gray-600">
           Every tunable is hot — changes apply on the next request (no

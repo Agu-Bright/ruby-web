@@ -2793,7 +2793,9 @@ export const api = {
     activate: (id: string) =>
       request<any>(`/admin/ad-subscriptions/${id}/activate`, {
         method: "POST",
-        body: JSON.stringify({}),
+        // `request()` owns JSON serialisation. Passing a pre-stringified
+        // body makes it send `"{}"` and Nest receives a string, not JSON.
+        body: {},
       }),
 
     /**

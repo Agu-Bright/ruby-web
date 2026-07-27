@@ -104,6 +104,12 @@ interface BusinessDoc {
   tagline?: string;
   logoUrl?: string;
   coverImageUrl?: string;
+  media?: Array<{
+    url: string;
+    type?: string;
+    isPrimary?: boolean;
+    order?: number;
+  }>;
   status?: string;
   cacNumber?: string;
   cacStatus?: string;
@@ -233,6 +239,7 @@ export default function BusinessProfilePage() {
   const [tagline, setTagline] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [sellsProducts, setSellsProducts] = useState(false);
   const [acceptsOrders, setAcceptsOrders] = useState(false);
   const [acceptsBookings, setAcceptsBookings] = useState(false);
@@ -253,8 +260,25 @@ export default function BusinessProfilePage() {
     setName(doc.name ?? '');
     setDescription(doc.description ?? '');
     setTagline(doc.tagline ?? '');
+    const primaryCoverUrl =
+      doc.coverImageUrl ??
+      doc.media?.find((media) => !media.isPrimary && media.order === 1)?.url ??
+      '';
     setLogoUrl(doc.logoUrl ?? '');
-    setCoverImageUrl(doc.coverImageUrl ?? '');
+    setCoverImageUrl(primaryCoverUrl);
+    setGalleryUrls(
+      (doc.media ?? [])
+        .filter(
+          (media) =>
+            !!media.url &&
+            !media.isPrimary &&
+            media.url !== doc.logoUrl &&
+            media.url !== primaryCoverUrl,
+        )
+        .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+        .map((media) => media.url)
+        .slice(0, 8),
+    );
     setSellsProducts(!!doc.sellsProducts);
     setAcceptsOrders(!!doc.acceptsOrders);
     setAcceptsBookings(!!doc.acceptsBookings);
@@ -316,6 +340,7 @@ export default function BusinessProfilePage() {
         tagline: tagline.trim() || undefined,
         logoUrl: logoUrl.trim() || undefined,
         coverImageUrl: coverImageUrl.trim() || undefined,
+        media: buildBusinessMedia(logoUrl, coverImageUrl, galleryUrls),
         sellsProducts,
         acceptsOrders,
         acceptsBookings,
@@ -351,6 +376,7 @@ export default function BusinessProfilePage() {
     tagline,
     logoUrl,
     coverImageUrl,
+    galleryUrls,
     sellsProducts,
     acceptsOrders,
     acceptsBookings,
@@ -477,6 +503,8 @@ export default function BusinessProfilePage() {
           setLogoUrl={setLogoUrl}
           coverImageUrl={coverImageUrl}
           setCoverImageUrl={setCoverImageUrl}
+          galleryUrls={galleryUrls}
+          setGalleryUrls={setGalleryUrls}
         />
       )}
       {activeTab === 'contact' && (
@@ -677,6 +705,8 @@ function MediaPanel(props: {
   setLogoUrl: (v: string) => void;
   coverImageUrl: string;
   setCoverImageUrl: (v: string) => void;
+  galleryUrls: string[];
+  setGalleryUrls: (urls: string[]) => void;
 }) {
   return (
     <Panel>
@@ -692,15 +722,51 @@ function MediaPanel(props: {
         />
       </div>
       <div>
-        <FieldLabel>Cover image</FieldLabel>
+        <FieldLabel>Primary cover image</FieldLabel>
         <p className="mb-3 text-xs text-gray-500">
-          Wide banner (16:9 or wider). Sits behind your profile header.
+          Wide banner (16:9 or wider). This is the main image behind your profile header.
         </p>
         <ImageUpload
           value={props.coverImageUrl}
           onChange={(url) => props.setCoverImageUrl(url ?? '')}
           folder="business/cover"
         />
+      </div>
+      <div>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <FieldLabel>Cover gallery</FieldLabel>
+          <span className="text-xs font-medium text-gray-500">
+            {props.galleryUrls.length}/8 photos
+          </span>
+        </div>
+        <p className="mb-3 text-xs text-gray-500">
+          Add extra photos of your store, products, menu or space. Customers can browse these on your profile.
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {props.galleryUrls.map((url, index) => (
+            <div key={url} className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+              <img src={url} alt={`Business gallery photo ${index + 1}`} className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => props.setGalleryUrls(props.galleryUrls.filter((item) => item !== url))}
+                className="absolute right-2 top-2 rounded-full bg-black/65 px-2 py-1 text-xs font-semibold text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                aria-label={`Remove gallery photo ${index + 1}`}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          {props.galleryUrls.length < 8 && (
+            <div className="min-h-28">
+              <ImageUpload
+                onChange={(url) => {
+                  if (url) props.setGalleryUrls([...props.galleryUrls, url].slice(0, 8));
+                }}
+                folder="business/gallery"
+              />
+            </div>
+          )}
+        </div>
       </div>
     </Panel>
   );
@@ -1087,4 +1153,27 @@ function sanitizeAddress(address: BusinessAddress): BusinessAddress {
     if (value) result[key] = value;
   });
   return result;
+}
+
+function buildBusinessMedia(
+  logoUrl: string,
+  coverImageUrl: string,
+  galleryUrls: string[],
+) {
+  const media: Array<{
+    url: string;
+    type: 'IMAGE';
+    isPrimary?: boolean;
+    order: number;
+  }> = [];
+  if (logoUrl.trim()) {
+    media.push({ url: logoUrl.trim(), type: 'IMAGE', isPrimary: true, order: 0 });
+  }
+  if (coverImageUrl.trim()) {
+    media.push({ url: coverImageUrl.trim(), type: 'IMAGE', order: 1 });
+  }
+  galleryUrls.slice(0, 8).forEach((url, index) => {
+    if (url.trim()) media.push({ url: url.trim(), type: 'IMAGE', order: index + 2 });
+  });
+  return media;
 }

@@ -44,6 +44,16 @@
 
 ## Session log (append-only)
 
+### 2026-07-27 — M13 business media gallery parity
+
+**What works:** Business Profile → Media now supports one primary header cover plus up to eight additional gallery photos, matching the mobile business editor. The gallery keeps the existing `media[]` API contract (`logo=order 0`, `primary cover=order 1`, extra photos from order 2), supports individual removal, and retains legacy media-only cover data.
+
+**Files touched:** `src/app/business/dashboard/profile/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** `tsc --noEmit -p tsconfig.json` passed with zero errors.
+
+**Next task for next agent:** Surface this gallery on the customer-facing web business profile when that public profile route is added.
+
 ### 2026-07-27 — M12 branch location picker completed
 
 **What works:** Branch creation now uses the shared SSR-safe Leaflet map. Staff can search an address, click or drag the pin, and get street/city/state/country details filled from the selected location. Choosing a Ruby+ city centres the initial pin using that city's configured centre. The existing server-backed **Validate pin** action remains in place before branch creation.

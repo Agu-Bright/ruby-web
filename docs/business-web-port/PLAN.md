@@ -54,6 +54,16 @@ src/app/business/
 
 ## Native → web substitution matrix (applies globally across every milestone)
 
+### Admin-assisted business workspace (2026-07-27 addition)
+
+| Native / owner capability | Admin-assisted web substitution | Access boundary |
+|---|---|---|
+| Merchant profile, media, hours and DRAFT onboarding | Admin Businesses detail workspace using admin-scoped APIs | SUPER_ADMIN, LOCATION_ADMIN (assigned locations only), SUPPORT |
+| Product and service catalogue maintenance | Admin Businesses catalog workspace using admin-scoped APIs | SUPER_ADMIN, LOCATION_ADMIN (assigned locations only), SUPPORT |
+| Wallet, payouts, bank accounts, ownership and login/security changes | No assisted surface | SUPER_ADMIN only through existing dedicated admin workflows where applicable; never exposed to SUPPORT |
+
+**Rule:** Assisted work must use the existing admin JWT and admin endpoints so audit records retain the real staff actor. Do not mint a merchant token, impersonate an owner, or write business-dashboard tokens into localStorage.
+
 | Native API (mobile) | Web replacement | Milestones affected |
 |---|---|---|
 | `expo-iap` (StoreKit / Play) | Paystack secure hosted checkout in the browser (callback + server verification) + wallet only. Use Inline JS when the backend exposes a browser-safe inline configuration; never use a WebView or iframe. | M7, M8 |

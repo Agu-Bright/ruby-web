@@ -215,12 +215,17 @@ export function BusinessSidebar() {
   }, [visibility.showProducts, visibility.showServices]);
 
   return (
-    <aside aria-label="Business dashboard navigation" className="flex h-full w-16 shrink-0 flex-col border-r border-gray-200 bg-white sm:w-64">
+    <aside
+      aria-label="Business dashboard navigation"
+      className="flex h-full w-16 shrink-0 flex-col border-r border-white/10 bg-gradient-to-b from-[#8d1238] via-[#cf203c] to-[#fd362f] text-white shadow-[10px_0_28px_rgba(127,13,42,0.12)] sm:w-64"
+    >
       {/* Logo */}
-      <div className="flex h-16 items-center justify-center border-b border-gray-100 px-2 sm:justify-start sm:px-6">
+      <div className="flex h-16 items-center justify-center border-b border-white/15 px-2 sm:justify-start sm:px-6">
         <Link href="/business/dashboard" className="flex items-center gap-2" aria-label="Ruby+ Business dashboard">
-          <img src="/images/logo.png" alt="Ruby+" className="h-5 w-auto sm:h-6" />
-          <span className="hidden text-sm font-bold text-gray-900 sm:inline">Business</span>
+          <span className="rounded-lg bg-white px-1.5 py-1 shadow-sm">
+            <img src="/images/logo.png" alt="Ruby+" className="h-4 w-auto sm:h-5" />
+          </span>
+          <span className="hidden text-sm font-bold text-white sm:inline">Business</span>
         </Link>
       </div>
 
@@ -228,7 +233,7 @@ export function BusinessSidebar() {
       <nav className="flex-1 overflow-y-auto overscroll-contain px-2 py-4">
         {groups.map((group) => (
           <div key={group.title} className="mb-4">
-            <p className="mb-1 hidden px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 sm:block">
+            <p className="mb-1 hidden px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-white/55 sm:block">
               {group.title}
             </p>
             <ul>
@@ -241,8 +246,8 @@ export function BusinessSidebar() {
                       href={item.href}
                       className={`flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm transition sm:justify-start ${
                         isActive
-                          ? 'bg-ruby-red/10 text-ruby-red font-semibold'
-                          : 'text-gray-700 hover:bg-gray-50'
+                          ? 'bg-white/20 text-white font-semibold shadow-sm ring-1 ring-white/15'
+                          : 'text-white/85 hover:bg-white/10 hover:text-white'
                       }`}
                     >
                       <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />

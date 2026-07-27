@@ -44,6 +44,34 @@
 
 ## Session log (append-only)
 
+### 2026-07-27 — M14 business profile map picker completed
+
+**What works:** The Business Dashboard Profile → Location tab now loads the existing SSR-safe Leaflet picker instead of showing a deferred-work notice. Merchants can search an address, click the map, or drag the pin. Reverse geocoding fills street, city, state and country while retaining any suite detail and landmark. `Save changes` persists only changed location fields: `address` for written details and `latitude`/`longitude` for a changed pin, so a general profile save cannot silently overwrite a location.
+
+**Design decisions:** The picker is dynamically imported with `ssr: false` because Leaflet requires browser globals. The initial pin uses stored longitude/latitude or `geoPoint.coordinates`; Lagos is merely a visual fallback until the merchant selects a pin.
+
+**Files touched:** `src/app/business/dashboard/profile/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Deferred:** Browser walk-through and TypeScript check remain pending because the local environment does not currently expose Node/npm.
+
+**Next task for next agent:** Reuse the same shared picker for M9 event venues and M12 branch locations, then complete the remaining M14 fields that need dedicated backend contracts.
+
+### 2026-07-27 — Admin-assisted business workspace
+
+**Approved access model:** SUPER_ADMIN has full assisted access. LOCATION_ADMIN has every Support capability, limited to businesses in their assigned locations. SUPPORT can assist with business profile, catalogue, media, operating hours and DRAFT onboarding only. Wallet, payouts, bank accounts, ownership and account-security controls remain unavailable to Support.
+
+**Design decision:** The assisted workspace must retain the admin session and use admin-scoped APIs, rather than issuing an owner/business token. This preserves the actual staff actor in audit trails and prevents support from inheriting finance or account-security privileges.
+
+**What works:** The existing Admin Businesses detail workspace is now the assisted workspace. Support staff can view a business, edit the approved customer-facing profile/onboarding fields, manage the scoped catalogue and add a product directly from the catalog tab. Support sees no wallet tab or lifecycle/finance actions. Location Admin retains those Support capabilities and is checked against the business's assigned location. Super Admin retains the existing full admin workflow.
+
+**Security/audit:** `PUT /admin/businesses/:id/assisted-profile` accepts only name, description, tagline, media, hours, contact/address, location/category/subcategory and coordinates. It rejects all finance, ownership, security and lifecycle fields by construction. Every assisted profile or catalog-create action records the real admin actor, roles and changed fields in the audit log. Product read/write operations now validate the selected product's business through the same admin location scope; Support cannot use the global product list without a selected business.
+
+**Files touched:** `src/modules/businesses/{businesses.controller.ts,businesses.service.ts}`, `src/modules/products/{products.controller.ts,products.service.ts,products.module.ts}`, `src/common/interfaces/index.ts`, `src/lib/api/client.ts`, `src/app/ruby-app/admin/(dashboard)/businesses/page.tsx`, `docs/business-web-port/{PLAN.md,PROGRESS.md}`.
+
+**Verification:** `git diff --check` passes. Full TypeScript/browser verification could not run because this environment does not have a runnable Node executable; next deployment must run backend build and web TypeScript/browser smoke tests.
+
+**Next task for next agent:** Add a service-creation assisted form and perform authenticated smoke tests for Support, Location Admin outside location, and Super Admin.
+
 ### 2026-07-25 — Dashboard fixed shell and responsive pass
 
 **What works:** The authenticated business dashboard is now a viewport-fixed shell, so the browser page cannot scroll the sidebar or topbar. The content pane is the sole page-level vertical scroller and uses overscroll containment to prevent touch-scroll chaining. The desktop sidebar remains fully visible and fixed; on small screens it becomes a compact fixed icon rail, with the business name safely truncated in the fixed top bar. The chat workspace now has bounded, independent conversation/message panes on phones rather than stacking a long conversation list above the composer. The Services list now has a stacked mobile header and filters, a full-width mobile status selector, and truncation-safe cards.
@@ -771,6 +799,30 @@ Start M0. First files to create:
 ---
 
 ## Decisions log (append-only)
+
+### 2026-07-27 — M14 business profile map picker completed
+
+**What works**
+
+- The Business Dashboard Profile → Location tab now loads the existing SSR-safe Leaflet picker instead of showing a deferred-work notice.
+- Merchants can search an address, click the map, or drag the pin. Reverse geocoding fills the street, city, state, and country fields while preserving any extra address detail and landmark.
+- `Save changes` persists only location fields that the merchant changed: `address` for written details and `latitude`/`longitude` for a changed pin. Existing profile saves do not silently overwrite a business location.
+
+**Design decisions**
+
+- The picker is dynamically imported with `ssr: false` because Leaflet requires browser globals.
+- The initial pin uses the business' stored longitude/latitude or `geoPoint.coordinates`; Lagos is only a visual fallback until the merchant chooses a pin.
+
+**Files touched**
+
+- `src/app/business/dashboard/profile/page.tsx`
+- `docs/business-web-port/PROGRESS.md`
+
+**Deferred items**
+
+- Browser walk-through and TypeScript check are pending because the local environment does not currently expose Node/npm.
+
+**Next task for next agent:** Use the same shared picker for the M9 event venue and M12 branch-location forms, then complete remaining M14 profile fields that require a dedicated backend contract.
 
 _As decisions get made that deviate from or extend PLAN.md, log them here with the milestone number that surfaced them._
 

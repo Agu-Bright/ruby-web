@@ -15,22 +15,8 @@
  *     always gets a real ₦0 instead of "—".
  */
 
-import { useCallback } from 'react';
 import { ShoppingBag, CalendarCheck, Wallet } from 'lucide-react';
-import { useDashboardStats } from '@/lib/business-api';
-import { useBusinessQuery } from '@/lib/business-api/hooks';
-import { useBusinessAuth } from '@/lib/business-auth';
-import { api } from '@/lib/api';
-
-interface BusinessWallet {
-  _id: string;
-  balance: number;
-  availableBalance?: number;
-  currency?: string;
-  status?: string;
-  type?: string;
-  ownerType?: string;
-}
+import { useBusinessWallets, useDashboardStats } from '@/lib/business-api';
 
 function formatCurrency(n: number | undefined | null): string {
   if (n == null || Number.isNaN(n)) return '₦—';
@@ -69,27 +55,18 @@ function StatCard({ label, value, hint, icon: Icon, tint }: StatCardProps) {
 
 export function StatCardRow() {
   const { data, isLoading } = useDashboardStats();
-  const { business } = useBusinessAuth();
-  const businessId = business?._id ?? '';
-
-  const walletsFetcher = useCallback(
-    () => api.businessWallets.list(businessId),
-    [businessId],
-  );
-  const { data: wallets } = useBusinessQuery<BusinessWallet[]>(
-    walletsFetcher,
-    [businessId],
-    { enabled: !!businessId },
-  );
+  const { data: wallets } = useBusinessWallets();
 
   // Prefer NGN wallet; else first wallet's balance.
   const primaryWallet =
     (wallets ?? []).find((w) => (w.currency ?? 'NGN') === 'NGN') ??
     (wallets ?? [])[0] ??
     null;
-  const walletBalance = primaryWallet
-    ? primaryWallet.availableBalance ?? primaryWallet.balance ?? 0
-    : null;
+  // Match the native business app and the wallet ledger: `balance` is the
+  // merchant's current usable balance. Some older wallets have a stale
+  // `availableBalance: 0` despite a positive balance, which previously made
+  // the web dashboard incorrectly show zero.
+  const walletBalance = primaryWallet ? primaryWallet.balance ?? 0 : null;
 
   if (isLoading && !data) {
     return (
@@ -138,10 +115,7 @@ export function StatCardRow() {
         value={walletBalance != null ? formatCurrency(walletBalance) : '—'}
         hint={
           walletBalance != null
-            ? primaryWallet && primaryWallet.availableBalance != null &&
-              primaryWallet.availableBalance !== primaryWallet.balance
-              ? `${formatCurrency(primaryWallet.balance)} total (some pending)`
-              : 'Available to withdraw'
+            ? 'Available to withdraw'
             : 'Loading balance…'
         }
         icon={Wallet}

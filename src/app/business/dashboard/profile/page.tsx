@@ -11,9 +11,8 @@
  *   - Verification: CAC number/status (display + link to CAC card if not registered)
  *   - More       : operation mode + acceptsOrders/acceptsBookings + branch label (parent view only)
  *
- * The Location tab is deferred to the shared Leaflet slice (needs a map
- * picker with `MapLocationPicker`). Merchants can still edit location
- * on mobile in the meantime.
+ * The Location tab uses the shared Leaflet picker with address search,
+ * draggable/clickable pin placement and reverse-geocoded address fields.
  *
  * All updates route through `PUT /business/:id` via
  * `api.businessOnboarding.update()` (the endpoint namespace name is
@@ -29,6 +28,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import {
   FileText,
@@ -45,6 +45,23 @@ import { api } from '@/lib/api';
 import { useBusinessAuth } from '@/lib/business-auth';
 import { useBusinessQuery } from '@/lib/business-api/hooks';
 import { ImageUpload } from '@/components/ui/image-upload';
+import type { ReverseGeocodeResult } from '@/lib/geocoding';
+
+// Leaflet reads browser globals at module initialisation, so the picker must
+// only be loaded in the browser. This is the shared picker used by the admin
+// business workflow as well.
+const MapLocationPicker = dynamic(
+  () =>
+    import('@/components/ui/map-location-picker').then((module) => ({
+      default: module.MapLocationPicker,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[360px] animate-pulse rounded-xl bg-gray-100" />
+    ),
+  },
+);
 
 // ─── Types ────────────────────────────────────────────────────────────
 type BusinessModel = 'ORDER_DELIVERY' | 'VISIT_ONLY' | 'BOOKING_VISIT';
@@ -95,6 +112,9 @@ interface BusinessDoc {
   acceptsBookings?: boolean;
   contact?: BusinessContact;
   address?: BusinessAddress;
+  latitude?: number;
+  longitude?: number;
+  geoPoint?: { type?: string; coordinates?: [number, number] };
   hours?: BusinessHour[];
   isParent?: boolean;
   parentBusinessId?: string;
@@ -218,6 +238,11 @@ export default function BusinessProfilePage() {
   const [acceptsBookings, setAcceptsBookings] = useState(false);
   const [contact, setContact] = useState<BusinessContact>({});
   const [hours, setHours] = useState<BusinessHour[]>(defaultHours());
+  const [address, setAddress] = useState<BusinessAddress>({});
+  const [latitude, setLatitude] = useState(6.5244);
+  const [longitude, setLongitude] = useState(3.3792);
+  const [addressChanged, setAddressChanged] = useState(false);
+  const [pinChanged, setPinChanged] = useState(false);
   const [branchLabel, setBranchLabel] = useState('');
   const [operationMode, setOperationMode] = useState<BusinessModel | undefined>();
   const [saving, setSaving] = useState(false);
@@ -235,6 +260,24 @@ export default function BusinessProfilePage() {
     setAcceptsBookings(!!doc.acceptsBookings);
     setContact(doc.contact ?? {});
     setHours(normaliseHours(doc.hours));
+    setAddress(doc.address ?? {});
+    const coordinates = doc.geoPoint?.coordinates;
+    const nextLongitude =
+      typeof doc.longitude === 'number'
+        ? doc.longitude
+        : typeof coordinates?.[0] === 'number'
+          ? coordinates[0]
+          : 3.3792;
+    const nextLatitude =
+      typeof doc.latitude === 'number'
+        ? doc.latitude
+        : typeof coordinates?.[1] === 'number'
+          ? coordinates[1]
+          : 6.5244;
+    setLongitude(nextLongitude);
+    setLatitude(nextLatitude);
+    setAddressChanged(false);
+    setPinChanged(false);
     setBranchLabel(doc.branchLabel ?? '');
     const populatedSub =
       typeof doc.subcategoryId === 'object' ? doc.subcategoryId : null;
@@ -285,6 +328,11 @@ export default function BusinessProfilePage() {
         })),
       };
       if (branchLabel.trim()) payload.branchLabel = branchLabel.trim();
+      if (addressChanged) payload.address = sanitizeAddress(address);
+      if (pinChanged) {
+        payload.latitude = latitude;
+        payload.longitude = longitude;
+      }
       await api.businessOnboarding.update(businessId, payload);
       toast.success('Business profile saved.');
       await refetch();
@@ -309,6 +357,11 @@ export default function BusinessProfilePage() {
     contact,
     hours,
     branchLabel,
+    address,
+    addressChanged,
+    latitude,
+    longitude,
+    pinChanged,
     refetch,
     refreshBusinessProfile,
   ]);
@@ -433,7 +486,20 @@ export default function BusinessProfilePage() {
         <HoursPanel hours={hours} setHours={setHours} />
       )}
       {activeTab === 'location' && (
-        <LocationPanel doc={doc} />
+        <LocationPanel
+          address={address}
+          setAddress={(nextAddress) => {
+            setAddress(nextAddress);
+            setAddressChanged(true);
+          }}
+          latitude={latitude}
+          longitude={longitude}
+          setCoordinates={(nextLatitude, nextLongitude) => {
+            setLatitude(nextLatitude);
+            setLongitude(nextLongitude);
+            setPinChanged(true);
+          }}
+        />
       )}
       {activeTab === 'verification' && (
         <VerificationPanel doc={doc} />
@@ -784,35 +850,101 @@ function HoursPanel({
 }
 
 // ─── Location ──────────────────────────────────────────────────────────
-function LocationPanel({ doc }: { doc: BusinessDoc | null | undefined }) {
-  const addr = doc?.address ?? {};
-  const parts = [addr.street, addr.street2, addr.city, addr.state, addr.country]
-    .filter(Boolean)
-    .join(', ');
+function LocationPanel({
+  address,
+  setAddress,
+  latitude,
+  longitude,
+  setCoordinates,
+}: {
+  address: BusinessAddress;
+  setAddress: (nextAddress: BusinessAddress) => void;
+  latitude: number;
+  longitude: number;
+  setCoordinates: (latitude: number, longitude: number) => void;
+}) {
+  const updateAddress = (field: keyof BusinessAddress, value: string) =>
+    setAddress({ ...address, [field]: value });
+  const applyReverseGeocode = (result: ReverseGeocodeResult) =>
+    setAddress({
+      ...address,
+      street: result.street ?? address.street,
+      city: result.city ?? address.city,
+      state: result.state ?? address.state,
+      country: result.country ?? address.country,
+    });
   return (
     <Panel>
       <div>
-        <FieldLabel>Registered address</FieldLabel>
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
-          {parts || 'No address on file yet.'}
-        </div>
+        <FieldLabel>Find your business on the map</FieldLabel>
+        <p className="mb-3 text-xs leading-relaxed text-gray-500">
+          Search for the address, click the map, or drag the Ruby+ pin to the
+          exact entrance. Selecting a place updates the address fields below.
+        </p>
+        <MapLocationPicker
+          latitude={latitude}
+          longitude={longitude}
+          onLocationChange={setCoordinates}
+          onAddressResolved={applyReverseGeocode}
+          height="360px"
+        />
       </div>
-      {addr.landmark && (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="font-semibold">Location details</p>
+        <p className="mt-1 text-xs leading-relaxed">
+          Confirm the written address below, then select Save changes to keep
+          it in sync with the precise map pin and customer discovery.
+        </p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <FieldLabel>Street address</FieldLabel>
+          <TextInput
+            value={address.street ?? ''}
+            onChange={(event) => updateAddress('street', event.target.value)}
+            placeholder="House number and street"
+          />
+        </div>
+        <div>
+          <FieldLabel>Suite, floor or extra detail</FieldLabel>
+          <TextInput
+            value={address.street2 ?? ''}
+            onChange={(event) => updateAddress('street2', event.target.value)}
+            placeholder="Optional"
+          />
+        </div>
         <div>
           <FieldLabel>Landmark</FieldLabel>
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
-            {addr.landmark}
-          </div>
+          <TextInput
+            value={address.landmark ?? ''}
+            onChange={(event) => updateAddress('landmark', event.target.value)}
+            placeholder="e.g. Opposite City Mall"
+          />
         </div>
-      )}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <p className="font-semibold">Map picker coming soon on web</p>
-        <p className="mt-1 text-xs leading-relaxed">
-          Editing your pin + address on the map requires the shared Leaflet
-          picker that&apos;s in progress. For now, edit your location from the
-          Ruby+ Business mobile app — the change syncs across both surfaces
-          immediately.
-        </p>
+        <div>
+          <FieldLabel>City</FieldLabel>
+          <TextInput
+            value={address.city ?? ''}
+            onChange={(event) => updateAddress('city', event.target.value)}
+            placeholder="City"
+          />
+        </div>
+        <div>
+          <FieldLabel>State</FieldLabel>
+          <TextInput
+            value={address.state ?? ''}
+            onChange={(event) => updateAddress('state', event.target.value)}
+            placeholder="State"
+          />
+        </div>
+        <div>
+          <FieldLabel>Country</FieldLabel>
+          <TextInput
+            value={address.country ?? ''}
+            onChange={(event) => updateAddress('country', event.target.value)}
+            placeholder="Nigeria"
+          />
+        </div>
       </div>
     </Panel>
   );
@@ -946,4 +1078,13 @@ function sanitizeContact(c: BusinessContact): BusinessContact {
     if (v) out[k] = v;
   });
   return out;
+}
+
+function sanitizeAddress(address: BusinessAddress): BusinessAddress {
+  const result: BusinessAddress = {};
+  (Object.keys(address) as Array<keyof BusinessAddress>).forEach((key) => {
+    const value = address[key]?.trim();
+    if (value) result[key] = value;
+  });
+  return result;
 }

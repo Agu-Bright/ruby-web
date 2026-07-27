@@ -113,10 +113,11 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 type ActionType = 'approve' | 'set-live' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'vip' | 'delete' | 'update-status' | 'edit' | 'verify-deolu' | 'unverify-deolu';
 
 // ─── Action Dropdown Component ───
-function ActionDropdown({ business, onAction, onView }: {
+function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
   business: Business;
   onAction: (business: Business, action: ActionType) => void;
   onView: (business: Business) => void;
+  supportOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -136,6 +137,15 @@ function ActionDropdown({ business, onAction, onView }: {
     { label: 'View Details', icon: Eye, action: () => { onView(business); setOpen(false); } },
     { label: 'Edit Business', icon: Edit2, action: () => { onAction(business, 'edit'); setOpen(false); } },
   ];
+
+  if (supportOnly) {
+    return (
+      <div ref={ref} className="relative">
+        <button ref={buttonRef} onClick={(e) => { e.stopPropagation(); if (!open && buttonRef.current) { const rect = buttonRef.current.getBoundingClientRect(); setMenuPos({ top: rect.bottom + 4, left: rect.right - 192 }); } setOpen(!open); }} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"><MoreHorizontal className="w-4 h-4 text-gray-500" /></button>
+        {open && <div className="fixed w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 animate-fade-in" style={{ top: menuPos.top, left: menuPos.left }}>{items.map((item, i) => <button key={i} onClick={(e) => { e.stopPropagation(); item.action(); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-50"><item.icon className="w-3.5 h-3.5" />{item.label}</button>)}</div>}
+      </div>
+    );
+  }
 
   if (business.status === 'PENDING_REVIEW') {
     items.push(
@@ -259,6 +269,10 @@ function ActionDropdown({ business, onAction, onView }: {
 
 export default function BusinessesPage() {
   const { admin } = useAuth();
+  const adminRoles = admin?.roles?.map((role) => role.toLowerCase()) ?? [];
+  // A Location Admin may also carry SUPPORT for inbox duties; retain the
+  // Location Admin workspace in that case. Restrict only Support-only staff.
+  const isSupport = adminRoles.includes('support') && !adminRoles.includes('location_admin') && !adminRoles.includes('super_admin');
   // Phase 44 — cross-page deep-link support.
   // `?openId=X` → auto-open the detail modal on that business.
   // `?ownerId=X` → pre-fill filters so the list shows only that user's
@@ -354,6 +368,7 @@ export default function BusinessesPage() {
   const [catalogItemModal, setCatalogItemModal] = useState<{ type: 'product' | 'service'; item: Product | ServiceListing } | null>(null);
   const [catalogEditModal, setCatalogEditModal] = useState<{ type: 'product' | 'service'; item: Product | ServiceListing } | null>(null);
   const [catalogConfirmModal, setCatalogConfirmModal] = useState<{ type: 'product' | 'service'; action: 'delete' | 'suspend' | 'activate' | 'archive'; item: Product | ServiceListing } | null>(null);
+  const [showAssistedProductCreate, setShowAssistedProductCreate] = useState(false);
   const [reason, setReason] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<BusinessStatus>('PENDING_REVIEW');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -1729,7 +1744,7 @@ export default function BusinessesPage() {
                             >
                               <Eye className="w-4 h-4 text-gray-400" />
                             </button>
-                            <ActionDropdown business={b} onAction={openAction} onView={(biz) => { setDetailBusiness(biz); setDetailTab('info'); }} />
+                            <ActionDropdown business={b} onAction={openAction} onView={(biz) => { setDetailBusiness(biz); setDetailTab('info'); }} supportOnly={isSupport} />
                           </div>
                         </td>
                       </tr>
@@ -1811,7 +1826,7 @@ export default function BusinessesPage() {
                                   >
                                     <Eye className="w-4 h-4 text-gray-400" />
                                   </button>
-                                  <ActionDropdown business={branch} onAction={openAction} onView={(biz) => { setDetailBusiness(biz); setDetailTab('info'); }} />
+                                  <ActionDropdown business={branch} onAction={openAction} onView={(biz) => { setDetailBusiness(biz); setDetailTab('info'); }} supportOnly={isSupport} />
                                 </div>
                               </td>
                             </tr>
@@ -1912,7 +1927,7 @@ export default function BusinessesPage() {
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-gray-100">
-              {(['info', 'media', 'cac', 'hours', 'catalog', 'wallet', ...(displayBusiness.isParent || displayBusiness.parentBusinessId ? ['branches'] as const : [])] as const).map(tab => (
+              {(['info', 'media', 'cac', 'hours', 'catalog', ...(!isSupport ? ['wallet'] as const : []), ...(displayBusiness.isParent || displayBusiness.parentBusinessId ? ['branches'] as const : [])] as const).map(tab => (
                 <button
                   key={tab}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
@@ -2376,6 +2391,9 @@ export default function BusinessesPage() {
                     </select>
                     <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                   </div>
+                  {showProducts && (
+                    <button onClick={() => setShowAssistedProductCreate(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-ruby-red px-3 py-1.5 text-sm font-semibold text-white"><Plus className="h-3.5 w-3.5" />Add product</button>
+                  )}
                 </div>
 
                 {/* Product list */}
@@ -2738,7 +2756,9 @@ export default function BusinessesPage() {
           business={editingBusiness}
           onClose={() => setEditingBusiness(null)}
           onSubmit={async (data) => {
-            const result = await api.businesses.adminUpdate(editingBusiness._id, data);
+            const result = isSupport
+              ? await api.businesses.assistedProfileUpdate(editingBusiness._id, data)
+              : await api.businesses.adminUpdate(editingBusiness._id, data);
             const updated = result?.data || result;
             if (updated) {
               toast.success(`"${editingBusiness.name}" updated`);
@@ -2748,6 +2768,16 @@ export default function BusinessesPage() {
           }}
         />
       )}
+
+      <Modal
+        isOpen={showAssistedProductCreate && !!detailBusiness}
+        onClose={() => setShowAssistedProductCreate(false)}
+        title="Add product for business"
+        subtitle={detailBusiness ? `You are assisting ${detailBusiness.name}. This action is audit logged.` : undefined}
+        size="md"
+      >
+        {detailBusiness && <AssistedProductCreateForm businessId={detailBusiness._id} onCancel={() => setShowAssistedProductCreate(false)} onCreated={() => { setShowAssistedProductCreate(false); refetchProducts(); }} />}
+      </Modal>
 
       {/* ─── Pandago Backfill Modal ─── */}
       <Modal
@@ -4091,6 +4121,45 @@ function CatalogDetailContent({ type, item }: { type: 'product' | 'service'; ite
 }
 
 // ─── Catalog Edit Product Form ───
+function AssistedProductCreateForm({ businessId, onCancel, onCreated }: { businessId: string; onCancel: () => void; onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
+  const [price, setPrice] = useState('');
+  const [stockQuantity, setStockQuantity] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !price || Number(price) < 0) {
+      toast.error('Enter a product name and valid price');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.products.create({
+        businessId,
+        name: name.trim(),
+        description: description.trim() || undefined,
+        category: category.trim() || undefined,
+        basePrice: Number(price),
+        stockQuantity: stockQuantity === '' ? undefined : Number(stockQuantity),
+        trackInventory: stockQuantity !== '',
+        isAvailable: true,
+        status: 'ACTIVE',
+      });
+      toast.success('Product added for this business');
+      onCreated();
+    } catch (error: any) {
+      toast.error(error?.message || 'Could not add product');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return <form onSubmit={submit} className="space-y-4 p-4"><label className="block text-sm font-medium">Product name<input autoFocus value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-medium">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium">Category<input value={category} onChange={(event) => setCategory(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-medium">Price (₦)<input type="number" min="0" value={price} onChange={(event) => setPrice(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5" /></label></div><label className="block text-sm font-medium">Opening stock <span className="font-normal text-gray-400">(optional)</span><input type="number" min="0" value={stockQuantity} onChange={(event) => setStockQuantity(event.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2.5" /></label><div className="flex justify-end gap-3 border-t pt-4"><button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm font-semibold">Cancel</button><button disabled={submitting} className="rounded-lg bg-ruby-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{submitting ? 'Adding…' : 'Add product'}</button></div></form>;
+}
+
 function CatalogEditProductForm({ product, isSubmitting, onCancel, onSubmit }: {
   product: Product;
   isSubmitting: boolean;

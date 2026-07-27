@@ -1434,6 +1434,11 @@ export const api = {
         method: "PUT",
         body: data,
       }),
+    assistedProfileUpdate: (id: string, data: Partial<import("@/lib/types").AdminCreateBusinessRequest>) =>
+      request<import("@/lib/types").Business>(`/admin/businesses/${id}/assisted-profile`, {
+        method: "PUT",
+        body: data,
+      }),
     unclaimed: (params?: import("@/lib/types").PaginationParams & { search?: string; locationId?: string }) =>
       request<import("@/lib/types").Business[]>("/admin/businesses/unclaimed", {
         params: params as Record<string, string | number | boolean | undefined>,
@@ -1489,6 +1494,11 @@ export const api = {
 
   // Admin Products
   products: {
+    create: (data: any) =>
+      request<import("@/lib/types").Product>("/admin/products", {
+        method: "POST",
+        body: data,
+      }),
     list: (params?: import("@/lib/types").ProductFilterParams) =>
       request<import("@/lib/types").Product[]>("/admin/products", {
         params: params as Record<string, string | number | boolean | undefined>,

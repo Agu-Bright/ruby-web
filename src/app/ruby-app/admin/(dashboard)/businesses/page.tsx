@@ -17,7 +17,7 @@ import {
   // P140 — Excel export button in the page header.
   Download,
   // P141 — Map view button + icon.
-  Map as MapIcon,
+  Map as MapIcon, LayoutDashboard,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -134,6 +134,18 @@ function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
   }, [open]);
 
   const items: { label: string; icon: typeof Eye; action: () => void; variant?: 'default' | 'success' | 'danger' | 'warning' }[] = [
+    {
+      label: 'Open business dashboard',
+      icon: LayoutDashboard,
+      action: () => {
+        window.open(
+          `/ruby-app/admin/businesses/${business._id}/dashboard`,
+          '_blank',
+          'noopener,noreferrer',
+        );
+        setOpen(false);
+      },
+    },
     { label: 'View Details', icon: Eye, action: () => { onView(business); setOpen(false); } },
     { label: 'Edit Business', icon: Edit2, action: () => { onAction(business, 'edit'); setOpen(false); } },
   ];

@@ -44,6 +44,16 @@
 
 ## Session log (append-only)
 
+### 2026-07-27 — Admin-assisted dashboard entry point
+
+**What works:** The three-dot action menu on every Admin Businesses row now starts with **Open business dashboard**. It opens `/ruby-app/admin/businesses/:id/dashboard`, an admin-authenticated assisted dashboard for the selected business. The route clearly labels the access role, records the distinction between staff assistance and owner access, and makes Wallet & withdrawals unavailable to Support and Location Admin while keeping the permitted profile, media, catalogue, order and booking workspace entry points visible.
+
+**Files touched:** `src/app/ruby-app/admin/(dashboard)/businesses/page.tsx`, `src/app/ruby-app/admin/(dashboard)/businesses/[id]/dashboard/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** `tsc --noEmit -p tsconfig.json` passed with zero errors.
+
+**Next task for next agent:** Continue routing the allowed assisted dashboard sections into dedicated admin-session pages; never proxy or copy a merchant token for staff access.
+
 ### 2026-07-27 — M13 business media gallery parity
 
 **What works:** Business Profile → Media now supports one primary header cover plus up to eight additional gallery photos, matching the mobile business editor. The gallery keeps the existing `media[]` API contract (`logo=order 0`, `primary cover=order 1`, extra photos from order 2), supports individual removal, and retains legacy media-only cover data.

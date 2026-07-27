@@ -1,20 +1,22 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   ShoppingCart, Search, Eye, Package, MoreHorizontal, XCircle, RefreshCw,
   Clock, CheckCircle, Truck, Store, User, MapPin, DollarSign, TrendingUp,
   Ban, ChevronDown, Loader2, Bike, Phone, Mail, Hash, Camera,
-  AlertTriangle, CircleDot,
+  AlertTriangle, CircleDot, MessageSquare, Send, Radio, Shield,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
+import { useAdminSockets } from '@/lib/admin-sockets';
 import { PageHeader, DataTable, StatusBadge, Modal, StatCard, type Column } from '@/components/ui';
 import type {
   Order, OrderFilterParams, OrderStatus, OrderStats,
   AdminDeliveryJob, AdminDeliveryStatus, OrderItem,
+  Dispute, DisputeMessage,
 } from '@/lib/types';
 import {
   formatDate, formatDateTime, formatCurrency, toLocationId,
@@ -121,48 +123,96 @@ function ActionDropdown({ order, onAction, onView, isSuperAdmin }: {
 
 export default function OrdersPage() {
   const { admin } = useAuth();
+  const sockets = useAdminSockets();
+  const ordersLive = sockets.isConnected('orders');
+  const deliveryLive = sockets.isConnected('delivery');
   const locationId = admin?.scope === 'LOCATION' && admin.locationIds.length === 1 ? toLocationId(admin.locationIds[0]) : undefined;
   const [filters, setFilters] = useState<OrderFilterParams>({ page: 1, limit: 20, ...(locationId ? { locationId } : {}) });
   const [search, setSearch] = useState('');
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
-  const [actionType, setActionType] = useState<'cancel' | 'override' | null>(null);
+  const [actionType, setActionType] = useState<'cancel' | 'override' | 'cancel-delivery' | null>(null);
+  const [activeDeliveryJob, setActiveDeliveryJob] = useState<AdminDeliveryJob | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [overrideStatus, setOverrideStatus] = useState('');
   const [overrideNote, setOverrideNote] = useState('');
   const isSuperAdmin = admin?.roles?.includes('super_admin') ?? false;
 
   const { data: orders, meta, isLoading, refetch } = useApi<Order[]>(() => api.orders.list({ ...filters, search: search || undefined }), [filters, search]);
-  const { data: stats } = useApi<OrderStats>(() => api.orders.stats({ locationId }), [locationId]);
-  const { data: fullDetail } = useApi<Order>(() => detailOrder ? api.orders.get(detailOrder._id) : Promise.resolve({ success: true, data: detailOrder! }), [detailOrder?._id]);
+  const { data: stats, refetch: refetchStats } = useApi<OrderStats>(() => api.orders.stats({ locationId }), [locationId]);
+  const { data: fullDetail, refetch: refetchDetail } = useApi<Order>(() => detailOrder ? api.orders.get(detailOrder._id) : Promise.resolve({ success: true, data: detailOrder! }), [detailOrder?._id]);
   const displayOrder = fullDetail || detailOrder;
-  // Fetch the linked delivery job when the modal opens; only makes sense
-  // for orders whose fulfillmentType is DELIVERY, but we still call for
-  // pickup orders — the endpoint returns null and the panel just hides.
-  const { data: deliveryJob } = useApi<AdminDeliveryJob | null>(
+  const { data: deliveryJob, refetch: refetchDelivery } = useApi<AdminDeliveryJob | null>(
     () =>
       detailOrder
         ? api.orders.getDelivery(detailOrder._id)
         : Promise.resolve({ success: true, data: null }),
     [detailOrder?._id],
   );
+  const { data: disputes, refetch: refetchDisputes } = useApi<Dispute[]>(
+    () =>
+      detailOrder
+        ? api.disputes.list({ orderId: detailOrder._id, limit: 20 })
+        : Promise.resolve({ success: true, data: [] }),
+    [detailOrder?._id],
+  );
+
+  // Realtime — refresh list on any order or delivery event across the platform.
+  // Backend already fans out to `user:<userId>` rooms; admin JWTs join those
+  // as well (harmless — the admin isn't the target user but the event
+  // arrives via broadcast rooms once we join_order below).
+  useEffect(() => {
+    const offOrder = sockets.subscribe('orders', 'order_status_changed', () => {
+      refetch();
+      refetchStats();
+    });
+    const offDelivery = sockets.subscribe('delivery', 'delivery_status_changed', () => {
+      refetch();
+    });
+    return () => { offOrder(); offDelivery(); };
+  }, [sockets, refetch, refetchStats]);
+
+  // Modal-scoped realtime — join the order's room on both /orders and
+  // /delivery so we receive status + rider events for THIS order and
+  // refetch the modal panels.
+  useEffect(() => {
+    if (!detailOrder?._id) return;
+    const orderId = detailOrder._id;
+    sockets.emit('orders', 'join_order', { orderId });
+    sockets.emit('delivery', 'join_order', { orderId });
+
+    const offs = [
+      sockets.subscribe('orders', 'order_status_changed', () => refetchDetail()),
+      sockets.subscribe('delivery', 'delivery_status_changed', () => refetchDelivery()),
+      sockets.subscribe('delivery', 'rider_assigned', () => refetchDelivery()),
+      sockets.subscribe('delivery', 'rider_location_updated', () => refetchDelivery()),
+      sockets.subscribe('delivery', 'delivery_completed', () => { refetchDelivery(); refetchDetail(); }),
+    ];
+    return () => { offs.forEach((off) => off()); };
+  }, [sockets, detailOrder?._id, refetchDetail, refetchDelivery]);
 
   const showError = useCallback((msg: string) => toast.error(msg), []);
   const opts = { onError: showError };
   const { mutate: cancelOrder, isLoading: cancelling } = useMutation(({ id, reason }: { id: string; reason: string }) => api.orders.cancel(id, reason), opts);
   const { mutate: overrideOrder, isLoading: overriding } = useMutation(({ id, status, note }: { id: string; status: string; note?: string }) => api.orders.updateStatus(id, status, note), opts);
+  const { mutate: cancelDelivery, isLoading: cancellingDelivery } = useMutation(({ id, reason }: { id: string; reason: string }) => api.delivery.cancelJob(id, reason), opts);
 
-  const closeAction = () => { setActionOrder(null); setActionType(null); setCancelReason(''); setOverrideStatus(''); setOverrideNote(''); };
+  const closeAction = () => { setActionOrder(null); setActionType(null); setActiveDeliveryJob(null); setCancelReason(''); setOverrideStatus(''); setOverrideNote(''); };
 
   const handleCancel = async () => {
     if (!actionOrder || !cancelReason.trim()) return;
     const r = await cancelOrder({ id: actionOrder._id, reason: cancelReason });
-    if (r !== null) { toast.success('Order cancelled'); closeAction(); refetch(); }
+    if (r !== null) { toast.success('Order cancelled — delivery cancel dispatched'); closeAction(); refetch(); refetchDetail(); refetchDelivery(); }
   };
   const handleOverride = async () => {
     if (!actionOrder || !overrideStatus) return;
     const r = await overrideOrder({ id: actionOrder._id, status: overrideStatus, note: overrideNote || undefined });
-    if (r !== null) { toast.success('Order status updated'); closeAction(); refetch(); }
+    if (r !== null) { toast.success('Order status updated'); closeAction(); refetch(); refetchDetail(); }
+  };
+  const handleCancelDelivery = async () => {
+    if (!activeDeliveryJob || !cancelReason.trim()) return;
+    const r = await cancelDelivery({ id: activeDeliveryJob._id, reason: cancelReason });
+    if (r !== null) { toast.success('Delivery cancelled — order left as-is'); closeAction(); refetchDelivery(); refetch(); }
   };
 
   const totalOrders = stats?.total ?? 0;
@@ -272,16 +322,37 @@ export default function OrdersPage() {
 
       {/* Detail Modal */}
       <Modal isOpen={!!detailOrder} onClose={() => setDetailOrder(null)} title="Order Details" size="xl">
-        {displayOrder && <OrderDetailContent order={displayOrder} deliveryJob={deliveryJob ?? null} isSuperAdmin={isSuperAdmin} onAction={(t) => { setDetailOrder(null); setActionOrder(displayOrder); setActionType(t); }} />}
+        {displayOrder && (
+          <OrderDetailContent
+            order={displayOrder}
+            deliveryJob={deliveryJob ?? null}
+            disputes={disputes ?? []}
+            isSuperAdmin={isSuperAdmin}
+            ordersLive={ordersLive}
+            deliveryLive={deliveryLive}
+            onRefetchDisputes={refetchDisputes}
+            onCancelDelivery={(job) => { setActiveDeliveryJob(job); setActionOrder(displayOrder); setActionType('cancel-delivery'); }}
+            onAction={(t) => { setDetailOrder(null); setActionOrder(displayOrder); setActionType(t); }}
+          />
+        )}
       </Modal>
 
-      {/* Cancel Modal */}
+      {/* Cancel Order Modal — warns admin about the automatic delivery cascade */}
       <Modal isOpen={actionType === 'cancel'} onClose={closeAction} title="Cancel Order">
         {actionOrder && (
           <div className="space-y-4">
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
               Cancel order <strong>#{actionOrder.orderNumber || actionOrder._id.slice(-8)}</strong>? This cannot be undone.
             </div>
+            {getOrderFulfillmentType(actionOrder) === 'DELIVERY' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  The linked delivery job will also be cancelled with the provider (Glovo/Topship/etc.).
+                  If you want to keep the order but re-dispatch, use <strong>Cancel Delivery Only</strong> from the order details instead.
+                </span>
+              </div>
+            )}
             <div>
               <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Cancellation Reason *</label>
               <textarea className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 resize-none" rows={3} placeholder="Explain why..." value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
@@ -289,7 +360,31 @@ export default function OrdersPage() {
             <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
               <button onClick={closeAction} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
               <button onClick={handleCancel} disabled={!cancelReason.trim() || cancelling} className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50">
-                {cancelling ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling...</> : 'Cancel Order'}
+                {cancelling ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling...</> : 'Cancel Order + Delivery'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Cancel Delivery Only Modal — keeps the order alive so it can be re-dispatched */}
+      <Modal isOpen={actionType === 'cancel-delivery'} onClose={closeAction} title="Cancel Delivery">
+        {activeDeliveryJob && actionOrder && (
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+              This cancels the delivery job with <strong>{activeDeliveryJob.provider}</strong> for order
+              {' '}<strong>#{actionOrder.orderNumber || actionOrder._id.slice(-8)}</strong>. The order stays live so
+              the merchant can re-dispatch. Use this when the rider goes silent, a wrong rider is assigned,
+              or you need to switch providers.
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Reason *</label>
+              <textarea className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 resize-none" rows={3} placeholder="Why is the delivery being cancelled?" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+            </div>
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button onClick={closeAction} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Never mind</button>
+              <button onClick={handleCancelDelivery} disabled={!cancelReason.trim() || cancellingDelivery} className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50">
+                {cancellingDelivery ? <><Loader2 className="w-4 h-4 animate-spin" /> Cancelling...</> : 'Cancel Delivery Only'}
               </button>
             </div>
           </div>
@@ -335,20 +430,34 @@ export default function OrdersPage() {
 function OrderDetailContent({
   order,
   deliveryJob,
+  disputes,
   isSuperAdmin,
+  ordersLive,
+  deliveryLive,
+  onRefetchDisputes,
+  onCancelDelivery,
   onAction,
 }: {
   order: Order;
   deliveryJob: AdminDeliveryJob | null;
+  disputes: Dispute[];
   isSuperAdmin: boolean;
+  ordersLive: boolean;
+  deliveryLive: boolean;
+  onRefetchDisputes: () => void;
+  onCancelDelivery: (job: AdminDeliveryJob) => void;
   onAction: (t: 'cancel' | 'override') => void;
 }) {
   const businessLogo = getOrderBusinessLogo(order);
   const isDelivery = getOrderFulfillmentType(order) === 'DELIVERY';
+  const openDisputes = (disputes || []).filter(
+    (d) => d.status !== 'RESOLVED' && d.status !== 'CLOSED',
+  );
+  const deliveryCancellable = !!deliveryJob && !['CANCELLED', 'DELIVERED', 'FAILED'].includes(deliveryJob.status);
 
   return (
     <div className="space-y-5">
-      {/* Hero header — business logo + order # + statuses */}
+      {/* Hero header — business logo + order # + statuses + live pulse */}
       <div className="flex items-start gap-4">
         {businessLogo ? (
           <img
@@ -382,6 +491,27 @@ function OrderDetailContent({
               </span>
             )}
             <StatusBadge status={order.status} />
+            {openDisputes.length > 0 && (
+              <span
+                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-red-50 text-red-700 border-red-200 uppercase tracking-wider"
+                title="Open disputes on this order"
+              >
+                <Shield className="w-3 h-3" />
+                {openDisputes.length} open dispute{openDisputes.length === 1 ? '' : 's'}
+              </span>
+            )}
+            {(ordersLive || deliveryLive) && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 uppercase tracking-wider"
+                title="Realtime feed connected"
+              >
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                </span>
+                Live
+              </span>
+            )}
           </div>
           <p className="text-sm text-gray-500">
             {getOrderBusinessName(order) || 'Unknown business'} · {formatDateTime(order.createdAt)}
@@ -550,11 +680,21 @@ function OrderDetailContent({
       {/* Unified Timeline — order + delivery events merged chronologically */}
       <UnifiedTimeline order={order} deliveryJob={deliveryJob} />
 
+      {/* Disputes — inline thread + reply so admin never leaves order context */}
+      {disputes.length > 0 && (
+        <DisputesPanel disputes={disputes} onReplied={onRefetchDisputes} />
+      )}
+
       {/* Actions */}
-      <div className="flex gap-2 pt-3 border-t border-gray-100">
+      <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
         {CANCELLABLE_STATUSES.includes(order.status) && (
           <button onClick={() => onAction('cancel')} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-red-50 text-red-600 hover:bg-red-100">
             <XCircle className="w-3.5 h-3.5" /> Cancel Order
+          </button>
+        )}
+        {isDelivery && deliveryCancellable && deliveryJob && (
+          <button onClick={() => onCancelDelivery(deliveryJob)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100">
+            <Truck className="w-3.5 h-3.5" /> Cancel Delivery Only
           </button>
         )}
         {isSuperAdmin && (
@@ -563,6 +703,187 @@ function OrderDetailContent({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Disputes Panel ───
+// Renders every dispute filed against this order with an inline message
+// thread + admin reply box. Uses the /disputes socket for live message
+// updates while the panel is open, so replies from either side appear
+// immediately without polling.
+function DisputesPanel({ disputes, onReplied }: { disputes: Dispute[]; onReplied: () => void }) {
+  return (
+    <div>
+      <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <Shield className="w-3 h-3" />
+        Disputes ({disputes.length})
+      </h4>
+      <div className="space-y-3">
+        {disputes.map((d) => (
+          <DisputeCard key={d._id} dispute={d} onReplied={onReplied} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const DISPUTE_STATUS_COLORS: Record<string, string> = {
+  OPEN: 'bg-red-50 text-red-700 border-red-200',
+  UNDER_REVIEW: 'bg-amber-50 text-amber-700 border-amber-200',
+  AWAITING_RESPONSE: 'bg-blue-50 text-blue-700 border-blue-200',
+  RESOLVED: 'bg-green-50 text-green-700 border-green-200',
+  CLOSED: 'bg-gray-100 text-gray-600 border-gray-200',
+  ESCALATED: 'bg-purple-50 text-purple-700 border-purple-200',
+};
+
+function DisputeCard({ dispute, onReplied }: { dispute: Dispute; onReplied: () => void }) {
+  const sockets = useAdminSockets();
+  const [expanded, setExpanded] = useState(true);
+  const [messages, setMessages] = useState<DisputeMessage[]>(dispute.messages ?? []);
+  const [reply, setReply] = useState('');
+  const [isInternal, setIsInternal] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  // Sync when parent refetches disputes
+  useEffect(() => {
+    setMessages(dispute.messages ?? []);
+  }, [dispute.messages, dispute._id]);
+
+  // Join the dispute room + listen for new messages
+  useEffect(() => {
+    if (!expanded) return;
+    sockets.emit('disputes', 'join', { disputeId: dispute._id });
+    const off = sockets.subscribe('disputes', 'dispute:message', (payload: unknown) => {
+      const p = payload as { disputeId?: string; message?: DisputeMessage };
+      if (p?.disputeId === dispute._id && p.message) {
+        setMessages((prev) => {
+          if (prev.some((m) => m._id === p.message!._id)) return prev;
+          return [...prev, p.message!];
+        });
+      }
+    });
+    return () => {
+      off();
+      sockets.emit('disputes', 'leave', { disputeId: dispute._id });
+    };
+  }, [sockets, dispute._id, expanded]);
+
+  const handleReply = async () => {
+    if (!reply.trim() || sending) return;
+    setSending(true);
+    try {
+      await api.disputes.addMessage(dispute._id, { message: reply.trim(), isInternal });
+      setReply('');
+      setIsInternal(false);
+      onReplied();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send reply');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const statusClass = DISPUTE_STATUS_COLORS[dispute.status] ?? 'bg-gray-100 text-gray-600 border-gray-200';
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 border-b border-gray-200 text-left"
+      >
+        <MessageSquare className="w-4 h-4 text-gray-500 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold text-gray-900 truncate">{dispute.reason || 'Dispute'}</span>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border uppercase tracking-wider ${statusClass}`}>
+              {dispute.status.replace(/_/g, ' ')}
+            </span>
+            {dispute.priority && dispute.priority !== 'LOW' && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 uppercase">
+                {dispute.priority}
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            #{dispute._id.slice(-8)} · {messages.length} message{messages.length === 1 ? '' : 's'} · {formatDateTime(dispute.createdAt)}
+          </div>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {expanded && (
+        <div className="p-3 space-y-3 bg-white">
+          {dispute.description && (
+            <div className="text-xs text-gray-600 italic border-l-2 border-gray-200 pl-2">
+              {dispute.description}
+            </div>
+          )}
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {messages.length === 0 ? (
+              <div className="text-xs text-gray-400 italic text-center py-4">No messages yet.</div>
+            ) : messages.map((m, i) => {
+              const role = m.senderRole ?? (m.sender as DisputeMessage['senderRole']);
+              const isAdmin = role === 'ADMIN';
+              const body = m.message ?? m.text ?? '';
+              return (
+                <div
+                  key={m._id || `${dispute._id}-${i}`}
+                  className={`rounded-lg px-3 py-2 text-sm ${
+                    m.isInternal
+                      ? 'bg-yellow-50 border border-yellow-200'
+                      : isAdmin
+                      ? 'bg-blue-50 border border-blue-100 ml-6'
+                      : 'bg-gray-50 border border-gray-100 mr-6'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1 text-[11px] text-gray-500">
+                    <span className="font-semibold">
+                      {role || 'User'}
+                      {m.isInternal && <span className="ml-1 text-yellow-700">· Internal Note</span>}
+                    </span>
+                    <span>·</span>
+                    <span>{formatDateTime(m.createdAt)}</span>
+                  </div>
+                  <div className="text-gray-800 whitespace-pre-wrap break-words">{body}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {dispute.status !== 'RESOLVED' && dispute.status !== 'CLOSED' && (
+            <div className="border-t border-gray-100 pt-3 space-y-2">
+              <textarea
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 resize-none"
+                rows={2}
+                placeholder="Reply as admin..."
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded text-ruby-500 focus:ring-ruby-400"
+                    checked={isInternal}
+                    onChange={(e) => setIsInternal(e.target.checked)}
+                  />
+                  Internal note (admin-only, hidden from user)
+                </label>
+                <button
+                  onClick={handleReply}
+                  disabled={!reply.trim() || sending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ruby-500 text-white text-sm font-medium rounded-lg hover:bg-ruby-600 disabled:opacity-50"
+                >
+                  {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Send
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -867,8 +1188,21 @@ type TimelineEntry = {
   status: string;
   timestamp: string | Date;
   note?: string;
+  updatedBy?: string;
+  actor?: string;
+  rider?: AdminDeliveryJob['riderInfo'];
   colorClass: string;
 };
+
+const RIDER_ASSIGNMENT_STATUSES = new Set<AdminDeliveryStatus>([
+  'ASSIGNED',
+  'RIDER_ACCEPTED',
+  'RIDER_AT_PICKUP',
+  'PICKED_UP',
+  'IN_TRANSIT',
+  'RIDER_AT_DROPOFF',
+  'DELIVERED',
+]);
 
 function UnifiedTimeline({
   order,
@@ -884,6 +1218,8 @@ function UnifiedTimeline({
       status: ev.status,
       timestamp: ev.timestamp,
       note: ev.note,
+      updatedBy: ev.updatedBy,
+      actor: ev.actor,
       colorClass: STATUS_COLORS[ev.status] ?? 'bg-gray-100 text-gray-600',
     });
   });
@@ -893,6 +1229,10 @@ function UnifiedTimeline({
       status: ev.status,
       timestamp: ev.timestamp,
       note: ev.note,
+      updatedBy: ev.updatedBy,
+      // The provider's delivery record holds the rider details. Attach them to
+      // rider-related events so the audit trail tells an admin who had the job.
+      rider: RIDER_ASSIGNMENT_STATUSES.has(ev.status) ? deliveryJob?.riderInfo : undefined,
       colorClass: DELIVERY_STATUS_COLORS[ev.status] ?? 'bg-gray-100 text-gray-600',
     });
   });
@@ -928,7 +1268,8 @@ function UnifiedTimeline({
                 }`}
               />
             )}
-            <div className="pb-4 min-w-0 flex-1">
+            <div className="grid min-w-0 flex-1 gap-3 pb-4 sm:grid-cols-[minmax(0,1fr)_190px]">
+              <div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <span
                   className={`text-xs font-medium px-1.5 py-0.5 rounded ${ev.colorClass}`}
@@ -945,10 +1286,35 @@ function UnifiedTimeline({
               {ev.note && (
                 <div className="text-xs text-gray-400 mt-0.5">{ev.note}</div>
               )}
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-[11px] leading-relaxed text-gray-500">
+                <p className="font-semibold uppercase tracking-wider text-gray-400">Performed by</p>
+                <p className="mt-0.5 font-medium text-gray-700">{timelineActorLabel(ev)}</p>
+                <p className="mt-1 text-gray-500">{ev.note ? `Details: ${ev.note}` : 'No additional note recorded.'}</p>
+                {ev.rider?.name && (
+                  <div className="mt-2 border-t border-gray-200 pt-2 text-gray-600">
+                    <p className="font-semibold uppercase tracking-wider text-gray-400">Assigned rider</p>
+                    <p className="mt-0.5 font-medium text-gray-800">{ev.rider.name}</p>
+                    {ev.rider.phone && <p>{ev.rider.phone}</p>}
+                    {(ev.rider.vehicleType || ev.rider.vehiclePlate) && (
+                      <p>
+                        {[ev.rider.vehicleType, ev.rider.vehiclePlate].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function timelineActorLabel(entry: TimelineEntry) {
+  if (entry.actor) return entry.actor;
+  if (entry.rider?.name) return `Assigned to ${entry.rider.name}`;
+  if (entry.updatedBy === 'system' || !entry.updatedBy) return entry.kind === 'delivery' ? 'Delivery provider / Ruby+ automation' : 'Ruby+ automation';
+  return `Account ${entry.updatedBy.slice(-8)}`;
 }

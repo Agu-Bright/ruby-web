@@ -1633,6 +1633,9 @@ export interface DisputeFilterParams extends PaginationParams {
   locationId?: string;
   status?: DisputeStatus;
   type?: DisputeType;
+  orderId?: string;
+  businessId?: string;
+  userId?: string;
 }
 
 export interface PayoutFilterParams extends PaginationParams {

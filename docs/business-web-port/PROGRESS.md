@@ -44,6 +44,18 @@
 
 ## Session log (append-only)
 
+### 2026-07-27 — Admin order timeline rider attribution
+
+**What works:** The Admin Order Details timeline now shows the actual assigned rider on the right-hand detail card for delivery assignment and rider-progress events. It displays the rider's name, phone number and available vehicle/plate information. The existing admin delivery socket events already refetch the order/delivery detail on assignment and status changes, so the named rider appears in real time without a manual refresh.
+
+**Design decision:** Rider identity is only attached to rider-related delivery milestones (Assigned through Delivered), avoiding misleading rider details on the initial delivery creation event. The UI uses the provider-synchronised `deliveryJob.riderInfo` already returned by the delivery API; events still retain their own action note and performer details.
+
+**Files touched:** `src/app/ruby-app/admin/(dashboard)/orders/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** `tsc --noEmit -p tsconfig.json` passed with zero errors. `git diff --check` passed; only existing repository line-ending warnings were emitted.
+
+**Next task for next agent:** Persist a rider snapshot on each backend status-timeline entry if delivery providers can reassign a job after it is first assigned, so historical events retain their original rider indefinitely.
+
 ### 2026-07-27 — Admin-assisted dashboard entry point
 
 **What works:** The three-dot action menu on every Admin Businesses row now starts with **Open business dashboard**. It opens `/ruby-app/admin/businesses/:id/dashboard`, an admin-authenticated assisted dashboard for the selected business. The route clearly labels the access role, records the distinction between staff assistance and owner access, and makes Wallet & withdrawals unavailable to Support and Location Admin while keeping the permitted profile, media, catalogue, order and booking workspace entry points visible.

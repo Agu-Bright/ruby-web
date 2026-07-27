@@ -44,6 +44,7 @@ import {
   Crown,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { AdminSocketsProvider } from "@/lib/admin-sockets";
 import { ToastProvider } from "@/components/ui";
 import { NotificationDropdown } from "@/components/ui/notification-dropdown";
 import { ChangePasswordModal } from "@/components/admin/change-password-modal";
@@ -618,8 +619,10 @@ export default function DashboardLayout({
 }) {
   return (
     <AuthProvider>
-      <ToastProvider />
-      <DashboardShell>{children}</DashboardShell>
+      <AdminSocketsProvider>
+        <ToastProvider />
+        <DashboardShell>{children}</DashboardShell>
+      </AdminSocketsProvider>
     </AuthProvider>
   );
 }

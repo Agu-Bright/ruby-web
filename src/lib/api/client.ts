@@ -438,6 +438,8 @@ export const api = {
         hasBusinesses?: boolean;
         business?: { id: string; _id?: string; name: string; status?: string };
       }>("/auth/business/login", { method: "POST", body: data, noAuth: true }),
+    requestMagicLink: (email: string) => request<{ message: string }>("/auth/business/magic-link", { method: "POST", body: { email }, noAuth: true }),
+    consumeMagicLink: (token: string) => request<any>("/auth/business/magic-link/consume", { method: "POST", body: { token }, noAuth: true }),
 
     // Google + Apple sign-in (identity token exchange). Web sends the
     // ID token from Google Identity Services (or Apple JS SDK on Safari)

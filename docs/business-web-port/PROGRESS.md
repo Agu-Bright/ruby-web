@@ -44,6 +44,16 @@
 
 ## Session log (append-only)
 
+### 2026-07-27 — M12 branch location picker completed
+
+**What works:** Branch creation now uses the shared SSR-safe Leaflet map. Staff can search an address, click or drag the pin, and get street/city/state/country details filled from the selected location. Choosing a Ruby+ city centres the initial pin using that city's configured centre. The existing server-backed **Validate pin** action remains in place before branch creation.
+
+**Files touched:** `src/app/business/dashboard/branches/page.tsx`, `src/components/business/onboarding/LocationSelector.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** `tsc --noEmit -p tsconfig.json` passed with zero errors.
+
+**Next task for next agent:** Reuse this picker when adding or editing another physical business location; continue remaining M12 organisation controls.
+
 ### 2026-07-27 — M14 business profile map picker completed
 
 **What works:** The Business Dashboard Profile → Location tab now loads the existing SSR-safe Leaflet picker instead of showing a deferred-work notice. Merchants can search an address, click the map, or drag the pin. Reverse geocoding fills street, city, state and country while retaining any suite detail and landmark. `Save changes` persists only changed location fields: `address` for written details and `latitude`/`longitude` for a changed pin, so a general profile save cannot silently overwrite a location.

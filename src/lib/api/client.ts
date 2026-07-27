@@ -2837,7 +2837,7 @@ export const api = {
     fulfilPushBlastRequest: (requestId: string, body: { finalMessage?: string }) =>
       request<any>(
         `/admin/ad-subscriptions/push-blast-requests/${requestId}/fulfil`,
-        { method: "POST", body: JSON.stringify(body) },
+        { method: "POST", body },
       ),
 
     /**
@@ -2847,7 +2847,7 @@ export const api = {
     rejectPushBlastRequest: (requestId: string, reason: string) =>
       request<any>(
         `/admin/ad-subscriptions/push-blast-requests/${requestId}/reject`,
-        { method: "POST", body: JSON.stringify({ reason }) },
+        { method: "POST", body: { reason } },
       ),
   },
 

@@ -180,7 +180,8 @@ export default function VatReportPage() {
             <p className="text-sm text-gray-600">No VAT-eligible transactions in this period.</p>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
               <tr>
                 <th className="text-left px-4 py-2.5">Type</th>
@@ -217,6 +218,7 @@ export default function VatReportPage() {
               </tr>
             </tfoot>
           </table>
+          </div>
         )}
       </div>
     </div>

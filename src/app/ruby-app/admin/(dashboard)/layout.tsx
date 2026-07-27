@@ -319,7 +319,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) => href === activeHref;
 
   return (
-    <div className="min-h-screen bg-gray-50/80">
+    <div className="admin-dashboard-shell min-h-screen bg-gray-50/80">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -348,7 +348,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <div className="lg:ml-[260px]">
+      <div className="min-w-0 lg:ml-[260px]">
         {/* Top bar */}
         <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-xl border-b border-gray-200/80 h-[60px] flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-4">
@@ -433,7 +433,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-6">{children}</main>
+        <main className="admin-dashboard-content min-w-0 max-w-full overflow-x-hidden p-3 sm:p-4 lg:p-6">
+          {children}
+        </main>
       </div>
 
       {/* Self-service password change. Available to every authenticated

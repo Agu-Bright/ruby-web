@@ -1574,8 +1574,8 @@ export default function BusinessesPage() {
 
       {/* ─── Hierarchical Business Table ─── */}
       <div className="card min-h-[400px]">
-        <div>
-          <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50">
                 {tableHeaders.map((h, i) => {
@@ -1835,7 +1835,7 @@ export default function BusinessesPage() {
 
         {/* Pagination */}
         {meta && (meta.totalPages || 1) > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/30">
+          <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 bg-gray-50/30">
             <div className="text-xs text-gray-500">
               Page {filters.page || 1} of {meta.totalPages || 1} · {meta.total} total
             </div>

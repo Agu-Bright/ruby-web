@@ -223,3 +223,46 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ===== Admin mobile resilience =====
+   Every admin route renders inside .admin-dashboard-content. These rules
+   deliberately protect legacy pages that predate the mobile shell without
+   forcing a one-size-fits-all card layout on their data. */
+.admin-dashboard-content,
+.admin-dashboard-content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-table-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 639px) {
+  /* Legacy admin pages often wrap raw tables in overflow-hidden cards.
+     Preserve card corners while allowing the table itself to scroll rather
+     than widening the entire page. */
+  .admin-dashboard-content [class~="overflow-hidden"]:has(table) {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-dashboard-content [class~="overflow-hidden"]:has(table) > table,
+  .admin-dashboard-content [class~="overflow-hidden"]:has(table) table {
+    min-width: 640px;
+  }
+
+  /* Prevent iOS from zooming into form fields and keep controls comfortably
+     tappable throughout the admin dashboard. */
+  .admin-dashboard-content input,
+  .admin-dashboard-content select,
+  .admin-dashboard-content textarea {
+    font-size: 16px;
+  }
+
+  .admin-dashboard-content .btn-primary,
+  .admin-dashboard-content .btn-secondary {
+    min-height: 42px;
+  }
+}

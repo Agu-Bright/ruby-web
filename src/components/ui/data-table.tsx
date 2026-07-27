@@ -34,8 +34,8 @@ export function DataTable<T>({
   if (isLoading) {
     return (
       <div className="card">
-        <div className="overflow-x-auto overflow-y-visible">
-          <table className="w-full">
+        <div className="admin-table-scroll overflow-x-auto overflow-y-visible">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50">
                 {columns.map((col) => (
@@ -79,7 +79,7 @@ export function DataTable<T>({
           row-level kebab dropdowns that drop down past the row box.
           The loading state above already does this; live state was the
           outlier. Affects every admin page that uses DataTable. */}
-      <div className="overflow-x-auto overflow-y-visible">
+      <div className="admin-table-scroll overflow-x-auto overflow-y-visible">
         <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50/50">
@@ -114,7 +114,7 @@ export function DataTable<T>({
       </div>
 
       {meta && totalPages > 1 && onPageChange && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/30">
+        <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 bg-gray-50/30">
           <div className="text-xs text-gray-500">
             Page {currentPage} of {totalPages} · {meta.total} total
           </div>

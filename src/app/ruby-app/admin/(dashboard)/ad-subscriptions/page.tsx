@@ -83,8 +83,8 @@ export default function AdSubscriptionsPage() {
   const [tab, setTab] = useState<Tab>("subscriptions");
 
   return (
-    <div className="space-y-6">
-      <header>
+    <div className="max-w-full space-y-4 sm:space-y-6">
+      <header className="min-w-0">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 rounded-lg bg-purple-100">
             <Sparkles className="w-5 h-5 text-purple-600" />
@@ -98,8 +98,8 @@ export default function AdSubscriptionsPage() {
       </header>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-1">
+      <div className="border-b border-gray-200 overflow-x-auto">
+        <nav className="flex min-w-max gap-1">
           {(
             [
               { key: "subscriptions", label: "Subscriptions" },
@@ -112,7 +112,7 @@ export default function AdSubscriptionsPage() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+              className={`whitespace-nowrap px-3 sm:px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
                 tab === t.key
                   ? "border-purple-600 text-purple-700"
                   : "border-transparent text-gray-500 hover:text-gray-800"
@@ -250,7 +250,7 @@ function SubscriptionsTab() {
             setPage(1);
             setTierFilter(e.target.value as AdTier | "");
           }}
-          className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white"
+          className="w-full sm:w-auto text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white"
         >
           <option value="">All tiers</option>
           <option value="STARTER">Starter</option>
@@ -263,7 +263,7 @@ function SubscriptionsTab() {
             setPage(1);
             setStatusFilter(e.target.value as AdStatus | "");
           }}
-          className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white"
+          className="w-full sm:w-auto text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white"
         >
           <option value="">All statuses</option>
           <option value="PENDING_ONBOARDING_REVIEW">Pending review</option>
@@ -275,7 +275,7 @@ function SubscriptionsTab() {
         </select>
         <button
           onClick={load}
-          className="ml-auto flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+          className="sm:ml-auto flex items-center justify-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -294,7 +294,8 @@ function SubscriptionsTab() {
             No subscriptions match these filters.
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] text-sm">
             <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left">Business</th>
@@ -361,11 +362,12 @@ function SubscriptionsTab() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between text-sm text-gray-600">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-gray-600">
         <span>Page {page}</span>
         <div className="flex gap-2">
           <button
@@ -842,7 +844,7 @@ function PendingReviewTab() {
   return (
     <div className="space-y-4">
       {/* Header strip */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="p-2 bg-indigo-100 rounded-lg">
             <Clock className="w-5 h-5 text-indigo-700" />
@@ -861,7 +863,7 @@ function PendingReviewTab() {
         </div>
         <button
           onClick={load}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+          className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
@@ -1070,7 +1072,7 @@ function PushBlastRequestsTab() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="p-2 bg-amber-100 rounded-lg">
             <Inbox className="w-5 h-5 text-amber-700" />
@@ -1086,11 +1088,11 @@ function PushBlastRequestsTab() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white"
+            className="w-full sm:w-auto text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white"
           >
             <option value="PENDING">Pending</option>
             <option value="SENT">Sent</option>
@@ -1100,7 +1102,7 @@ function PushBlastRequestsTab() {
           </select>
           <button
             onClick={load}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+            className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>

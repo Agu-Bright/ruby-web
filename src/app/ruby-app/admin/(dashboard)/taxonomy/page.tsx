@@ -2141,7 +2141,8 @@ function LocationConfigTab() {
               <p className="text-sm font-medium text-gray-500">No categories match your search</p>
             </div>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Category</th>
@@ -2218,6 +2219,7 @@ function LocationConfigTab() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}

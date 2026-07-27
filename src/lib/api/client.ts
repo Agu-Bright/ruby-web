@@ -1564,6 +1564,14 @@ export const api = {
       }),
     get: (id: string) =>
       request<import("@/lib/types").Order>(`/admin/orders/${id}`),
+    // P155 — linked delivery job (rider, provider, live location, timeline,
+    // proof of delivery). Returns `null` when the order is a pickup or the
+    // delivery hasn't been dispatched yet. Kept separate from `.get()` so
+    // pickup orders don't pay the extra round trip.
+    getDelivery: (id: string) =>
+      request<import("@/lib/types").AdminDeliveryJob | null>(
+        `/admin/orders/${id}/delivery`,
+      ),
     cancel: (id: string, reason: string) =>
       request<import("@/lib/types").Order>(`/admin/orders/${id}/cancel`, {
         method: "POST",

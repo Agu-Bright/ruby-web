@@ -891,12 +891,23 @@ export interface OrderDeliveryAddress {
   contactPhone?: string;
 }
 
+export interface OrderItemProductRef {
+  _id: string;
+  name?: string;
+  basePrice?: number;
+  images?: Array<{ url: string; alt?: string; isPrimary?: boolean } | string>;
+}
+
 export interface OrderItem {
-  productId: string;
+  // P155 — Order admin/business detail endpoints populate this ref so we
+  // can render product thumbnails. Older responses still return a bare
+  // ObjectId string; check `typeof productId === 'object'` before use.
+  productId: string | OrderItemProductRef;
   name: string;
   // Backend uses basePrice, frontend used price
   basePrice?: number;
   price?: number;
+  unitPrice?: number;
   quantity: number;
   // Backend uses subtotal, frontend used total
   subtotal?: number;
@@ -905,6 +916,79 @@ export interface OrderItem {
   variations?: { name: string; option: string; priceAdjustment?: number }[];
   addOns?: { name: string; price: number; quantity: number; subtotal: number }[];
   specialInstructions?: string;
+}
+
+// P155 — admin delivery detail (mirror of backend `DeliveryJob` schema).
+// Fetched via `api.orders.getDelivery(id)` for orders with fulfillment
+// type DELIVERY. Every field is optional on this side because a job may
+// not have all data yet (rider not assigned, no last location, etc.).
+export type AdminDeliveryProvider = 'MANUAL' | 'INTERNAL' | 'TOPSHIP' | 'GLOVO';
+export type AdminDeliveryStatus =
+  | 'CREATED'
+  | 'ASSIGNED'
+  | 'RIDER_ACCEPTED'
+  | 'RIDER_AT_PICKUP'
+  | 'PICKED_UP'
+  | 'IN_TRANSIT'
+  | 'RIDER_AT_DROPOFF'
+  | 'DELIVERED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export interface AdminDeliveryJob {
+  _id: string;
+  orderId?: string;
+  businessId?: string;
+  userId?: string;
+  provider: AdminDeliveryProvider;
+  externalId?: string;
+  status: AdminDeliveryStatus;
+  statusTimeline?: Array<{
+    status: AdminDeliveryStatus;
+    timestamp: string;
+    note?: string;
+    updatedBy?: string;
+    location?: { lat: number; lng: number };
+  }>;
+  riderInfo?: {
+    name?: string;
+    phone?: string;
+    vehicleType?: string;
+    vehiclePlate?: string;
+    photoUrl?: string;
+    rating?: number;
+  };
+  pickup?: {
+    lat: number;
+    lng: number;
+    address?: string;
+    contactName?: string;
+    contactPhone?: string;
+    instructions?: string;
+  };
+  dropoff?: {
+    lat: number;
+    lng: number;
+    address?: string;
+    contactName?: string;
+    contactPhone?: string;
+    instructions?: string;
+  };
+  lastKnownLocation?: { lat: number; lng: number; updatedAt?: string };
+  distanceKm?: number;
+  deliveryFee?: number;
+  currency?: string;
+  estimatedPickupAt?: string;
+  estimatedDeliveryAt?: string;
+  actualPickupAt?: string;
+  actualDeliveryAt?: string;
+  cancellationReason?: string;
+  cancelledBy?: string;
+  failureReason?: string;
+  proofOfDeliveryUrl?: string;
+  signatureUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface StatusEvent {

@@ -4,14 +4,18 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   ShoppingCart, Search, Eye, Package, MoreHorizontal, XCircle, RefreshCw,
   Clock, CheckCircle, Truck, Store, User, MapPin, DollarSign, TrendingUp,
-  Ban, ChevronDown, Loader2,
+  Ban, ChevronDown, Loader2, Bike, Phone, Mail, Hash, Camera,
+  AlertTriangle, CircleDot,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { PageHeader, DataTable, StatusBadge, Modal, StatCard, type Column } from '@/components/ui';
-import type { Order, OrderFilterParams, OrderStatus, OrderStats } from '@/lib/types';
+import type {
+  Order, OrderFilterParams, OrderStatus, OrderStats,
+  AdminDeliveryJob, AdminDeliveryStatus, OrderItem,
+} from '@/lib/types';
 import {
   formatDate, formatDateTime, formatCurrency, toLocationId,
   getOrderBusinessName, getOrderBusinessLogo, getOrderCustomerName,
@@ -20,6 +24,42 @@ import {
   getOrderDiscount, getOrderNotes, getOrderDeliveryAddressStr,
   getItemPrice, getItemTotal,
 } from '@/lib/utils';
+
+// P155 — pull the first available image URL from an order item's populated
+// productId ref. Falls back through: primary image → first image →
+// undefined. Handles both `{url}` object shape and legacy raw-string shape.
+function getItemImageUrl(item: OrderItem): string | undefined {
+  const p = item.productId;
+  if (!p || typeof p === 'string') return undefined;
+  const images = p.images ?? [];
+  if (!images.length) return undefined;
+  const primary = images.find(
+    (img) => typeof img === 'object' && img && (img as { isPrimary?: boolean }).isPrimary,
+  );
+  const chosen = primary ?? images[0];
+  if (typeof chosen === 'string') return chosen;
+  return (chosen as { url?: string })?.url;
+}
+
+const DELIVERY_STATUS_COLORS: Record<AdminDeliveryStatus, string> = {
+  CREATED: 'bg-gray-100 text-gray-600',
+  ASSIGNED: 'bg-indigo-50 text-indigo-700',
+  RIDER_ACCEPTED: 'bg-blue-50 text-blue-700',
+  RIDER_AT_PICKUP: 'bg-amber-50 text-amber-700',
+  PICKED_UP: 'bg-teal-50 text-teal-700',
+  IN_TRANSIT: 'bg-purple-50 text-purple-700',
+  RIDER_AT_DROPOFF: 'bg-cyan-50 text-cyan-700',
+  DELIVERED: 'bg-green-50 text-green-700',
+  FAILED: 'bg-red-50 text-red-700',
+  CANCELLED: 'bg-gray-100 text-gray-600',
+};
+
+const PROVIDER_TINT: Record<string, string> = {
+  GLOVO: 'bg-yellow-50 text-yellow-800 border-yellow-200',
+  TOPSHIP: 'bg-blue-50 text-blue-800 border-blue-200',
+  INTERNAL: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  MANUAL: 'bg-gray-100 text-gray-700 border-gray-200',
+};
 
 const STATUS_OPTIONS: OrderStatus[] = ['PLACED', 'ACCEPTED', 'REJECTED', 'PREPARING', 'READY', 'DISPATCHED', 'PICKED_UP', 'DELIVERED', 'COMPLETED', 'CANCELLED'];
 const CANCELLABLE_STATUSES: OrderStatus[] = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY'];
@@ -96,6 +136,16 @@ export default function OrdersPage() {
   const { data: stats } = useApi<OrderStats>(() => api.orders.stats({ locationId }), [locationId]);
   const { data: fullDetail } = useApi<Order>(() => detailOrder ? api.orders.get(detailOrder._id) : Promise.resolve({ success: true, data: detailOrder! }), [detailOrder?._id]);
   const displayOrder = fullDetail || detailOrder;
+  // Fetch the linked delivery job when the modal opens; only makes sense
+  // for orders whose fulfillmentType is DELIVERY, but we still call for
+  // pickup orders — the endpoint returns null and the panel just hides.
+  const { data: deliveryJob } = useApi<AdminDeliveryJob | null>(
+    () =>
+      detailOrder
+        ? api.orders.getDelivery(detailOrder._id)
+        : Promise.resolve({ success: true, data: null }),
+    [detailOrder?._id],
+  );
 
   const showError = useCallback((msg: string) => toast.error(msg), []);
   const opts = { onError: showError };
@@ -221,8 +271,8 @@ export default function OrdersPage() {
       <DataTable columns={columns} data={filtered} meta={meta} isLoading={isLoading} emptyMessage="No orders found" currentPage={filters.page} onPageChange={(page) => setFilters(f => ({ ...f, page }))} />
 
       {/* Detail Modal */}
-      <Modal isOpen={!!detailOrder} onClose={() => setDetailOrder(null)} title="Order Details" size="lg">
-        {displayOrder && <OrderDetailContent order={displayOrder} isSuperAdmin={isSuperAdmin} onAction={(t) => { setDetailOrder(null); setActionOrder(displayOrder); setActionType(t); }} />}
+      <Modal isOpen={!!detailOrder} onClose={() => setDetailOrder(null)} title="Order Details" size="xl">
+        {displayOrder && <OrderDetailContent order={displayOrder} deliveryJob={deliveryJob ?? null} isSuperAdmin={isSuperAdmin} onAction={(t) => { setDetailOrder(null); setActionOrder(displayOrder); setActionType(t); }} />}
       </Modal>
 
       {/* Cancel Modal */}
@@ -282,31 +332,126 @@ export default function OrdersPage() {
 }
 
 // ─── Order Detail Content ───
-function OrderDetailContent({ order, isSuperAdmin, onAction }: { order: Order; isSuperAdmin: boolean; onAction: (t: 'cancel' | 'override') => void }) {
+function OrderDetailContent({
+  order,
+  deliveryJob,
+  isSuperAdmin,
+  onAction,
+}: {
+  order: Order;
+  deliveryJob: AdminDeliveryJob | null;
+  isSuperAdmin: boolean;
+  onAction: (t: 'cancel' | 'override') => void;
+}) {
+  const businessLogo = getOrderBusinessLogo(order);
+  const isDelivery = getOrderFulfillmentType(order) === 'DELIVERY';
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">#{order.orderNumber || order._id.slice(-8)}</h3>
-          <p className="text-sm text-gray-500">{formatDateTime(order.createdAt)}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {order.paymentStatus && (
-            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${order.paymentStatus === 'PAID' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-              {order.paymentStatus}
-            </span>
-          )}
-          <StatusBadge status={order.status} />
+      {/* Hero header — business logo + order # + statuses */}
+      <div className="flex items-start gap-4">
+        {businessLogo ? (
+          <img
+            src={businessLogo}
+            alt={getOrderBusinessName(order) || 'Business'}
+            className="w-16 h-16 rounded-xl object-cover ring-1 ring-gray-200 shrink-0"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center ring-1 ring-blue-200/50 shrink-0">
+            <Store className="w-6 h-6 text-blue-600" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h3 className="text-lg font-bold text-gray-900">
+              #{order.orderNumber || order._id.slice(-8)}
+            </h3>
+            {order.paymentStatus && (
+              <span
+                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                  order.paymentStatus === 'PAID'
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : order.paymentStatus === 'FAILED'
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : order.paymentStatus === 'REFUNDED'
+                    ? 'bg-gray-100 text-gray-600 border-gray-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}
+              >
+                {order.paymentStatus}
+              </span>
+            )}
+            <StatusBadge status={order.status} />
+          </div>
+          <p className="text-sm text-gray-500">
+            {getOrderBusinessName(order) || 'Unknown business'} · {formatDateTime(order.createdAt)}
+          </p>
         </div>
       </div>
 
-      {/* Info Grid */}
-      <div className="grid grid-cols-2 gap-3">
-        <InfoCard icon={Store} label="Business" value={getOrderBusinessName(order) || 'Unknown'} />
-        <InfoCard icon={User} label="Customer" value={getOrderCustomerName(order) || 'Unknown'} sub={getOrderCustomerEmail(order) || getOrderCustomerPhone(order)} />
-        <InfoCard icon={Truck} label="Fulfillment" value={getOrderFulfillmentType(order) === 'DELIVERY' ? 'Delivery' : 'Pickup'} sub={order.estimatedPrepTime ? `Prep: ${order.estimatedPrepTime} min` : undefined} />
-        <InfoCard icon={DollarSign} label="Total" value={formatCurrency(getOrderTotal(order), order.currency)} large />
+      {/* Info Grid — 4 columns: business meta / customer / fulfillment / total */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <InfoCard
+          icon={User}
+          label="Customer"
+          value={getOrderCustomerName(order) || 'Unknown'}
+          sub={
+            getOrderCustomerEmail(order) ||
+            getOrderCustomerPhone(order) ||
+            undefined
+          }
+        />
+        <InfoCard
+          icon={isDelivery ? Truck : Store}
+          label="Fulfillment"
+          value={isDelivery ? 'Delivery' : 'Pickup'}
+          sub={
+            order.estimatedPrepTime
+              ? `Prep: ${order.estimatedPrepTime} min`
+              : undefined
+          }
+        />
+        <InfoCard
+          icon={Hash}
+          label="Items"
+          value={String(order.items?.length ?? 0)}
+          sub={
+            order.items?.length
+              ? `${order.items.reduce((sum, i) => sum + (i.quantity ?? 0), 0)} units total`
+              : undefined
+          }
+        />
+        <InfoCard
+          icon={DollarSign}
+          label="Total"
+          value={formatCurrency(getOrderTotal(order), order.currency)}
+          large
+        />
       </div>
+
+      {/* Contact links row */}
+      {(getOrderCustomerPhone(order) || getOrderCustomerEmail(order)) && (
+        <div className="flex flex-wrap gap-2">
+          {getOrderCustomerPhone(order) && (
+            <a
+              href={`tel:${getOrderCustomerPhone(order)}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+            >
+              <Phone className="w-3 h-3" />
+              {getOrderCustomerPhone(order)}
+            </a>
+          )}
+          {getOrderCustomerEmail(order) && (
+            <a
+              href={`mailto:${getOrderCustomerEmail(order)}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+            >
+              <Mail className="w-3 h-3" />
+              {getOrderCustomerEmail(order)}
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Delivery Address */}
       {getOrderDeliveryAddressStr(order) && (
@@ -316,27 +461,50 @@ function OrderDetailContent({ order, isSuperAdmin, onAction }: { order: Order; i
         </div>
       )}
 
-      {/* Items */}
+      {/* Items with real product images */}
       {order.items && order.items.length > 0 && (
         <div>
           <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Items ({order.items.length})</h4>
           <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
-            {order.items.map((item, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0"><Package className="w-4 h-4 text-gray-400" /></div>
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-gray-900 block truncate">{item.name}</span>
-                    <span className="text-xs text-gray-500">{formatCurrency(getItemPrice(item), order.currency)} x {item.quantity}</span>
-                    {item.variations && item.variations.length > 0 && <div className="text-xs text-gray-400 mt-0.5">{item.variations.map(v => `${v.name}: ${v.option}`).join(', ')}</div>}
-                    {item.specialInstructions && <div className="text-xs text-amber-600 mt-0.5 italic">{item.specialInstructions}</div>}
+            {order.items.map((item, i) => {
+              const imageUrl = getItemImageUrl(item);
+              return (
+                <div key={i} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={item.name}
+                        className="w-12 h-12 rounded-lg object-cover ring-1 ring-gray-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                        <Package className="w-5 h-5 text-gray-400" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-gray-900 block truncate">{item.name}</span>
+                      <span className="text-xs text-gray-500">{formatCurrency(getItemPrice(item), order.currency)} × {item.quantity}</span>
+                      {item.variations && item.variations.length > 0 && <div className="text-xs text-gray-400 mt-0.5">{item.variations.map(v => `${v.name}: ${v.option}`).join(', ')}</div>}
+                      {item.addOns && item.addOns.length > 0 && (
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          + {item.addOns.map((a) => `${a.name}${a.quantity > 1 ? ` ×${a.quantity}` : ''}`).join(', ')}
+                        </div>
+                      )}
+                      {item.specialInstructions && <div className="text-xs text-amber-600 mt-0.5 italic">{item.specialInstructions}</div>}
+                    </div>
                   </div>
+                  <span className="text-sm font-semibold text-gray-900 shrink-0 ml-4">{formatCurrency(getItemTotal(item), order.currency)}</span>
                 </div>
-                <span className="text-sm font-semibold text-gray-900 shrink-0 ml-4">{formatCurrency(getItemTotal(item), order.currency)}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
+      )}
+
+      {/* Delivery + Rider card — only for DELIVERY fulfillment */}
+      {isDelivery && (
+        <DeliverySection job={deliveryJob} currency={order.currency} />
       )}
 
       {/* Fee Breakdown */}
@@ -379,25 +547,8 @@ function OrderDetailContent({ order, isSuperAdmin, onAction }: { order: Order; i
         </div>
       )}
 
-      {/* Timeline */}
-      {order.statusHistory && order.statusHistory.length > 0 && (
-        <div>
-          <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Timeline</h4>
-          <div className="space-y-0">
-            {order.statusHistory.map((ev, i) => (
-              <div key={i} className="flex items-start gap-3 relative">
-                {i < order.statusHistory!.length - 1 && <div className="absolute left-[7px] top-4 w-px h-full bg-gray-200" />}
-                <div className={`mt-1 w-[14px] h-[14px] rounded-full border-2 shrink-0 z-10 ${i === 0 ? 'bg-ruby-500 border-ruby-500' : 'bg-white border-gray-300'}`} />
-                <div className="pb-4 min-w-0">
-                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${STATUS_COLORS[ev.status] || 'bg-gray-100 text-gray-600'}`}>{ev.status.replace(/_/g, ' ')}</span>
-                  <div className="text-xs text-gray-500 mt-0.5">{formatDateTime(ev.timestamp)}</div>
-                  {ev.note && <div className="text-xs text-gray-400 mt-0.5">{ev.note}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Unified Timeline — order + delivery events merged chronologically */}
+      <UnifiedTimeline order={order} deliveryJob={deliveryJob} />
 
       {/* Actions */}
       <div className="flex gap-2 pt-3 border-t border-gray-100">
@@ -428,4 +579,376 @@ function InfoCard({ icon: Icon, label, value, sub, large }: { icon: React.Elemen
 
 function FeeRow({ label, amount, currency }: { label: string; amount: number; currency: string }) {
   return <div className="flex justify-between"><span className="text-gray-500">{label}</span><span>{formatCurrency(amount, currency)}</span></div>;
+}
+
+// ─── Delivery Section (P155) ───
+// Renders rider + provider + delivery status + ETAs + proof of delivery for
+// orders whose fulfillmentType is DELIVERY. `job === null` after fetch means
+// no delivery has been dispatched yet (order is still with the merchant),
+// which is the norm for PLACED/ACCEPTED/PREPARING states.
+function DeliverySection({
+  job,
+  currency,
+}: {
+  job: AdminDeliveryJob | null;
+  currency: string | undefined;
+}) {
+  if (!job) {
+    return (
+      <div>
+        <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          Delivery
+        </h4>
+        <div className="border border-dashed border-gray-200 rounded-lg p-4 text-center bg-gray-50/50">
+          <Truck className="w-5 h-5 text-gray-400 mx-auto mb-1.5" />
+          <p className="text-xs text-gray-500">
+            No delivery job yet — the merchant hasn&apos;t dispatched this order.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const rider = job.riderInfo;
+  const provider = job.provider;
+  const providerClass =
+    PROVIDER_TINT[provider] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+  const deliveryStatusClass =
+    DELIVERY_STATUS_COLORS[job.status] ?? 'bg-gray-100 text-gray-600';
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          Delivery
+        </h4>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${providerClass}`}
+          >
+            {provider}
+          </span>
+          <span
+            className={`text-[11px] font-medium px-2 py-0.5 rounded ${deliveryStatusClass}`}
+          >
+            {job.status.replace(/_/g, ' ')}
+          </span>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
+        {/* Rider */}
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            {rider?.photoUrl ? (
+              <img
+                src={rider.photoUrl}
+                alt={rider.name || 'Rider'}
+                className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow-sm shrink-0"
+              />
+            ) : (
+              <div className="w-11 h-11 rounded-full bg-purple-50 flex items-center justify-center shrink-0">
+                <Bike className="w-5 h-5 text-purple-600" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-900">
+                {rider?.name || 'Rider not assigned yet'}
+              </p>
+              <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-500">
+                {rider?.phone && (
+                  <a
+                    href={`tel:${rider.phone}`}
+                    className="inline-flex items-center gap-1 hover:text-ruby-600"
+                  >
+                    <Phone className="w-3 h-3" />
+                    {rider.phone}
+                  </a>
+                )}
+                {rider?.vehicleType && (
+                  <span className="inline-flex items-center gap-1">
+                    <Truck className="w-3 h-3" />
+                    {rider.vehicleType}
+                    {rider.vehiclePlate ? ` · ${rider.vehiclePlate}` : ''}
+                  </span>
+                )}
+                {typeof rider?.rating === 'number' && (
+                  <span className="inline-flex items-center gap-1">
+                    ★ {rider.rating.toFixed(1)}
+                  </span>
+                )}
+              </div>
+            </div>
+            {job.externalId && (
+              <div className="text-right shrink-0">
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">
+                  Provider Ref
+                </p>
+                <p className="text-xs font-mono text-gray-700">{job.externalId}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Metrics grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 text-xs">
+          <MetricCell
+            label="Distance"
+            value={
+              typeof job.distanceKm === 'number'
+                ? `${job.distanceKm.toFixed(1)} km`
+                : '—'
+            }
+          />
+          <MetricCell
+            label="Fee"
+            value={
+              typeof job.deliveryFee === 'number'
+                ? formatCurrency(job.deliveryFee, job.currency || currency)
+                : '—'
+            }
+          />
+          <MetricCell
+            label="Est. pickup"
+            value={
+              job.estimatedPickupAt ? formatDateTime(job.estimatedPickupAt) : '—'
+            }
+          />
+          <MetricCell
+            label="Est. delivery"
+            value={
+              job.estimatedDeliveryAt
+                ? formatDateTime(job.estimatedDeliveryAt)
+                : '—'
+            }
+          />
+          {job.actualPickupAt && (
+            <MetricCell
+              label="Picked up"
+              value={formatDateTime(job.actualPickupAt)}
+              tint="teal"
+            />
+          )}
+          {job.actualDeliveryAt && (
+            <MetricCell
+              label="Delivered"
+              value={formatDateTime(job.actualDeliveryAt)}
+              tint="green"
+            />
+          )}
+          {job.lastKnownLocation && (
+            <MetricCell
+              label="Last location"
+              value={`${job.lastKnownLocation.lat.toFixed(4)}, ${job.lastKnownLocation.lng.toFixed(4)}`}
+              sub={
+                job.lastKnownLocation.updatedAt
+                  ? formatDateTime(job.lastKnownLocation.updatedAt)
+                  : undefined
+              }
+            />
+          )}
+        </div>
+
+        {/* Pickup / Dropoff addresses */}
+        {(job.pickup?.address || job.dropoff?.address) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 text-xs">
+            {job.pickup?.address && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-400 mb-0.5">
+                  Pickup
+                </p>
+                <p className="text-gray-900">{job.pickup.address}</p>
+                {job.pickup.contactName && (
+                  <p className="text-gray-500 mt-0.5">
+                    {job.pickup.contactName}
+                    {job.pickup.contactPhone ? ` · ${job.pickup.contactPhone}` : ''}
+                  </p>
+                )}
+              </div>
+            )}
+            {job.dropoff?.address && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-400 mb-0.5">
+                  Dropoff
+                </p>
+                <p className="text-gray-900">{job.dropoff.address}</p>
+                {job.dropoff.contactName && (
+                  <p className="text-gray-500 mt-0.5">
+                    {job.dropoff.contactName}
+                    {job.dropoff.contactPhone ? ` · ${job.dropoff.contactPhone}` : ''}
+                  </p>
+                )}
+                {job.dropoff.instructions && (
+                  <p className="text-amber-600 italic mt-0.5">
+                    {job.dropoff.instructions}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Failure / cancel banner */}
+        {(job.failureReason || job.cancellationReason) && (
+          <div className="p-4 bg-red-50 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-red-800 uppercase tracking-wider">
+                {job.failureReason ? 'Delivery Failed' : 'Delivery Cancelled'}
+                {job.cancelledBy ? ` · by ${job.cancelledBy}` : ''}
+              </p>
+              <p className="text-sm text-red-900 mt-0.5">
+                {job.failureReason || job.cancellationReason}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Proof of delivery */}
+        {job.proofOfDeliveryUrl && (
+          <div className="p-4">
+            <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-400 mb-2 inline-flex items-center gap-1">
+              <Camera className="w-3 h-3" /> Proof of Delivery
+            </p>
+            <a
+              href={job.proofOfDeliveryUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block"
+            >
+              <img
+                src={job.proofOfDeliveryUrl}
+                alt="Proof of delivery"
+                className="max-h-40 rounded-lg ring-1 ring-gray-200"
+              />
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MetricCell({
+  label,
+  value,
+  sub,
+  tint,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tint?: 'teal' | 'green';
+}) {
+  const valueClass =
+    tint === 'green'
+      ? 'text-green-700'
+      : tint === 'teal'
+      ? 'text-teal-700'
+      : 'text-gray-900';
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">
+        {label}
+      </p>
+      <p className={`text-xs font-medium mt-0.5 ${valueClass}`}>{value}</p>
+      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Unified Timeline (P155) ───
+// Merges order.statusHistory + deliveryJob.statusTimeline into a single
+// chronologically-ordered list, tagging each event with its source so the
+// admin can see the full lifecycle in one place. Delivery events use their
+// own color palette; order events keep the existing STATUS_COLORS.
+type TimelineEntry = {
+  kind: 'order' | 'delivery';
+  status: string;
+  timestamp: string | Date;
+  note?: string;
+  colorClass: string;
+};
+
+function UnifiedTimeline({
+  order,
+  deliveryJob,
+}: {
+  order: Order;
+  deliveryJob: AdminDeliveryJob | null;
+}) {
+  const entries: TimelineEntry[] = [];
+  (order.statusHistory ?? []).forEach((ev) => {
+    entries.push({
+      kind: 'order',
+      status: ev.status,
+      timestamp: ev.timestamp,
+      note: ev.note,
+      colorClass: STATUS_COLORS[ev.status] ?? 'bg-gray-100 text-gray-600',
+    });
+  });
+  (deliveryJob?.statusTimeline ?? []).forEach((ev) => {
+    entries.push({
+      kind: 'delivery',
+      status: ev.status,
+      timestamp: ev.timestamp,
+      note: ev.note,
+      colorClass: DELIVERY_STATUS_COLORS[ev.status] ?? 'bg-gray-100 text-gray-600',
+    });
+  });
+  if (entries.length === 0) return null;
+
+  entries.sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+
+  return (
+    <div>
+      <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
+        Timeline ({entries.length})
+      </h4>
+      <div className="space-y-0">
+        {entries.map((ev, i) => (
+          <div key={i} className="flex items-start gap-3 relative">
+            {i < entries.length - 1 && (
+              <div className="absolute left-[7px] top-4 w-px h-full bg-gray-200" />
+            )}
+            {ev.kind === 'delivery' ? (
+              <Bike
+                className={`mt-0.5 w-4 h-4 shrink-0 z-10 rounded-full bg-white p-0.5 ring-2 ${
+                  i === entries.length - 1
+                    ? 'text-purple-600 ring-purple-500'
+                    : 'text-gray-400 ring-gray-300'
+                }`}
+              />
+            ) : (
+              <CircleDot
+                className={`mt-0.5 w-4 h-4 shrink-0 z-10 rounded-full bg-white ${
+                  i === entries.length - 1 ? 'text-ruby-600' : 'text-gray-300'
+                }`}
+              />
+            )}
+            <div className="pb-4 min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`text-xs font-medium px-1.5 py-0.5 rounded ${ev.colorClass}`}
+                >
+                  {ev.status.replace(/_/g, ' ')}
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                  {ev.kind === 'delivery' ? 'delivery' : 'order'}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                {formatDateTime(ev.timestamp)}
+              </div>
+              {ev.note && (
+                <div className="text-xs text-gray-400 mt-0.5">{ev.note}</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

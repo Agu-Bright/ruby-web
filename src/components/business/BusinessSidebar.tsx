@@ -230,10 +230,10 @@ export function BusinessSidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto overscroll-contain px-2 py-4">
+      <nav className="scrollbar-hide flex-1 overflow-y-auto overscroll-contain py-4">
         {groups.map((group) => (
           <div key={group.title} className="mb-4">
-            <p className="mb-1 hidden px-3 text-[10px] font-bold uppercase tracking-[0.12em] text-white/55 sm:block">
+            <p className="mb-1 hidden px-5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/55 sm:block">
               {group.title}
             </p>
             <ul>
@@ -244,10 +244,10 @@ export function BusinessSidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={`flex items-center justify-center gap-3 rounded-lg px-3 py-2 text-sm transition sm:justify-start ${
+                      className={`flex items-center justify-center gap-3 border-l-2 px-3 py-2 text-sm transition sm:justify-start ${
                         isActive
-                          ? 'bg-white/20 text-white font-semibold shadow-sm ring-1 ring-white/15'
-                          : 'text-white/85 hover:bg-white/10 hover:text-white'
+                          ? 'ml-2 rounded-l-xl border-transparent bg-white text-ruby-red font-semibold shadow-[-5px_3px_16px_rgba(91,10,38,0.12)]'
+                          : 'mx-2 rounded-lg border-transparent text-white/85 hover:bg-white/10 hover:text-white'
                       }`}
                     >
                       <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />

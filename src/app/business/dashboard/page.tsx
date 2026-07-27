@@ -6,6 +6,7 @@ import { useBusinessAuth } from '@/lib/business-auth';
 import { StoreStatusBar } from '@/components/business/dashboard/StoreStatusBar';
 import { StatCardRow } from '@/components/business/dashboard/StatCardRow';
 import { PayViaRubyBanner } from '@/components/business/dashboard/PayViaRubyBanner';
+import { EngagementSection } from '@/components/business/dashboard/EngagementSection';
 import { CacRegistrationCard } from '@/components/business/support/CacRegistrationCard';
 
 interface QuickActionProps { href: string; label: string; description: string; icon: React.ElementType; }
@@ -30,7 +31,10 @@ export default function BusinessDashboardHome() {
       <StoreStatusBar />
       <StatCardRow />
       <CacRegistrationCard surface="home" />
-      <PayViaRubyBanner />
+      <div className="mt-4">
+        <PayViaRubyBanner />
+      </div>
+      <EngagementSection />
       <div className="mt-8">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
           Quick actions

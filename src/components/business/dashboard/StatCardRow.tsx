@@ -4,13 +4,33 @@
  * StatCardRow — three top-line KPIs on the dashboard home.
  *
  * Orders today / Bookings today / Wallet balance. Web parity with mobile
- * `<StatCard />` grid. Real wallet balance flows in with M6; for M1 the
- * card reads whatever `dashboardStats.walletBalance` returns (backend
- * already ships it on `orders/stats/dashboard`).
+ * `<StatCard />` grid.
+ *
+ * Wallet balance:
+ *   - Reads from `api.businessWallets.list(businessId)` (returns the
+ *     merchant's BUSINESS wallets — usually one, but a business could
+ *     have both a NGN wallet and a USD wallet later). We show the
+ *     primary NGN balance, falling back to the first wallet's balance.
+ *   - Backend auto-creates the wallet on first read so a fresh merchant
+ *     always gets a real ₦0 instead of "—".
  */
 
+import { useCallback } from 'react';
 import { ShoppingBag, CalendarCheck, Wallet } from 'lucide-react';
 import { useDashboardStats } from '@/lib/business-api';
+import { useBusinessQuery } from '@/lib/business-api/hooks';
+import { useBusinessAuth } from '@/lib/business-auth';
+import { api } from '@/lib/api';
+
+interface BusinessWallet {
+  _id: string;
+  balance: number;
+  availableBalance?: number;
+  currency?: string;
+  status?: string;
+  type?: string;
+  ownerType?: string;
+}
 
 function formatCurrency(n: number | undefined | null): string {
   if (n == null || Number.isNaN(n)) return '₦—';
@@ -49,6 +69,27 @@ function StatCard({ label, value, hint, icon: Icon, tint }: StatCardProps) {
 
 export function StatCardRow() {
   const { data, isLoading } = useDashboardStats();
+  const { business } = useBusinessAuth();
+  const businessId = business?._id ?? '';
+
+  const walletsFetcher = useCallback(
+    () => api.businessWallets.list(businessId),
+    [businessId],
+  );
+  const { data: wallets } = useBusinessQuery<BusinessWallet[]>(
+    walletsFetcher,
+    [businessId],
+    { enabled: !!businessId },
+  );
+
+  // Prefer NGN wallet; else first wallet's balance.
+  const primaryWallet =
+    (wallets ?? []).find((w) => (w.currency ?? 'NGN') === 'NGN') ??
+    (wallets ?? [])[0] ??
+    null;
+  const walletBalance = primaryWallet
+    ? primaryWallet.availableBalance ?? primaryWallet.balance ?? 0
+    : null;
 
   if (isLoading && !data) {
     return (
@@ -67,7 +108,6 @@ export function StatCardRow() {
   const pendingOrders = data?.pendingOrders ?? 0;
   const activeBookings = data?.activeBookings ?? 0;
   const pendingBookings = data?.pendingBookings ?? 0;
-  const walletBalance = data?.walletBalance ?? null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -96,7 +136,14 @@ export function StatCardRow() {
       <StatCard
         label="Wallet balance"
         value={walletBalance != null ? formatCurrency(walletBalance) : '—'}
-        hint={walletBalance != null ? 'Available to withdraw' : 'Ships with M6'}
+        hint={
+          walletBalance != null
+            ? primaryWallet && primaryWallet.availableBalance != null &&
+              primaryWallet.availableBalance !== primaryWallet.balance
+              ? `${formatCurrency(primaryWallet.balance)} total (some pending)`
+              : 'Available to withdraw'
+            : 'Loading balance…'
+        }
         icon={Wallet}
         tint="purple"
       />

@@ -32,7 +32,7 @@ export default function PushBlastPage() {
       <form onSubmit={onSubmit} className="rounded-2xl border bg-white p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wider text-ruby-red">Admin-reviewed send</p>
         <h1 className="mt-2 text-2xl font-bold">Request a push blast</h1>
-        <p className="mt-2 text-sm leading-6 text-gray-500">Ruby+ reviews each request and sends approved messages within 48 hours. Your monthly quota is used only when the message is sent.</p>
+        <p className="mt-2 text-sm leading-6 text-gray-500">Ruby+ reviews each request and sends approved messages within 48 hours. Your weekly quota is used only when the message is sent.</p>
         <label className="mt-5 block text-sm font-semibold">Message<textarea maxLength={180} required value={message} onChange={(event) => setMessage(event.target.value)} rows={5} className="mt-2 w-full rounded-xl border p-3 font-normal" placeholder="Tell nearby customers what is new at your business…" /></label>
         <p className="mt-1 text-right text-xs text-gray-400">{message.length}/180</p>
         <label className="mt-4 block text-sm font-semibold">Audience radius <span className="text-ruby-red">{radiusKm} km</span><input aria-label="Audience radius in kilometres" type="range" min="1" max="20" value={radiusKm} onChange={(event) => setRadiusKm(Number(event.target.value))} className="mt-3 w-full accent-ruby-red" /><span className="flex justify-between text-xs font-normal text-gray-400"><span>1 km</span><span>20 km</span></span></label>

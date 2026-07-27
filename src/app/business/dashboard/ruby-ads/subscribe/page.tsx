@@ -20,6 +20,12 @@ function money(value: number) {
   return `₦${value.toLocaleString('en-NG')}`;
 }
 
+function formatPerk(perk: string) {
+  return perk
+    .replace(/push-notification blasts?\/month/gi, 'push-notification blasts/week')
+    .replace(/reels?\/month/gi, 'reels/week');
+}
+
 export default function SubscribePage() {
   const { user } = useBusinessAuth();
   const tiers = useAdSubscriptionTiers();
@@ -97,7 +103,7 @@ export default function SubscribePage() {
               <h2 className="mt-2 text-2xl font-bold text-gray-900">{tier.displayName}</h2>
               <p className="mt-4 text-3xl font-bold text-gray-900">{money(tier.weeklyAmountNgn)}<span className="text-sm font-medium text-gray-500"> / week</span></p>
               <ul className="mt-6 space-y-3 text-sm leading-5 text-gray-600">
-                {tier.perkBullets.map((perk) => <li key={perk} className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-emerald-600" />{perk}</li>)}
+                {tier.perkBullets.map((perk) => <li key={perk} className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-emerald-600" />{formatPerk(perk)}</li>)}
               </ul>
               {isCurrent ? (
                 <Link href="/business/dashboard/ruby-ads/manage" className="mt-7 inline-flex w-full items-center justify-center rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-800 transition hover:border-ruby-red hover:text-ruby-red">Manage current tier</Link>

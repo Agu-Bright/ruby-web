@@ -36,6 +36,7 @@ import {
   Gift,
   Settings,
   Sparkles,
+  Store,
 } from 'lucide-react';
 import { useBusinessVisibility } from '@/lib/business-auth';
 
@@ -136,6 +137,11 @@ export const BUSINESS_NAV_GROUPS: NavGroup[] = [
   {
     title: 'Organization',
     items: [
+      {
+        label: 'Business Profile',
+        href: '/business/dashboard/profile',
+        icon: Store,
+      },
       {
         label: 'Branches',
         href: '/business/dashboard/branches',

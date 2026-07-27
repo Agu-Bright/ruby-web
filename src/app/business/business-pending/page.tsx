@@ -18,6 +18,7 @@ import {
   useBusinessAuth,
   type BusinessStatus,
 } from '@/lib/business-auth';
+import { CacRegistrationCard } from '@/components/business/support/CacRegistrationCard';
 
 const COPY: Record<
   BusinessStatus | 'NO_BUSINESS',
@@ -152,6 +153,8 @@ function BusinessPendingContent() {
             </button>
           </div>
         </div>
+
+        <CacRegistrationCard surface="pending_review" />
 
         <p className="text-center text-xs text-gray-400 mt-6">
           Need help?{' '}

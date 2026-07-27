@@ -6,7 +6,7 @@ import { useMutation } from '@/lib/hooks';
 import { useBusinessQuery } from './hooks';
 
 export type AdTier = 'STARTER' | 'GROWTH' | 'PRIME';
-export interface AdTierDefinition { tier: AdTier; displayName: string; weeklyAmountNgn: number; pushBlastsPerMonth: number; reelsPerMonth: number; perkBullets: readonly string[]; [key: string]: unknown }
+export interface AdTierDefinition { tier: AdTier; displayName: string; weeklyAmountNgn: number; pushBlastsPerWeek: number; reelsPerMonth: number; perkBullets: readonly string[]; [key: string]: unknown }
 export interface AdSubscriptionStatus { subscription: { _id: string; tier: AdTier; status: string; weeklyAmountNgn: number; currentPeriodEnd: string; autoRenew: boolean; pendingDowngradeToTier?: AdTier; cardBrand?: string; cardLast4?: string; [key: string]: unknown }; tier: AdTierDefinition; quotas: { push: { used: number; cap: number; remaining: number }; reels: { used: number; cap: number; remaining: number } } }
 
 export function useAdSubscriptionTiers() { const fetcher = useCallback(() => api.businessAdSubscriptions.tiers(), []); return useBusinessQuery<AdTierDefinition[]>(fetcher, []); }

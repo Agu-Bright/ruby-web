@@ -91,6 +91,14 @@ export interface SelectedBusiness {
   subcategoryId?: string;
   categoryId?: string;
   locationId?: string;
+
+  // ── CAC state (used by the CAC lead card, mobile P153 parity) ──────
+  // When present, the "Register your business with CAC" card is hidden
+  // because the merchant already has CAC on file.
+  cacNumber?: string;
+  cacStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'NOT_SUBMITTED';
+  city?: string;
+  phone?: string;
 }
 
 interface BusinessAuthContextValue {
@@ -154,6 +162,12 @@ export function BusinessAuthProvider({ children }: { children: React.ReactNode }
       const sub = profile.subcategoryId;
       const populatedSub =
         sub && typeof sub === 'object' ? (sub as PopulatedSubcategory) : null;
+      // Backend `GET /business/:id` returns the full doc — pluck the
+      // CAC + contact fields for the CAC-registration lead card (P153
+      // parity). Contact fields are also useful for pre-filling other
+      // support conversations later.
+      const contact = (profile as unknown as { contact?: { phone?: string } }).contact;
+      const address = (profile as unknown as { address?: { city?: string } }).address;
       const enriched: SelectedBusiness = {
         ...current,
         _id: profile._id || current._id,
@@ -177,6 +191,14 @@ export function BusinessAuthProvider({ children }: { children: React.ReactNode }
           typeof profile.locationId === 'object'
             ? profile.locationId?._id
             : profile.locationId ?? current.locationId,
+        cacNumber:
+          (profile as unknown as { cacNumber?: string }).cacNumber ??
+          current.cacNumber,
+        cacStatus:
+          (profile as unknown as { cacStatus?: SelectedBusiness['cacStatus'] })
+            .cacStatus ?? current.cacStatus,
+        phone: contact?.phone ?? current.phone,
+        city: address?.city ?? current.city,
       };
       localStorage.setItem(
         BIZ_SELECTED_BUSINESS_KEY,

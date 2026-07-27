@@ -345,7 +345,7 @@ function SubscriptionsTab() {
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">
-                      Push {sub.pushBlastsThisMonth ?? 0} ·{" "}
+                      Push this week {sub.pushBlastsThisWeek ?? 0} ·{" "}
                       Reels {sub.reelsThisMonth ?? 0}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -1256,7 +1256,7 @@ function FulfilComposer({
           </h3>
           <p className="text-xs text-gray-500 mt-1">
             Review and tweak the merchant&apos;s message, then send. This
-            consumes 1 of their monthly push quota slots and goes to every
+            consumes 1 of their weekly push quota slots and goes to every
             customer within {request.radiusKm} km.
           </p>
         </div>

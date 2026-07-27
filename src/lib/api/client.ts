@@ -794,7 +794,11 @@ export const api = {
     businessStats: (businessId: string) => request<unknown>("/business/services/stats", { params: { businessId } }),
   },
   businessWallets: {
-    list: (businessId:string) => request<any[]>(`/business/wallets/${businessId}`),
+    // Backend `GET /business/wallets` reads businessId from `?businessId=` query
+    // (see wallets.controller.ts:377). Do NOT change to `/business/wallets/${id}`
+    // — that path matches `@Get(':walletId')` and would treat the id as a
+    // wallet id instead of a business id, silently returning nothing.
+    list: (businessId:string) => request<any[]>(`/business/wallets`,{params:{businessId}}),
     detail: (id:string) => request<any>(`/business/wallets/${id}`),
     transactions: (id:string, params?:Record<string,string|number|undefined>) => request<any[]>(`/business/wallets/${id}/transactions`,{params}),
     stats: (id:string) => request<any>(`/business/wallets/${id}/stats`),
@@ -863,7 +867,28 @@ export const api = {
   // NOTE: merchantSupport `get`/`update` (admin) is defined further down; the
   // business-facing public config lives on `businessMerchantSupport.config()`
   // so the two namespaces don't collide.
-  businessMerchantSupport: { config: () => request<{ whatsappNumber?: string; whatsappMessage?: string; supportEmail?: string; supportPhone?: string }>('/public/merchant-support') },
+  //
+  // Shape mirrors the backend `getPublicConfig()` in merchant-support.service —
+  // the CAC fields (P153) drive the "Register your business with CAC"
+  // WhatsApp lead card on the merchant dashboard.
+  businessMerchantSupport: {
+    config: () =>
+      request<{
+        whatsappPhone?: string;
+        whatsappIntroMessage?: string;
+        voicePhone?: string;
+        isActive?: boolean;
+        cacRegistrationEnabled?: boolean;
+        cacRegistrationWhatsAppNumber?: string;
+        cacRegistrationPitch?: string;
+        // Legacy alias support — the older admin `merchantSupport` output
+        // used `whatsappNumber` / `whatsappMessage` on some paths.
+        whatsappNumber?: string;
+        whatsappMessage?: string;
+        supportEmail?: string;
+        supportPhone?: string;
+      }>('/public/merchant-support'),
+  },
   businessReviews: { list:(params:any)=>request<any[]>('/business/reviews',{params}), stats:()=>request<any>('/business/reviews/stats'), reply:(id:string,text:string)=>request<any>(`/business/reviews/${id}/reply`,{method:'POST',body:{text}}) },
   businessNotifications: { list:(params?:any)=>request<any>('/business/notifications',{params}), unreadCount:()=>request<{count:number}>('/business/notifications/unread-count'), markRead:(ids:string[])=>request<any>('/business/notifications/mark-read',{method:'POST',body:{ids}}), markAllRead:()=>request<any>('/business/notifications/mark-all-read',{method:'POST',body:{}}), registerDevice:(token:string,platform:'web')=>request<any>('/business/notifications/device',{method:'POST',body:{token,platform}}), removeDevice:(token:string)=>request<any>('/business/notifications/device',{method:'DELETE',body:{token}}) },
   businessOrganization: { branches:(id:string)=>request<any[]>(`/business/${id}/branches`), enableMultiBranch:(id:string,data:any)=>request<any>(`/business/${id}/enable-multi-branch`,{method:'POST',body:data}), createBranch:(id:string,data:any)=>request<any>(`/business/${id}/branches`,{method:'POST',body:data}), catalogMode:(id:string,data:any)=>request<any>(`/business/${id}/catalog-mode`,{method:'PATCH',body:data}), staff:(id:string)=>request<any[]>(`/business/${id}/staff`), assignStaff:(id:string,data:any)=>request<any>(`/business/${id}/staff`,{method:'POST',body:data}), updateStaff:(id:string,staffId:string,data:any)=>request<any>(`/business/${id}/staff/${staffId}`,{method:'PATCH',body:data}), removeStaff:(id:string,staffId:string)=>request<any>(`/business/${id}/staff/${staffId}`,{method:'DELETE'}), referral:(id:string)=>request<any>(`/business/${id}/referrals/me`) },
@@ -2612,7 +2637,7 @@ export const api = {
           tier: "STARTER" | "GROWTH" | "PRIME";
           displayName: string;
           weeklyAmountNgn: number;
-          pushBlastsPerMonth: number;
+          pushBlastsPerWeek: number;
           reelsPerMonth: number;
           perkBullets: string[];
         }>

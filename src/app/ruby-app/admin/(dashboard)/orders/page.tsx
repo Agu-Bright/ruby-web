@@ -1172,12 +1172,32 @@ function AdminDeliveryLiveMap({ job, live }: { job: AdminDeliveryJob; live: bool
   const pickup = asMapPoint(job.pickup);
   const dropoff = asMapPoint(job.dropoff);
   const rider = asMapPoint(job.lastKnownLocation);
+  const [roadRoute, setRoadRoute] = useState<LatLng[]>([]);
+  const [routeMeta, setRouteMeta] = useState<{ distanceText: string; durationText: string } | null>(null);
+  const [routeUnavailable, setRouteUnavailable] = useState(false);
+  const routeOrigin = rider || pickup;
+
+  useEffect(() => {
+    if (!routeOrigin || !dropoff) { setRoadRoute([]); setRouteMeta(null); return; }
+    let cancelled = false;
+    setRouteUnavailable(false);
+    api.directions.get({
+      originLat: routeOrigin[0], originLng: routeOrigin[1],
+      destLat: dropoff[0], destLng: dropoff[1], mode: 'DRIVING',
+    }).then(({ data }) => {
+      if (cancelled) return;
+      const points = (data?.points || []).map((point) => [point.latitude, point.longitude] as LatLng);
+      setRoadRoute(points);
+      setRouteMeta(data ? { distanceText: data.distanceText, durationText: data.durationText } : null);
+      setRouteUnavailable(points.length < 2);
+    }).catch(() => { if (!cancelled) { setRoadRoute([]); setRouteMeta(null); setRouteUnavailable(true); } });
+    return () => { cancelled = true; };
+  }, [routeOrigin?.[0], routeOrigin?.[1], dropoff?.[0], dropoff?.[1]]);
   const markers = [
-    pickup && { id: 'business', position: pickup, title: 'Business pickup', description: job.pickup?.address || 'Business location' },
-    rider && { id: 'rider', position: rider, title: job.riderInfo?.name || 'Rider', description: job.lastKnownLocation?.updatedAt ? `Last update: ${formatDateTime(job.lastKnownLocation.updatedAt)}` : 'Live rider location' },
-    dropoff && { id: 'customer', position: dropoff, title: 'Customer delivery', description: job.dropoff?.address || 'Customer location' },
+    pickup && { id: 'business', kind: 'pickup' as const, position: pickup, title: 'Business pickup', description: job.pickup?.address || 'Business location' },
+    rider && { id: 'rider', kind: 'rider' as const, position: rider, title: job.riderInfo?.name || 'Rider', description: job.lastKnownLocation?.updatedAt ? `Last update: ${formatDateTime(job.lastKnownLocation.updatedAt)}` : 'Live rider location' },
+    dropoff && { id: 'customer', kind: 'destination' as const, position: dropoff, title: 'Customer delivery', description: job.dropoff?.address || 'Customer location' },
   ].filter(Boolean) as Array<{ id: string; position: LatLng; title: string; description: string }>;
-  const route = rider && dropoff ? [pickup, rider, dropoff].filter(Boolean) as LatLng[] : pickup && dropoff ? [pickup, dropoff] : [];
   const center = rider || pickup || dropoff;
 
   return (
@@ -1185,7 +1205,7 @@ function AdminDeliveryLiveMap({ job, live }: { job: AdminDeliveryJob; live: bool
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Live delivery map</p>
-          <p className="mt-0.5 text-sm font-semibold text-gray-900">Business → rider → customer</p>
+          <p className="mt-0.5 text-sm font-semibold text-gray-900">{rider ? 'Rider → customer road route' : 'Business → customer road route'}</p>
         </div>
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${live ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
           <Radio className={live ? 'h-3.5 w-3.5' : 'h-3.5 w-3.5 text-amber-600'} />
@@ -1193,12 +1213,15 @@ function AdminDeliveryLiveMap({ job, live }: { job: AdminDeliveryJob; live: bool
         </span>
       </div>
       {center && markers.length >= 2 ? (
-        <DynamicMap center={center} markers={markers} polylines={route.length >= 2 ? [route] : []} fitToMarkers className="h-80 w-full" />
+        <DynamicMap center={center} markers={markers} polylines={roadRoute.length >= 2 ? [roadRoute] : []} fitToMarkers className="h-80 w-full" />
       ) : (
         <div className="flex min-h-48 items-center justify-center bg-gray-50 p-6 text-center text-sm text-gray-500">
           Waiting for complete pickup and customer coordinates before the delivery map can be displayed.
         </div>
       )}
+      <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
+        {routeMeta ? `Road route: ${routeMeta.distanceText} · ${routeMeta.durationText}` : routeUnavailable ? 'Road directions are temporarily unavailable.' : 'Calculating road directions…'}
+      </div>
       <div className="grid grid-cols-1 divide-y divide-gray-100 text-xs sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <MapLocationSummary label="Business" value={job.pickup?.address || 'Pickup location unavailable'} />
         <MapLocationSummary label="Rider" value={job.riderInfo?.name || 'Awaiting rider assignment'} />

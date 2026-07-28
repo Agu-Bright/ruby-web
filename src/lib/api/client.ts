@@ -1646,6 +1646,15 @@ export const api = {
       ),
   },
 
+  directions: {
+    get: (params: { originLat: number; originLng: number; destLat: number; destLng: number; mode?: 'DRIVING' | 'WALKING' | 'TRANSIT' }) =>
+      request<{
+        points: Array<{ latitude: number; longitude: number }>;
+        distanceText: string;
+        durationText: string;
+      }>("/public/directions", { params }),
+  },
+
   // Bookings
   bookings: {
     list: (params?: import("@/lib/types").BookingFilterParams) =>

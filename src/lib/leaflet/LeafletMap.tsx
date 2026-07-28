@@ -13,7 +13,7 @@ import {
   useMapEvents,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { configureLeafletIcons } from './leaflet-icons';
+import { configureLeafletIcons, createRubyMapMarkerIcon, type RubyMapMarkerKind } from './leaflet-icons';
 
 export type LatLng = [number, number];
 
@@ -23,6 +23,7 @@ export interface LeafletMarker {
   title?: string;
   description?: string;
   icon?: L.Icon | L.DivIcon;
+  kind?: RubyMapMarkerKind;
   draggable?: boolean;
 }
 
@@ -106,12 +107,10 @@ export default function LeafletMap({
         <Marker
           key={marker.id}
           position={marker.position}
-          // Passing `icon={undefined}` makes react-leaflet call
-          // `setIcon(undefined)` during a production reconciliation,
-          // which crashes inside Leaflet's `createIcon`. Omit the prop
-          // entirely when a caller has not supplied a custom icon so
-          // Leaflet uses its configured default marker safely.
-          {...(marker.icon ? { icon: marker.icon } : {})}
+          // Always use an explicit SVG icon. This avoids Next.js asset-path
+          // issues with Leaflet defaults and gives live delivery points
+          // distinct visual identities.
+          icon={marker.icon ?? createRubyMapMarkerIcon(marker.kind)}
           draggable={marker.draggable}
           eventHandlers={{
             dragend: (event) => {

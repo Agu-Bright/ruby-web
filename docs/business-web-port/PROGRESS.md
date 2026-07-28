@@ -44,6 +44,12 @@
 
 ## Session log (append-only)
 
+### 2026-07-28 — Admin delivery map markers and road directions
+
+**What works:** The admin delivery map now uses distinct SVG markers: red Ruby+ pickup pin, blue rider/scooter marker, and purple customer destination pin. Its route uses the existing backend Google Directions endpoint rather than a straight-line approximation. Before assignment it requests a business-to-customer driving route; once rider GPS is available it recalculates from rider to customer and displays the provider's road distance and ETA. The existing delivery socket refresh moves the rider marker in real time.
+
+**Files touched:** `src/lib/{leaflet/leaflet-icons.ts,leaflet/LeafletMap.tsx,api/client.ts}`, `src/app/ruby-app/admin/(dashboard)/orders/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
 ### 2026-07-28 — Admin live delivery map in order details
 
 **What works:** The Admin Orders detail modal now renders a live map for delivery orders showing the business pickup, latest rider position and customer destination. The parent modal already joins the order's delivery socket room; `rider_location_updated` refetches the delivery job, so the rider marker moves as provider GPS events arrive. The map falls back to the business-to-customer line before a rider location exists and clearly reports when complete map coordinates are unavailable.

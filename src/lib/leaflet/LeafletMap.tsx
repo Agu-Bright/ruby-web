@@ -106,7 +106,12 @@ export default function LeafletMap({
         <Marker
           key={marker.id}
           position={marker.position}
-          icon={marker.icon}
+          // Passing `icon={undefined}` makes react-leaflet call
+          // `setIcon(undefined)` during a production reconciliation,
+          // which crashes inside Leaflet's `createIcon`. Omit the prop
+          // entirely when a caller has not supplied a custom icon so
+          // Leaflet uses its configured default marker safely.
+          {...(marker.icon ? { icon: marker.icon } : {})}
           draggable={marker.draggable}
           eventHandlers={{
             dragend: (event) => {

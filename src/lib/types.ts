@@ -849,7 +849,10 @@ export interface Order {
   // Backend sends object, may also be string
   deliveryAddress?: string | OrderDeliveryAddress;
   deliveryQuoteId?: string;
-  deliveryJobId?: string;
+  // The admin order list populates this lightweight delivery-job summary so
+  // delivery orders can show the actual last-mile state, not only the parent
+  // order's DISPATCHED stage.
+  deliveryJobId?: string | OrderDeliveryJobSummary;
   // Backend uses `statusHistory`
   statusHistory?: StatusEvent[];
   // Backend uses `customerNote`
@@ -936,6 +939,18 @@ export type AdminDeliveryStatus =
   | 'DELIVERED'
   | 'FAILED'
   | 'CANCELLED';
+
+export interface OrderDeliveryJobSummary {
+  _id: string;
+  status: AdminDeliveryStatus;
+  provider?: AdminDeliveryProvider;
+  lastKnownLocation?: {
+    lat: number;
+    lng: number;
+    updatedAt?: string;
+  };
+  updatedAt?: string;
+}
 
 export interface AdminDeliveryJob {
   _id: string;

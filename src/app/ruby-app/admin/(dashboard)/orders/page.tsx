@@ -76,6 +76,18 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: 'bg-green-50 text-green-700', CANCELLED: 'bg-gray-100 text-gray-600',
 };
 
+/**
+ * A delivery order's parent status intentionally stays DISPATCHED while the
+ * courier is working. The populated delivery job is the operational truth
+ * for the admin list — e.g. RIDER AT PICKUP or IN TRANSIT.
+ */
+function getLiveDeliveryStatus(order: Order): AdminDeliveryStatus | undefined {
+  const deliveryJob = order.deliveryJobId;
+  return deliveryJob && typeof deliveryJob === 'object'
+    ? deliveryJob.status
+    : undefined;
+}
+
 // ─── Action Dropdown ───
 function ActionDropdown({ order, onAction, onView, isSuperAdmin }: {
   order: Order; onAction: (o: Order, t: 'cancel' | 'override') => void;
@@ -243,7 +255,21 @@ export default function OrdersPage() {
         </div>
       ),
     },
-    { key: 'status', header: 'Status', render: (o) => <StatusBadge status={o.status} /> },
+    {
+      key: 'status', header: 'Status',
+      render: (o) => {
+        const deliveryStatus = getLiveDeliveryStatus(o);
+        if (!deliveryStatus) return <StatusBadge status={o.status} />;
+        return (
+          <div className="flex flex-col items-start gap-0.5">
+            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${DELIVERY_STATUS_COLORS[deliveryStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+              {deliveryStatus.replace(/_/g, ' ')}
+            </span>
+            <span className="text-[10px] text-gray-400">Order: {o.status.replace(/_/g, ' ')}</span>
+          </div>
+        );
+      },
+    },
     {
       key: 'fulfillment', header: 'Type',
       render: (o) => {

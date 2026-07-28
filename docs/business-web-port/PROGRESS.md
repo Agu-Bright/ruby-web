@@ -950,6 +950,31 @@ Start M0. First files to create:
 
 _As decisions get made that deviate from or extend PLAN.md, log them here with the milestone number that surfaced them._
 
+### 2026-07-28 — Admin orders: live delivery state in list
+
+**What works**
+
+- Delivery orders now include a lightweight populated delivery-job summary in the admin order-list API.
+- The Status column shows the active fulfilment state (`RIDER AT PICKUP`, `PICKED UP`, `IN TRANSIT`, etc.) when a delivery job exists, with the parent order stage shown underneath for context.
+- Non-delivery orders and delivery orders that have not yet been dispatched retain their normal order-status display.
+
+**Design decision**
+
+- `DISPATCHED` remains the correct parent-order status while a provider completes last-mile delivery; it is no longer presented as the sole operational status in the admin table.
+
+**Files touched**
+
+- `C:/Users/DELL/Desktop/ruby-plus-backend/src/modules/orders/orders.service.ts`
+- `src/lib/types.ts`
+- `src/app/ruby-app/admin/(dashboard)/orders/page.tsx`
+
+**Verification**
+
+- Web TypeScript check: passed.
+- Backend TypeScript check: passed.
+
+**Next task for next agent:** Deploy both backend and web changes together, then confirm that an `IN_TRANSIT` Pandago job renders as `IN TRANSIT` in the admin order table.
+
 **2026-07-24 · Pre-M0** — Route structure uses flat paths (`/business/login`, `/business/dashboard/*`) instead of route groups (`(auth)/…`, `(dashboard)/…`). Reason: `/business/` root is already the marketing landing (page.tsx exists), so a `(public)/page.tsx` and `(dashboard)/page.tsx` would conflict. Flat URLs are also easier to read.
 
 ---

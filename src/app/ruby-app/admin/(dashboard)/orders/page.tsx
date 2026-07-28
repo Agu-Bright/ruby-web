@@ -13,6 +13,8 @@ import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { useAdminSockets } from '@/lib/admin-sockets';
 import { PageHeader, DataTable, StatusBadge, Modal, StatCard, type Column } from '@/components/ui';
+import { DynamicMap } from '@/lib/leaflet/DynamicMap';
+import type { LatLng } from '@/lib/leaflet/LeafletMap';
 import type {
   Order, OrderFilterParams, OrderStatus, OrderStats,
   AdminDeliveryJob, AdminDeliveryStatus, OrderItem,
@@ -637,6 +639,12 @@ function OrderDetailContent({
         <DeliverySection job={deliveryJob} currency={order.currency} />
       )}
 
+      {/* Live route surface — parent modal subscribes to rider_location_updated
+          and refetches deliveryJob, so this marker moves without a refresh. */}
+      {isDelivery && deliveryJob && (
+        <AdminDeliveryLiveMap job={deliveryJob} live={deliveryLive} />
+      )}
+
       {/* Fee Breakdown */}
       <div>
         <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Fee Breakdown</h4>
@@ -1148,6 +1156,60 @@ function DeliverySection({
       </div>
     </div>
   );
+}
+
+function asMapPoint(value?: { lat?: number; lng?: number }): LatLng | null {
+  if (!value || !Number.isFinite(value.lat) || !Number.isFinite(value.lng)) return null;
+  return [value.lat as number, value.lng as number];
+}
+
+/**
+ * Admin delivery tracking map. The order modal already joins this order's
+ * delivery socket room and refetches `deliveryJob` on every rider GPS event,
+ * making the rider marker update in real time.
+ */
+function AdminDeliveryLiveMap({ job, live }: { job: AdminDeliveryJob; live: boolean }) {
+  const pickup = asMapPoint(job.pickup);
+  const dropoff = asMapPoint(job.dropoff);
+  const rider = asMapPoint(job.lastKnownLocation);
+  const markers = [
+    pickup && { id: 'business', position: pickup, title: 'Business pickup', description: job.pickup?.address || 'Business location' },
+    rider && { id: 'rider', position: rider, title: job.riderInfo?.name || 'Rider', description: job.lastKnownLocation?.updatedAt ? `Last update: ${formatDateTime(job.lastKnownLocation.updatedAt)}` : 'Live rider location' },
+    dropoff && { id: 'customer', position: dropoff, title: 'Customer delivery', description: job.dropoff?.address || 'Customer location' },
+  ].filter(Boolean) as Array<{ id: string; position: LatLng; title: string; description: string }>;
+  const route = rider && dropoff ? [pickup, rider, dropoff].filter(Boolean) as LatLng[] : pickup && dropoff ? [pickup, dropoff] : [];
+  const center = rider || pickup || dropoff;
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Live delivery map</p>
+          <p className="mt-0.5 text-sm font-semibold text-gray-900">Business → rider → customer</p>
+        </div>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${live ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
+          <Radio className={live ? 'h-3.5 w-3.5' : 'h-3.5 w-3.5 text-amber-600'} />
+          {live ? 'Live tracking' : 'Connecting…'}
+        </span>
+      </div>
+      {center && markers.length >= 2 ? (
+        <DynamicMap center={center} markers={markers} polylines={route.length >= 2 ? [route] : []} fitToMarkers className="h-80 w-full" />
+      ) : (
+        <div className="flex min-h-48 items-center justify-center bg-gray-50 p-6 text-center text-sm text-gray-500">
+          Waiting for complete pickup and customer coordinates before the delivery map can be displayed.
+        </div>
+      )}
+      <div className="grid grid-cols-1 divide-y divide-gray-100 text-xs sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <MapLocationSummary label="Business" value={job.pickup?.address || 'Pickup location unavailable'} />
+        <MapLocationSummary label="Rider" value={job.riderInfo?.name || 'Awaiting rider assignment'} />
+        <MapLocationSummary label="Customer" value={job.dropoff?.address || 'Delivery location unavailable'} />
+      </div>
+    </section>
+  );
+}
+
+function MapLocationSummary({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0 p-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{label}</p><p className="mt-1 truncate text-sm font-medium text-gray-800" title={value}>{value}</p></div>;
 }
 
 function MetricCell({

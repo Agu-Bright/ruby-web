@@ -44,6 +44,12 @@
 
 ## Session log (append-only)
 
+### 2026-07-28 — Admin live delivery map in order details
+
+**What works:** The Admin Orders detail modal now renders a live map for delivery orders showing the business pickup, latest rider position and customer destination. The parent modal already joins the order's delivery socket room; `rider_location_updated` refetches the delivery job, so the rider marker moves as provider GPS events arrive. The map falls back to the business-to-customer line before a rider location exists and clearly reports when complete map coordinates are unavailable.
+
+**Files touched:** `src/app/ruby-app/admin/(dashboard)/orders/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
 ### 2026-07-28 — Pandago coordinates visible in Admin Businesses
 
 **What works:** The Admin Businesses Pandago column now shows the latitude/longitude last successfully registered with Pandago beneath the outlet status. The same coordinates appear in the selected business's Info panel, so staff can compare them with the Ruby+ map pin while investigating a delivery-location issue.

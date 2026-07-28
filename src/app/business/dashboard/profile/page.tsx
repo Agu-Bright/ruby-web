@@ -286,17 +286,20 @@ export default function BusinessProfilePage() {
     setHours(normaliseHours(doc.hours));
     setAddress(doc.address ?? {});
     const coordinates = doc.geoPoint?.coordinates;
+    // `geoPoint` is the canonical delivery location and the value sent to
+    // Pandago. Prefer it over any legacy latitude/longitude fields so the
+    // Settings map can never re-save an older, contradictory coordinate.
     const nextLongitude =
-      typeof doc.longitude === 'number'
-        ? doc.longitude
-        : typeof coordinates?.[0] === 'number'
-          ? coordinates[0]
+      typeof coordinates?.[0] === 'number'
+        ? coordinates[0]
+        : typeof doc.longitude === 'number'
+          ? doc.longitude
           : 3.3792;
     const nextLatitude =
-      typeof doc.latitude === 'number'
-        ? doc.latitude
-        : typeof coordinates?.[1] === 'number'
-          ? coordinates[1]
+      typeof coordinates?.[1] === 'number'
+        ? coordinates[1]
+        : typeof doc.latitude === 'number'
+          ? doc.latitude
           : 6.5244;
     setLongitude(nextLongitude);
     setLatitude(nextLatitude);

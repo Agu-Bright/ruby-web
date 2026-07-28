@@ -44,6 +44,20 @@
 
 ## Session log (append-only)
 
+### 2026-07-28 — Pandago coordinates visible in Admin Businesses
+
+**What works:** The Admin Businesses Pandago column now shows the latitude/longitude last successfully registered with Pandago beneath the outlet status. The same coordinates appear in the selected business's Info panel, so staff can compare them with the Ruby+ map pin while investigating a delivery-location issue.
+
+**Files touched:** `src/app/ruby-app/admin/(dashboard)/businesses/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+### 2026-07-28 — Profile map-pin updates now sync Pandago
+
+**What works:** A business Profile/Settings save that changes both map coordinates now updates Ruby+'s canonical `geoPoint` and immediately invokes Pandago's idempotent outlet PUT for an ACTIVE outlet. It does not unregister the outlet first, avoiding a delivery-routing gap; a failed provider sync is recorded on the outlet status for admin recovery. The web profile map now always loads from canonical `geoPoint` before considering legacy latitude/longitude values, preventing an older contradictory value from being silently saved back to the business.
+
+**Files touched:** `C:/Users/DELL/Desktop/ruby-plus-backend/src/modules/businesses/businesses.service.ts`, `src/app/business/dashboard/profile/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Next task for next agent:** Surface Pandago sync state in the business Profile location panel and add the wider location-health/reconciliation campaign described in the product review.
+
 ### 2026-07-28 — One-click admin login to selected business dashboard
 
 **What works:** Admin Businesses now starts a short-lived secure handoff and opens the selected merchant's real `business.rubyplus.net` dashboard in a new tab. The business subdomain exchanges the 60-second handoff proof for a 15-minute assisted session; neither the admin bearer nor an owner password/token crosses origins. `SUPER_ADMIN` receives the normal dashboard. `LOCATION_ADMIN` and `SUPPORT` receive a server-enforced limited session for profile, media, operating hours and catalogue support, and the business sidebar only exposes those areas.

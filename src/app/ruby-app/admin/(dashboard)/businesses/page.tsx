@@ -2036,6 +2036,12 @@ export default function BusinessesPage() {
                   {displayBusiness.catalogMode && displayBusiness.catalogMode !== 'INDEPENDENT' && (
                     <DetailField label="Catalog Mode" value={displayBusiness.catalogMode} />
                   )}
+                  {displayBusiness.pandagoOutlet?.registeredCoordinates && (
+                    <DetailField
+                      label="Pandago registered pin"
+                      value={`${displayBusiness.pandagoOutlet.registeredCoordinates.lat.toFixed(6)}, ${displayBusiness.pandagoOutlet.registeredCoordinates.lng.toFixed(6)}`}
+                    />
+                  )}
                 </div>
 
                 {/* Claim Info */}
@@ -3874,6 +3880,7 @@ function PandagoBadge({
     status === 'FAILED' ||
     status === 'UNREGISTERED';
   const showUnregisterButton = status === 'ACTIVE';
+  const registeredCoordinates = outlet?.registeredCoordinates;
 
   return (
     <div className="flex flex-col gap-1 min-w-0">
@@ -3889,6 +3896,14 @@ function PandagoBadge({
       >
         {labels[status] || status}
       </span>
+      {registeredCoordinates && (
+        <div
+          className="font-mono text-[10px] leading-tight text-gray-500"
+          title="Coordinates last successfully registered with Pandago"
+        >
+          {registeredCoordinates.lat.toFixed(6)}, {registeredCoordinates.lng.toFixed(6)}
+        </div>
+      )}
       {/* Manual register / retry link. Visible for:
           - legacy + unclaimed businesses (auto-register only fires for
             claimed merchants), and

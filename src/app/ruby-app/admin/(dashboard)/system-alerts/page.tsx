@@ -22,7 +22,9 @@ import type {
 
 /**
  * Admin-managed system alert recipients. CRUD over /admin/system-alerts/
- * recipients. The three flags map to platform-wide ops alerts:
+ * recipients. The general notification setting covers every platform alert;
+ * the remaining flags are narrower operational alerts:
+ *   allNotifications   — every persisted platform notification, including orders
  *   adPayment         — merchant successfully paid for an ad (IAP/Paystack/wallet)
  *   payoutRequested   — reserved future use
  *   businessSubmission — reserved future use
@@ -33,6 +35,7 @@ import type {
  */
 
 const FLAG_LABELS: Record<keyof SystemAlertRecipient["alerts"], string> = {
+  allNotifications: "All platform notifications",
   adPayment: "Ad payment received",
   payoutRequested: "Payout requested (V1.1)",
   businessSubmission: "New business submitted (V1.1)",
@@ -89,10 +92,17 @@ export default function SystemAlertsPage() {
     {
       key: "alerts",
       header: "Subscribed to",
-      render: (r) => (
+      render: (r) => {
+        // Older recipient records predate the general flag. Treat them as
+        // opted in until an admin explicitly changes the saved preference.
+        const alerts = {
+          ...r.alerts,
+          allNotifications: r.alerts.allNotifications ?? true,
+        };
+        return (
         <div className="flex flex-wrap gap-1">
-          {(Object.keys(r.alerts) as Array<keyof typeof r.alerts>).map((k) => {
-            const on = r.alerts[k];
+          {(Object.keys(alerts) as Array<keyof typeof alerts>).map((k) => {
+            const on = alerts[k];
             return (
               <span
                 key={k}
@@ -107,7 +117,8 @@ export default function SystemAlertsPage() {
             );
           })}
         </div>
-      ),
+        );
+      },
     },
     {
       key: "isActive",
@@ -166,8 +177,8 @@ export default function SystemAlertsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <PageHeader
-          title="System Alerts"
-          description="Email addresses that receive critical platform alerts (ad payments succeeded today; payouts + submissions reserved for V1.1). Merged with the SYSTEM_ALERT_INBOX_EMAIL env-var inbox so ops always gets paged even when this list is empty."
+          title="Notification settings"
+          description="Manage the email inboxes that receive platform alerts. Enable All platform notifications to email an address for every customer, business and operational notification — including new orders."
         />
         <div className="flex gap-2">
           <button
@@ -190,7 +201,7 @@ export default function SystemAlertsPage() {
         data={recipients}
         columns={columns}
         isLoading={isLoading}
-        emptyMessage="No recipients yet. Add an email to start receiving system alerts."
+        emptyMessage="No recipients yet. Add an email to start receiving platform notifications."
       />
 
       {creating && (
@@ -231,13 +242,12 @@ function RecipientFormModal({
 }) {
   const [email, setEmail] = useState(recipient?.email || "");
   const [label, setLabel] = useState(recipient?.label || "");
-  const [alerts, setAlerts] = useState<SystemAlertRecipient["alerts"]>(
-    recipient?.alerts || {
-      adPayment: true,
-      payoutRequested: true,
-      businessSubmission: true,
-    },
-  );
+  const [alerts, setAlerts] = useState<SystemAlertRecipient["alerts"]>(() => ({
+    allNotifications: recipient?.alerts?.allNotifications ?? true,
+    adPayment: recipient?.alerts?.adPayment ?? true,
+    payoutRequested: recipient?.alerts?.payoutRequested ?? true,
+    businessSubmission: recipient?.alerts?.businessSubmission ?? true,
+  }));
 
   const createMut = useMutation((data: CreateSystemAlertRecipientRequest) =>
     api.systemAlerts.create(data),
@@ -282,7 +292,7 @@ function RecipientFormModal({
     <Modal
       isOpen
       onClose={onClose}
-      title={isCreate ? "Add system alert recipient" : "Edit recipient"}
+      title={isCreate ? "Add notification recipient" : "Edit recipient"}
       size="md"
     >
       <div className="space-y-4">

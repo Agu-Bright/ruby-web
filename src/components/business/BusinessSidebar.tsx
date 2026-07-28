@@ -38,7 +38,7 @@ import {
   Sparkles,
   Store,
 } from 'lucide-react';
-import { useBusinessVisibility } from '@/lib/business-auth';
+import { useBusinessAuth, useBusinessVisibility } from '@/lib/business-auth';
 
 interface NavItem {
   label: string;
@@ -193,6 +193,8 @@ export function BusinessSidebar() {
   const pathname = usePathname();
   const activeHref = computeActiveHref(pathname);
   const visibility = useBusinessVisibility();
+  const { user } = useBusinessAuth();
+  const restrictedAssistedSession = user?.isAssisted && user.assistedRole !== 'SUPER_ADMIN';
 
   // Apply per-business visibility to the catalog group. Products hide
   // when the business doesn't sell products; Services hide when the
@@ -200,8 +202,7 @@ export function BusinessSidebar() {
   // (`isReady === false`) both stay visible to avoid a hydration flash.
   const groups = useMemo(() => {
     return BUSINESS_NAV_GROUPS.map((group) => {
-      if (group.title !== 'Catalog') return group;
-      const items = group.items.filter((item) => {
+      let items = group.items.filter((item) => {
         if (item.href === '/business/dashboard/products') {
           return visibility.showProducts;
         }
@@ -210,9 +211,13 @@ export function BusinessSidebar() {
         }
         return true;
       });
+      if (restrictedAssistedSession) {
+        const allowed = new Set(['/business/dashboard', '/business/dashboard/products', '/business/dashboard/services', '/business/dashboard/profile']);
+        items = items.filter((item) => allowed.has(item.href));
+      }
       return { ...group, items };
     }).filter((group) => group.items.length > 0);
-  }, [visibility.showProducts, visibility.showServices]);
+  }, [visibility.showProducts, visibility.showServices, restrictedAssistedSession]);
 
   return (
     <aside

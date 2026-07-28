@@ -26,6 +26,7 @@ import { useAuth } from '@/lib/auth';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { PageHeader, StatusBadge, Modal, StatCard, ImageUpload } from '@/components/ui';
+import { businessLink } from '@/lib/subdomain-links';
 
 const MapLocationPicker = dynamic(
   () => import('@/components/ui/map-location-picker').then(mod => ({ default: mod.MapLocationPicker })),
@@ -101,6 +102,7 @@ const PANDAGO_STATUS_OPTIONS = [
   'ACTIVE',
   'FAILED',
   'STALE',
+  'UNREGISTERED',
 ] as const;
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -123,6 +125,25 @@ function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const [openingDashboard, setOpeningDashboard] = useState(false);
+
+  const openBusinessDashboard = async () => {
+    // Open synchronously so browser popup protection cannot block the new tab.
+    const target = window.open('', '_blank', 'noopener,noreferrer');
+    setOpeningDashboard(true);
+    try {
+      const response = await api.businesses.startAssistedDashboard(business._id);
+      const token = response.data?.handoffToken;
+      if (!token) throw new Error('Could not create a secure business session.');
+      const url = `${businessLink('/admin-assisted-login')}?token=${encodeURIComponent(token)}`;
+      if (target) target.location.href = url;
+      else window.open(url, '_blank', 'noopener,noreferrer');
+      setOpen(false);
+    } catch (error: any) {
+      target?.close();
+      toast.error(error?.message || 'Could not open the business dashboard.');
+    } finally { setOpeningDashboard(false); }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -134,6 +155,7 @@ function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
   }, [open]);
 
   const items: { label: string; icon: typeof Eye; action: () => void; variant?: 'default' | 'success' | 'danger' | 'warning' }[] = [
+    { label: openingDashboard ? 'Opening dashboard…' : 'Open business dashboard', icon: ExternalLink, action: () => { void openBusinessDashboard(); } },
     { label: 'View Details', icon: Eye, action: () => { onView(business); setOpen(false); } },
     { label: 'Edit Business', icon: Edit2, action: () => { onAction(business, 'edit'); setOpen(false); } },
   ];
@@ -382,6 +404,7 @@ export default function BusinessesPage() {
   // pandagoRegistering = current businessId being registered (loading state).
   // backfillResult = preview/result of the most recent backfill call.
   const [pandagoRegistering, setPandagoRegistering] = useState<string | null>(null);
+  const [pandagoUnregistering, setPandagoUnregistering] = useState<string | null>(null);
   const [pandagoBackfillResult, setPandagoBackfillResult] = useState<{
     scanned: number;
     registered: number;
@@ -867,6 +890,36 @@ export default function BusinessesPage() {
         toast.error(msg);
       } finally {
         setPandagoRegistering(null);
+      }
+    },
+    [refetch],
+  );
+
+  const handlePandagoUnregister = useCallback(
+    async (b: Business) => {
+      const confirmed = window.confirm(
+        `Unregister "${b.name}" from Pandago?\n\nThis removes its outlet from Pandago but keeps the Ruby+ business intact. Delivery quoting through Pandago will no longer work for this business until an admin registers it again.`,
+      );
+      if (!confirmed) return;
+
+      setPandagoUnregistering(b._id);
+      try {
+        const res = await api.delivery.pandagoUnregisterBusiness(b._id);
+        const result = res?.data || res;
+        toast.success(
+          result?.alreadyAbsent
+            ? `"${b.name}" was already absent from Pandago and is now marked unregistered.`
+            : `"${b.name}" has been unregistered from Pandago.`,
+        );
+        await refetch();
+      } catch (err) {
+        const msg =
+          (err as any)?.response?.data?.error?.message ||
+          (err as any)?.message ||
+          'Could not unregister the Pandago outlet';
+        toast.error(msg);
+      } finally {
+        setPandagoUnregistering(null);
       }
     },
     [refetch],
@@ -1730,7 +1783,13 @@ export default function BusinessesPage() {
                         </td>
                         {/* Pandago — outlet registration status */}
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          <PandagoBadge business={b} onRegister={handlePandagoRegister} registering={pandagoRegistering === b._id} />
+                          <PandagoBadge
+                            business={b}
+                            onRegister={handlePandagoRegister}
+                            onUnregister={handlePandagoUnregister}
+                            registering={pandagoRegistering === b._id}
+                            unregistering={pandagoUnregistering === b._id}
+                          />
                         </td>
                         {/* Created */}
                         <td className="px-4 py-3 text-sm text-gray-500">{formatDate(b.createdAt)}</td>
@@ -3772,11 +3831,15 @@ function CacBadge({ status }: { status?: string }) {
 function PandagoBadge({
   business,
   onRegister,
+  onUnregister,
   registering,
+  unregistering,
 }: {
   business: Business;
   onRegister: (b: Business) => void;
+  onUnregister: (b: Business) => void;
   registering: boolean;
+  unregistering: boolean;
 }) {
   const outlet = business.pandagoOutlet;
   const status = outlet?.status || 'NOT_REGISTERED';
@@ -3786,6 +3849,7 @@ function PandagoBadge({
     PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
     FAILED: 'bg-red-50 text-red-700 border-red-200',
     STALE: 'bg-orange-50 text-orange-700 border-orange-200',
+    UNREGISTERED: 'bg-slate-100 text-slate-600 border-slate-200',
     NOT_REGISTERED: 'bg-gray-50 text-gray-500 border-gray-200',
   };
   const labels: Record<string, string> = {
@@ -3793,6 +3857,7 @@ function PandagoBadge({
     PENDING: 'Pending',
     FAILED: 'Failed',
     STALE: 'Stale',
+    UNREGISTERED: 'Unregistered',
     NOT_REGISTERED: 'Not registered',
   };
 
@@ -3806,7 +3871,9 @@ function PandagoBadge({
   // / the cron sync.
   const showRegisterButton =
     (isManualEligible && (status === 'NOT_REGISTERED' || status === 'STALE')) ||
-    status === 'FAILED';
+    status === 'FAILED' ||
+    status === 'UNREGISTERED';
+  const showUnregisterButton = status === 'ACTIVE';
 
   return (
     <div className="flex flex-col gap-1 min-w-0">
@@ -3843,9 +3910,24 @@ function PandagoBadge({
             ? 'Registering…'
             : status === 'NOT_REGISTERED'
               ? 'Register'
-              : status === 'FAILED'
-                ? 'Retry'
-                : 'Re-register'}
+            : status === 'FAILED'
+              ? 'Retry'
+                : status === 'UNREGISTERED'
+                  ? 'Register again'
+                  : 'Re-register'}
+        </button>
+      )}
+      {showUnregisterButton && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onUnregister(business);
+          }}
+          disabled={unregistering}
+          className="text-[10px] font-medium text-red-600 hover:text-red-700 disabled:opacity-50 hover:underline w-fit"
+          title="Remove this outlet from Pandago while retaining the Ruby+ business"
+        >
+          {unregistering ? 'Unregistering…' : 'Unregister'}
         </button>
       )}
       {status === 'FAILED' && outlet?.lastError && (

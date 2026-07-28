@@ -440,6 +440,7 @@ export const api = {
       }>("/auth/business/login", { method: "POST", body: data, noAuth: true }),
     requestMagicLink: (email: string) => request<{ message: string }>("/auth/business/magic-link", { method: "POST", body: { email }, noAuth: true }),
     consumeMagicLink: (token: string) => request<any>("/auth/business/magic-link/consume", { method: "POST", body: { token }, noAuth: true }),
+    consumeAdminAssistedLogin: (handoffToken: string) => request<any>("/auth/business/admin-assisted-login/consume", { method: "POST", body: { handoffToken }, noAuth: true }),
 
     // Google + Apple sign-in (identity token exchange). Web sends the
     // ID token from Google Identity Services (or Apple JS SDK on Safari)
@@ -1346,6 +1347,10 @@ export const api = {
 
   // Businesses
   businesses: {
+    startAssistedDashboard: (businessId: string) =>
+      request<{ handoffToken: string; expiresIn: number }>("/auth/admin/assisted-business-login", {
+        method: "POST", body: { businessId },
+      }),
     list: (params?: import("@/lib/types").BusinessFilterParams) =>
       request<import("@/lib/types").Business[]>("/admin/businesses", {
         params: params as Record<string, string | number | boolean | undefined>,
@@ -1633,6 +1638,11 @@ export const api = {
       request<{ status: 'ACTIVE' | 'FAILED'; error?: string }>(
         `/admin/delivery/pandago/businesses/${businessId}/register`,
         { method: "POST" },
+      ),
+    pandagoUnregisterBusiness: (businessId: string) =>
+      request<{ status: 'UNREGISTERED'; alreadyAbsent: boolean }>(
+        `/admin/delivery/pandago/businesses/${businessId}/register`,
+        { method: "DELETE" },
       ),
   },
 

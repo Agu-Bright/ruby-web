@@ -655,13 +655,15 @@ export interface Business {
   branchCount?: number;
   // Pandago / Glovo outlet registration
   pandagoOutlet?: {
-    status: 'NOT_REGISTERED' | 'PENDING' | 'ACTIVE' | 'FAILED' | 'STALE';
+    status: 'NOT_REGISTERED' | 'PENDING' | 'ACTIVE' | 'FAILED' | 'STALE' | 'UNREGISTERED';
     isLegacy: boolean;
     registeredAt?: string;
     registeredCoordinates?: { lat: number; lng: number };
     lastAttemptAt?: string;
     lastError?: string;
     attemptCount: number;
+    unregisteredAt?: string;
+    unregisteredByAdminId?: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -1585,7 +1587,7 @@ export interface BusinessFilterParams extends PaginationParams {
   // BusinessQueryDto field of the same name. All optional.
   subcategoryId?: string;
   cacStatus?: CacDocumentStatus;
-  pandagoStatus?: 'NOT_REGISTERED' | 'PENDING' | 'ACTIVE' | 'FAILED' | 'STALE';
+  pandagoStatus?: 'NOT_REGISTERED' | 'PENDING' | 'ACTIVE' | 'FAILED' | 'STALE' | 'UNREGISTERED';
   isClaimed?: boolean;
   isFeatured?: boolean;
   isVerified?: boolean;
@@ -2649,6 +2651,8 @@ export interface SystemAlertRecipient {
   label?: string;
   isActive: boolean;
   alerts: {
+    /** Every platform notification: orders, bookings, delivery, disputes, etc. */
+    allNotifications: boolean;
     adPayment: boolean;
     payoutRequested: boolean;
     businessSubmission: boolean;

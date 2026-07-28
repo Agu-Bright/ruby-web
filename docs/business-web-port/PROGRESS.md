@@ -44,6 +44,62 @@
 
 ## Session log (append-only)
 
+### 2026-07-28 — One-click admin login to selected business dashboard
+
+**What works:** Admin Businesses now starts a short-lived secure handoff and opens the selected merchant's real `business.rubyplus.net` dashboard in a new tab. The business subdomain exchanges the 60-second handoff proof for a 15-minute assisted session; neither the admin bearer nor an owner password/token crosses origins. `SUPER_ADMIN` receives the normal dashboard. `LOCATION_ADMIN` and `SUPPORT` receive a server-enforced limited session for profile, media, operating hours and catalogue support, and the business sidebar only exposes those areas.
+
+**Security:** The backend verifies the selected business against the admin's location scope before issuing a handoff. The assisted token is tagged with the staff role, and `JwtAuthGuard` rejects restricted-session calls to finance, payouts, wallets, bank accounts, security/auth, ownership, branches, staff, ads, events, operations, chat and similar protected areas. Creating the assisted session is recorded in the audit log with the actual admin actor.
+
+**Files touched:** `C:/Users/DELL/Desktop/ruby-plus-backend/src/modules/auth/{auth.controller.ts,auth.service.ts,dto/index.ts,strategies/jwt.strategy.ts,guards/jwt-auth.guard.ts}`, `src/lib/{api/client.ts,business-auth/business-auth-context.tsx}`, `src/components/business/BusinessSidebar.tsx`, `src/app/{ruby-app/admin/(dashboard)/businesses/page.tsx,business/admin-assisted-login/page.tsx}`, `docs/business-web-port/PROGRESS.md`.
+
+**Next task for next agent:** Run an authenticated browser smoke test from Admin Businesses with each role, then extend server-side field-level profile allowlisting if new assisted profile fields are introduced.
+
+### 2026-07-28 — Customer cancellation cut-off at Ready
+
+**What works:** Customers can now cancel only while an order is `PLACED`, `ACCEPTED` or `PREPARING`. Once it is `READY`, the customer cancellation endpoint rejects the request with a support-directed message, and the customer mobile order-detail screen no longer renders a Cancel Order control. Business and admin cancellation permissions at Ready are unchanged for operational exceptions.
+
+**Files touched:** `src/modules/orders/orders.service.ts`, `C:/Users/DELL/Desktop/ruby-app-mobile/app/(main)/order/[id].tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** Backend `tsc --noEmit -p tsconfig.json` passed with zero errors. Customer mobile `tsc --noEmit` reports existing unrelated project-wide errors (including onboarding animation types, colours/theme literals, booking and dispatch screens); the edited order-detail file is not among them.
+
+**Next task for next agent:** Deploy backend and customer app OTA, then confirm at `READY` the customer sees no cancellation control and receives the API support message if attempting a stale/manual request.
+
+### 2026-07-28 — Paid order cancellation refunds
+
+**What works:** Rejecting a paid order or cancelling a paid order through the customer, business or admin route now returns the full amount paid to the customer’s Ruby+ wallet. The order payment status becomes `REFUNDED`; customer cancellation/rejection notifications explicitly confirm that the refund was issued.
+
+**Safety and accounting:** A transaction-backed refund creates an idempotent customer wallet credit, reverses the merchant’s net merchandise settlement, and updates any linked Payment record. The platform-held delivery/service/tax component is not charged to the merchant, while the customer still receives the full original payment. Refund processing happens before the terminal order status is written, so a paid order cannot be finalised as cancelled/rejected if funds could not be moved safely. Repeating a request cannot double-credit the customer.
+
+**Files touched:** `src/modules/orders/orders.service.ts`, `src/modules/wallets/wallets.service.ts`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** Backend `tsc --noEmit -p tsconfig.json` passed with zero errors.
+
+**Next task for next agent:** Deploy and test a wallet-paid and a Paystack-paid order in a non-production environment. Confirm one customer refund ledger credit, one merchant settlement reversal, Payment/Order `REFUNDED` status, and the refund notification/email.
+
+### 2026-07-28 — Admin Pandago outlet unregister control
+
+**What works:** The Admin Businesses Pandago column now provides an **Unregister** action for ACTIVE outlets. It requires confirmation, removes the outlet from Pandago, and keeps the Ruby+ business record intact. A successful removal is visibly marked **Unregistered**, and an admin can later use **Register again** to deliberately restore the outlet.
+
+**Safety and audit:** The endpoint is SUPER_ADMIN-only. It records the actual admin actor and Pandago response status in the audit log. Unregistered outlets are excluded from the approval auto-register path and cron backfills, and their vendor ID is omitted from new Pandago delivery requests. The local state is changed only after Pandago confirms removal (or confirms it was already absent).
+
+**Files touched:** `src/common/interfaces/index.ts`, `src/modules/{businesses/businesses.service.ts,businesses/schemas/business.schema.ts,delivery/delivery.controller.ts,delivery/adapters/glovo-delivery.adapter.ts,delivery/services/pandago-outlets.service.ts}`, `src/lib/{api/client.ts,types.ts}`, `src/app/ruby-app/admin/(dashboard)/businesses/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** Backend `tsc --noEmit -p tsconfig.json` passed with zero errors. Web `tsc --noEmit -p tsconfig.json` passed with zero errors.
+
+**Next task for next agent:** Deploy both services and test an ACTIVE outlet with Pandago sandbox/production credentials: confirm it becomes Unregistered, delivery payloads omit `client_vendor_id`, and Register again restores it.
+
+### 2026-07-28 — Admin platform notification email settings
+
+**What works:** Admin **System Alerts** is now presented as **Notification settings**. Admins can add and manage a list of email recipients, with a new **All platform notifications** option enabled by default. Every persisted platform notification now fans out to enabled addresses by email, including the notification created when a customer places an order. This also covers notification-driven booking, delivery, dispute, customer and business updates.
+
+**Design decisions:** The recipient list remains the existing auditable System Alert recipient collection rather than introducing a competing settings store. Existing recipient records are treated as opted in to the new general setting until an admin changes them, preventing a deployment from silently removing operational emails. Recipient lookups and mail delivery are fire-and-forget, so placing an order is never delayed or failed by SMTP.
+
+**Files touched:** `src/modules/notifications/{notifications.service.ts,schemas/system-alert-recipient.schema.ts,dto/system-alert-recipient.dto.ts,services/system-alert-recipients.service.ts}`, `src/lib/types.ts`, `src/app/ruby-app/admin/(dashboard)/system-alerts/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** Backend `tsc --noEmit -p tsconfig.json` passed with zero errors. Web `tsc --noEmit -p tsconfig.json` passed with zero errors.
+
+**Next task for next agent:** Deploy the backend and web together, add the intended operations addresses in Admin → Notification settings, then place a test order and confirm the configured inbox receives the email.
+
 ### 2026-07-27 — Admin order timeline rider attribution
 
 **What works:** The Admin Order Details timeline now shows the actual assigned rider on the right-hand detail card for delivery assignment and rider-progress events. It displays the rider's name, phone number and available vehicle/plate information. The existing admin delivery socket events already refetch the order/delivery detail on assignment and status changes, so the named rider appears in real time without a manual refresh.

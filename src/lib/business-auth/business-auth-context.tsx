@@ -59,6 +59,8 @@ export interface BusinessUser {
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
   phoneVerifiedAt?: string;
+  isAssisted?: boolean;
+  assistedRole?: 'SUPER_ADMIN' | 'LOCATION_ADMIN' | 'SUPPORT';
 }
 
 export type BusinessModel = 'ORDER_DELIVERY' | 'VISIT_ONLY' | 'BOOKING_VISIT';
@@ -111,6 +113,7 @@ interface BusinessAuthContextValue {
     hasBusinesses: boolean;
     business: SelectedBusiness | null;
   }>;
+  loginWithAssistedSession: (data: any) => void;
   logout: () => void;
   setBusiness: (b: SelectedBusiness | null) => void;
 
@@ -321,6 +324,24 @@ export function BusinessAuthProvider({ children }: { children: React.ReactNode }
     [refreshBusinessProfile],
   );
 
+  const loginWithAssistedSession = useCallback((data: any) => {
+    const accessToken = data?.accessToken;
+    const nextBusiness = data?.business
+      ? { _id: data.business._id || data.business.id, name: data.business.name, status: data.business.status as BusinessStatus | undefined }
+      : null;
+    if (!accessToken || !nextBusiness?._id || !data?.user) throw new Error('The assisted session could not be started.');
+    const nextUser: BusinessUser = { _id: data.user._id || data.user.id, email: data.user.email, firstName: data.user.firstName, lastName: data.user.lastName, isAssisted: true, assistedRole: data.user.assistedRole };
+    localStorage.setItem(BIZ_ACCESS_TOKEN_KEY, accessToken);
+    localStorage.removeItem(BIZ_REFRESH_TOKEN_KEY);
+    localStorage.setItem(BIZ_USER_KEY, JSON.stringify(nextUser));
+    localStorage.setItem(BIZ_SELECTED_BUSINESS_KEY, JSON.stringify(nextBusiness));
+    localStorage.setItem('ruby_access_token', accessToken);
+    localStorage.removeItem('ruby_refresh_token');
+    setUser(nextUser);
+    setBusinessState(nextBusiness);
+    void refreshBusinessProfile();
+  }, [refreshBusinessProfile]);
+
   const logout = useCallback(() => {
     clearBusinessTokens();
     setUser(null);
@@ -357,6 +378,7 @@ export function BusinessAuthProvider({ children }: { children: React.ReactNode }
       isAuthenticated: !!user,
       isLoading,
       login,
+      loginWithAssistedSession,
       logout,
       setBusiness,
       refreshBusinessProfile,
@@ -367,6 +389,7 @@ export function BusinessAuthProvider({ children }: { children: React.ReactNode }
       business,
       isLoading,
       login,
+      loginWithAssistedSession,
       logout,
       setBusiness,
       refreshBusinessProfile,

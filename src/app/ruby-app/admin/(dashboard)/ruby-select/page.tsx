@@ -35,6 +35,8 @@ function emptyForm(): CreateRubySelectPostRequest {
     title: '',
     subtitle: '',
     imageUrl: '',
+    mediaType: 'IMAGE',
+    videoUrl: '',
     ctaUrl: '',
     ctaLabel: '',
     locationIds: [],
@@ -50,6 +52,8 @@ function postToForm(p: RubySelectPost): CreateRubySelectPostRequest {
     title: p.title,
     subtitle: p.subtitle || '',
     imageUrl: p.imageUrl,
+    mediaType: p.mediaType || 'IMAGE',
+    videoUrl: p.videoUrl || '',
     ctaUrl: p.ctaUrl || '',
     ctaLabel: p.ctaLabel || '',
     locationIds: p.locationIds || [],
@@ -72,6 +76,7 @@ export default function RubySelectPage() {
   const [tab, setTab] = useState<FilterTab>('ALL');
   const [editor, setEditor] = useState<EditorState>({ open: false, post: null });
   const [form, setForm] = useState<CreateRubySelectPostRequest>(emptyForm());
+  const [videoUploading, setVideoUploading] = useState(false);
 
   const listParams = useMemo(
     () => ({ status: tab === 'ALL' ? undefined : tab, limit: 100 }),
@@ -116,8 +121,8 @@ export default function RubySelectPage() {
       toast.error('Title is required');
       return;
     }
-    if (!form.imageUrl?.trim()) {
-      toast.error('Upload a hero image');
+    if (form.mediaType === 'VIDEO' ? !form.videoUrl?.trim() : !form.imageUrl?.trim()) {
+      toast.error(form.mediaType === 'VIDEO' ? 'Upload a video clip' : 'Upload a hero image');
       return;
     }
     const payload: CreateRubySelectPostRequest = {
@@ -324,13 +329,26 @@ export default function RubySelectPage() {
         }
       >
         <div className="space-y-5">
-          <ImageUpload
-            label="Hero image"
-            helpText="16:9 banner art. Min 600px wide."
-            folder="ruby-select"
-            value={form.imageUrl}
-            onChange={(url) => setForm((f) => ({ ...f, imageUrl: url || '' }))}
-          />
+          <div className="flex gap-2 rounded-lg bg-gray-100 p-1">
+            {(['IMAGE', 'VIDEO'] as const).map((mediaType) => (
+              <button key={mediaType} type="button" onClick={() => setForm((f) => ({ ...f, mediaType }))}
+                className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold ${form.mediaType === mediaType ? 'bg-white text-ruby-red shadow-sm' : 'text-gray-600'}`}>
+                {mediaType === 'IMAGE' ? 'Image banner' : 'Muted video clip'}
+              </button>
+            ))}
+          </div>
+          {form.mediaType === 'VIDEO' ? (
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">Video clip</label>
+              <input type="file" accept="video/mp4,video/webm,video/quicktime" disabled={videoUploading}
+                onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 50 * 1024 * 1024) { toast.error('Video must be 50MB or smaller'); return; } try { setVideoUploading(true); const res = await api.media.upload(file, 'ruby-select'); setForm((f) => ({ ...f, videoUrl: res.data.url })); toast.success('Video uploaded'); } catch (err: any) { toast.error(err?.message || 'Video upload failed'); } finally { setVideoUploading(false); } }}
+                className="block w-full rounded-lg border border-gray-300 p-2 text-sm" />
+              <p className="mt-1 text-[11px] text-gray-500">MP4/WebM, up to 50MB. Customer playback is muted and loops automatically.</p>
+              {form.videoUrl ? <p className="mt-2 text-xs text-emerald-600">Video ready to publish.</p> : null}
+            </div>
+          ) : (
+            <ImageUpload label="Hero image" helpText="16:9 banner art. Min 600px wide." folder="ruby-select" value={form.imageUrl} onChange={(url) => setForm((f) => ({ ...f, imageUrl: url || '' }))} />
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">

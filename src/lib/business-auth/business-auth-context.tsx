@@ -34,6 +34,7 @@ import React, {
   useState,
 } from 'react';
 import { api } from '@/lib/api';
+import type { CustomField } from '@/lib/types';
 
 // ─── Storage keys ──────────────────────────────────────────────────────
 export const BIZ_ACCESS_TOKEN_KEY = 'ruby_business_access_token';
@@ -70,7 +71,7 @@ export interface PopulatedSubcategory {
   name?: string;
   slug?: string;
   businessModel?: BusinessModel;
-  productFields?: unknown[];
+  productFields?: CustomField[];
   serviceFields?: unknown[];
   allowedFulfillmentModes?: string[];
 }
@@ -91,6 +92,8 @@ export interface SelectedBusiness {
   businessModel?: BusinessModel;
   sellsProducts?: boolean;
   subcategoryId?: string;
+  subcategorySlug?: string;
+  productFields?: CustomField[];
   categoryId?: string;
   locationId?: string;
 
@@ -186,6 +189,8 @@ export function BusinessAuthProvider({ children }: { children: React.ReactNode }
         subcategoryId:
           populatedSub?._id ??
           (typeof sub === 'string' ? sub : current.subcategoryId),
+        subcategorySlug: populatedSub?.slug ?? current.subcategorySlug,
+        productFields: populatedSub?.productFields ?? current.productFields,
         categoryId:
           typeof profile.categoryId === 'object'
             ? profile.categoryId?._id

@@ -1833,7 +1833,9 @@ export interface Promo {
   _id: string;
   title: string;
   description?: string;
-  imageUrl: string;
+  imageUrl?: string;
+  mediaType?: 'IMAGE' | 'VIDEO';
+  videoUrl?: string;
   linkType: 'BUSINESS' | 'EXTERNAL' | 'IN_APP';
   businessId?: string | { _id: string; name: string; slug: string; logoUrl?: string };
   externalUrl?: string;
@@ -2844,7 +2846,9 @@ export interface RubySelectPost {
   _id: string;
   title: string;
   subtitle?: string;
-  imageUrl: string;
+  imageUrl?: string;
+  mediaType?: 'IMAGE' | 'VIDEO';
+  videoUrl?: string;
   ctaUrl?: string;
   ctaLabel?: string;
   /** Empty array = global; non-empty = scoped to these cities */
@@ -2862,7 +2866,9 @@ export interface RubySelectPost {
 export interface CreateRubySelectPostRequest {
   title: string;
   subtitle?: string;
-  imageUrl: string;
+  imageUrl?: string;
+  mediaType?: 'IMAGE' | 'VIDEO';
+  videoUrl?: string;
   ctaUrl?: string;
   ctaLabel?: string;
   locationIds?: string[];

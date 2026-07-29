@@ -80,6 +80,18 @@
 
 **Next task for next agent:** Run an authenticated browser smoke test from Admin Businesses with each role, then extend server-side field-level profile allowlisting if new assisted profile fields are introduced.
 
+### 2026-07-28 — Admin-assisted dashboard blank-tab fix
+
+**What works:** The Admin Businesses action now opens a synchronously-created temporary tab, obtains the one-time assisted-login proof, and navigates that same tab to the selected merchant dashboard. The tab no longer remains at `about:blank`.
+
+**Root cause and design decision:** The previous synchronous `window.open` included `noopener,noreferrer`. Chromium can return a null `WindowProxy` for that form, so the asynchronous callback had no tab to redirect. The tab is now opened as `about:blank`, verified, navigated with `location.replace`, and then has its opener severed before the cross-origin business dashboard loads.
+
+**Files touched:** `src/app/ruby-app/admin/(dashboard)/businesses/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** `tsc --noEmit -p tsconfig.json` passed with zero errors.
+
+**Next task for next agent:** After deployment, browser-smoke the action from `zadmin.rubyplus.net` and confirm the target is `business.rubyplus.net/business/admin-assisted-login?token=…` before the dashboard redirect.
+
 ### 2026-07-28 — Customer cancellation cut-off at Ready
 
 **What works:** Customers can now cancel only while an order is `PLACED`, `ACCEPTED` or `PREPARING`. Once it is `READY`, the customer cancellation endpoint rejects the request with a support-directed message, and the customer mobile order-detail screen no longer renders a Cancel Order control. Business and admin cancellation permissions at Ready are unchanged for operational exceptions.
@@ -976,6 +988,40 @@ _As decisions get made that deviate from or extend PLAN.md, log them here with t
 **Next task for next agent:** Deploy both backend and web changes together, then confirm that an `IN_TRANSIT` Pandago job renders as `IN TRANSIT` in the admin order table.
 
 **2026-07-24 · Pre-M0** — Route structure uses flat paths (`/business/login`, `/business/dashboard/*`) instead of route groups (`(auth)/…`, `(dashboard)/…`). Reason: `/business/` root is already the marketing landing (page.tsx exists), so a `(public)/page.tsx` and `(dashboard)/page.tsx` would conflict. Flat URLs are also easier to read.
+
+---
+
+### 2026-07-29 — M4 product editor parity corrective slice
+
+**What works**
+
+- The business web product editor now accepts a batch of product photos by file picker or drag-and-drop, uploads them to the existing media service, retains up to eight images, and lets the merchant choose the primary image.
+- The form now captures the mobile-equivalent core product contract: category, stock and availability scheduling, variation selection mode and required state, option SKU/availability, add-on availability/maximum quantity, and food-only nutrition.
+- Category-specific fields are sourced from the business's populated subcategory configuration and saved in product `metadata`, matching the platform's configurable product-field templates instead of duplicating fields in the web UI.
+
+**Design decisions**
+
+- Photo uploads remain direct uploads to the existing `/media` API, so the same storage, validation, and product image schema are used by mobile and web.
+- Product field templates are hydrated from the authoritative backend subcategory configuration on login/profile refresh. This ensures future admin template changes appear on web without another frontend release.
+
+**Files touched**
+
+- `src/components/business/products/ProductImageGallery.tsx`
+- `src/components/business/products/DynamicProductFields.tsx` (new)
+- `src/components/business/products/ProductEditor.tsx`
+- `src/lib/business-auth/business-auth-context.tsx`
+
+**Deferred items**
+
+- The mobile app also contains a static profile-hint layer around its field templates. The web now captures the same backend-supported fields and payload, but a visual profile/hint catalogue should be extracted into shared data in a later cleanup rather than copied into two apps again.
+
+**Verification**
+
+- Static source review completed.
+- TypeScript command could not run in this environment: Node/npm is absent from `PATH`; direct local `tsc.cmd` also fails because it cannot find `node`.
+- Browser walk-through is pending until the local Node runtime is restored.
+
+**Next task for next agent:** Restore Node on the workstation, run `npx tsc --noEmit -p tsconfig.json`, then open `/business/dashboard/products/create` as a merchant and verify a multi-photo product persists correctly on refresh and in the mobile business app.
 
 ---
 

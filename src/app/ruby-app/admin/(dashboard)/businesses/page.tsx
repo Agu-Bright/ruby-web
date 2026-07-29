@@ -129,15 +129,25 @@ function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
 
   const openBusinessDashboard = async () => {
     // Open synchronously so browser popup protection cannot block the new tab.
-    const target = window.open('', '_blank', 'noopener,noreferrer');
+    // Do not use `noopener` here: Chromium returns a null WindowProxy for a
+    // noopener popup, which leaves the visible tab at about:blank once the
+    // asynchronous handoff token request finishes.
+    const target = window.open('about:blank', '_blank');
+    if (!target) {
+      toast.error('Your browser blocked the business dashboard tab. Allow popups and try again.');
+      return;
+    }
     setOpeningDashboard(true);
     try {
       const response = await api.businesses.startAssistedDashboard(business._id);
       const token = response.data?.handoffToken;
       if (!token) throw new Error('Could not create a secure business session.');
       const url = `${businessLink('/admin-assisted-login')}?token=${encodeURIComponent(token)}`;
-      if (target) target.location.href = url;
-      else window.open(url, '_blank', 'noopener,noreferrer');
+      if (target.closed) throw new Error('The business dashboard tab was closed before it could open.');
+      // The new tab has no need to retain a reference to the admin origin
+      // after this one-time navigation.
+      try { target.opener = null; } catch { /* Browser may already isolate it. */ }
+      target.location.replace(url);
       setOpen(false);
     } catch (error: any) {
       target?.close();

@@ -81,7 +81,7 @@ export default function PromosPage() {
     setFormData({
       title: promo.title,
       description: promo.description || '',
-      imageUrl: promo.imageUrl,
+      imageUrl: promo.imageUrl || '',
       linkType: promo.linkType,
       businessId: typeof promo.businessId === 'object' ? promo.businessId?._id || '' : promo.businessId || '',
       externalUrl: promo.externalUrl || '',

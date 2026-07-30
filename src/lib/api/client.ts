@@ -3385,6 +3385,15 @@ export const api = {
         "/admin/ruby-quest/config",
         { method: "PATCH", body: data },
       ),
+    sendTestDailyPrompt: (email: string) =>
+      request<{
+        notificationId: string;
+        recipient: { id: string; email: string };
+        hasLiveDrop: boolean;
+      }>("/admin/ruby-quest/test-daily-prompt", {
+        method: "POST",
+        body: { email },
+      }),
   },
 };
 

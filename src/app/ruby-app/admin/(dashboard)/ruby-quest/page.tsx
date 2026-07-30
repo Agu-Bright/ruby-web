@@ -1319,6 +1319,7 @@ function ConfigTab() {
     [],
   );
   const [form, setForm] = useState<Partial<RubyQuestConfig>>({});
+  const [testEmail, setTestEmail] = useState('');
 
   const { mutate: doSave, isLoading: saving } = useMutation(
     () => api.rubyQuest.updateConfig(form),
@@ -1329,6 +1330,17 @@ function ConfigTab() {
         refetch();
       },
       onError: (m) => toast.error(m),
+    },
+  );
+
+  const { mutate: sendTestPrompt, isLoading: sendingTestPrompt } = useMutation(
+    () => api.rubyQuest.sendTestDailyPrompt(testEmail.trim()),
+    {
+      onSuccess: (result) => {
+        toast.success(`Test Ruby Quest push sent to ${result.recipient.email}`);
+        setTestEmail('');
+      },
+      onError: (message) => toast.error(message),
     },
   );
 
@@ -1390,6 +1402,40 @@ function ConfigTab() {
             }`}
           />
         </button>
+      </div>
+
+      <div className="card p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-gray-800">Test daily Ruby Quest prompt</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Sends the real daily push to one customer device. Tapping it opens the Ruby Quest launch modal.
+            </p>
+          </div>
+          <div className="flex w-full gap-2 sm:w-auto sm:min-w-[430px]">
+            <input
+              type="email"
+              value={testEmail}
+              onChange={(event) => setTestEmail(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && testEmail.trim()) sendTestPrompt();
+              }}
+              placeholder="Customer app email"
+              className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-ruby-500"
+            />
+            <button
+              type="button"
+              onClick={() => sendTestPrompt()}
+              disabled={!testEmail.trim() || sendingTestPrompt}
+              className="shrink-0 rounded-lg bg-ruby-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {sendingTestPrompt ? 'Sending…' : 'Send test push'}
+            </button>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-amber-700">
+          The customer must have opened the customer app and allowed notifications. Create a live Ruby drop first so the Quest map has something to show.
+        </p>
       </div>
 
       <div className="card p-4">

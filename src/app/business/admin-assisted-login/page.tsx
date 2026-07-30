@@ -11,6 +11,9 @@ function AssistedLoginContent() {
   const { loginWithAssistedSession } = useBusinessAuth();
   const [message, setMessage] = useState('Opening the selected business dashboard securely…');
   useEffect(() => {
+    // The destination can safely sever the relationship only after the admin
+    // tab has completed its cross-origin navigation to this page.
+    try { window.opener = null; } catch { /* Browser may forbid reassignment. */ }
     const handoffToken = params.get('token');
     if (!handoffToken) { setMessage('This assisted-login link is invalid. Return to Admin and try again.'); return; }
     api.businessAuth.consumeAdminAssistedLogin(handoffToken)

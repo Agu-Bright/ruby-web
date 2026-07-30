@@ -1073,6 +1073,18 @@ _Appended by each session so a fresh agent can `git diff` intelligently._
 - `src/components/business/dashboard/PayViaRubyBanner.tsx` — NEW gradient nudge to share Ruby Pay QR
 - `src/app/business/dashboard/page.tsx` — REWRITTEN placeholder → real M1 dashboard (greeting + status bar + stat row + pay banner + 4-tile quick actions)
 
+### 2026-07-29 — Admin-assisted dashboard blank-tab navigation correction
+
+**What works:** The Admin Businesses action keeps its synchronously-created tab alive while the API generates the selected merchant's short-lived assisted-login proof, then navigates that same tab to `business.rubyplus.net/admin-assisted-login?token=…`. The destination consumes the proof and opens the selected merchant's dashboard session.
+
+**Root cause and design decision:** The previous implementation cleared `target.opener` while the tab was still `about:blank`, before attempting the cross-origin navigation. Chromium can invalidate that window proxy in this state, leaving the visible tab on `about:blank`. The admin now keeps the proxy intact through `target.location.href`; the business destination clears its own opener only after it has loaded. The temporary tab also has an explicit secure-opening message while the 60-second proof is requested.
+
+**Files touched:** `src/app/ruby-app/admin/(dashboard)/businesses/page.tsx`, `src/app/business/admin-assisted-login/page.tsx`, `docs/business-web-port/PROGRESS.md`.
+
+**Verification:** `pnpm exec tsc --noEmit -p tsconfig.json` completed with two pre-existing errors in `src/app/ruby-app/admin/(dashboard)/promos/page.tsx` and `src/components/business/products/ProductEditor.tsx`; neither is in this change. No diagnostics were reported for the edited handoff files. Deploy and browser-smoke from Admin Businesses: the new tab must first show the opening message, then load `https://business.rubyplus.net/admin-assisted-login?token=…`, then redirect to the selected business dashboard.
+
+**Next task for next agent:** Run the authenticated production browser smoke test with SUPER_ADMIN, LOCATION_ADMIN and SUPPORT to confirm the selected business and role restrictions are applied correctly.
+
 **M0 core (2026-07-24):**
 - `src/lib/api/client.ts` — extended with `api.businessAuth.*` namespace (login / google / apple / forgotPassword / resetPassword / refresh / me / logout)
 - `src/lib/business-auth/business-auth-context.tsx` — NEW BusinessAuthProvider + useBusinessAuth hook with separate localStorage keys

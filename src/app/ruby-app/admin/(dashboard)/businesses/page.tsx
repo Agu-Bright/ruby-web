@@ -128,10 +128,8 @@ function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
   const [openingDashboard, setOpeningDashboard] = useState(false);
 
   const openBusinessDashboard = async () => {
-    // Open synchronously so browser popup protection cannot block the new tab.
-    // Do not use `noopener` here: Chromium returns a null WindowProxy for a
-    // noopener popup, which leaves the visible tab at about:blank once the
-    // asynchronous handoff token request finishes.
+    // Open synchronously so popup protection cannot block the new tab while
+    // the API creates the short-lived handoff token.
     const target = window.open('about:blank', '_blank');
     if (!target) {
       toast.error('Your browser blocked the business dashboard tab. Allow popups and try again.');
@@ -139,15 +137,21 @@ function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
     }
     setOpeningDashboard(true);
     try {
+      // Keep this WindowProxy intact until after its cross-origin navigation.
+      // Clearing target.opener while it is still about:blank can leave
+      // Chromium with no usable handle to redirect the visible tab.
+      target.document.title = 'Opening Ruby+ Business';
+      if (target.document.body) {
+        target.document.body.textContent = 'Opening the selected business dashboard securely…';
+      }
       const response = await api.businesses.startAssistedDashboard(business._id);
       const token = response.data?.handoffToken;
       if (!token) throw new Error('Could not create a secure business session.');
       const url = `${businessLink('/admin-assisted-login')}?token=${encodeURIComponent(token)}`;
       if (target.closed) throw new Error('The business dashboard tab was closed before it could open.');
-      // The new tab has no need to retain a reference to the admin origin
-      // after this one-time navigation.
-      try { target.opener = null; } catch { /* Browser may already isolate it. */ }
-      target.location.replace(url);
+      // This is deliberately a browser navigation rather than Next.js routing:
+      // business.rubyplus.net is a separate dashboard origin.
+      target.location.href = url;
       setOpen(false);
     } catch (error: any) {
       target?.close();

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Poppins, Playfair_Display } from 'next/font/google';
 import '@/styles/globals.css';
+import ChunkReloadGuard from '@/components/ChunkReloadGuard';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -29,7 +30,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${poppins.variable} ${playfair.variable}`}>
-      <body className="font-poppins antialiased">{children}</body>
+      <body className="font-poppins antialiased">
+        <ChunkReloadGuard />
+        {children}
+      </body>
     </html>
   );
 }

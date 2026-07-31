@@ -843,6 +843,9 @@ export const api = {
   },
   businessRubyQuest: {
     subscribe: (data: any) => request<any>('/business/ruby-quest/subscribe', { method: 'POST', body: data }),
+    initializePaystack: (data: { businessId: string; tier: string; email: string; callbackUrl?: string }) => request<any>('/business/ruby-quest/paystack/initialize', { method: 'POST', body: data }),
+    verifyPaystack: (data: { businessId: string; reference: string }) => request<any>('/business/ruby-quest/paystack/verify', { method: 'POST', body: data }),
+    setAutoRenew: (campaignId: string, autoRenew: boolean) => request<any>(`/business/ruby-quest/${campaignId}/auto-renew`, { method: 'POST', body: { autoRenew } }),
     pause: (id: string) => request<any>(`/business/ruby-quest/pause/${id}`, { method: 'POST', body: {} }),
     resume: (id: string) => request<any>(`/business/ruby-quest/resume/${id}`, { method: 'POST', body: {} }),
     analytics: (businessId: string) => request<any>('/business/ruby-quest/analytics', { params: { businessId } }),
@@ -1584,7 +1587,7 @@ export const api = {
       }),
     updateStatus: (id: string, status: string, note?: string) =>
       request<import("@/lib/types").Order>(`/admin/orders/${id}/status`, {
-        method: "PATCH",
+        method: "PUT",
         body: { status, note },
       }),
     stats: (params?: { locationId?: string; businessId?: string; startDate?: string; endDate?: string }) =>
@@ -3394,6 +3397,40 @@ export const api = {
         method: "POST",
         body: { email },
       }),
+
+    // ── Merchant subscriptions ────────────────────────────────────
+    // Ops view of the Ruby Quest billing table — wallet + Paystack
+    // subs side-by-side, with force-pause/resume when a merchant
+    // reports a billing issue.
+    listSubscriptions: (params?: {
+      status?: string;
+      tier?: string;
+      paymentSource?: "WALLET" | "PAYSTACK";
+      businessId?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }) =>
+      request<{
+        items: import("@/lib/types").RubyQuestAdminSubscription[];
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+      }>("/admin/ruby-quest/subscriptions", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
+    getSubscription: (id: string) =>
+      request<import("@/lib/types").RubyQuestAdminSubscription>(
+        `/admin/ruby-quest/subscriptions/${id}`,
+      ),
+    pauseSubscription: (id: string, reason?: string) =>
+      request<import("@/lib/types").RubyQuestAdminSubscription>(
+        `/admin/ruby-quest/subscriptions/${id}/pause`,
+        { method: "POST", body: { reason } },
+      ),
+    resumeSubscription: (id: string) =>
+      request<import("@/lib/types").RubyQuestAdminSubscription>(
+        `/admin/ruby-quest/subscriptions/${id}/resume`,
+        { method: "POST", body: {} },
+      ),
   },
 };
 

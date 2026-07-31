@@ -14,6 +14,12 @@ import {
   Clock,
   XCircle,
   Sparkles,
+  CreditCard,
+  Wallet,
+  Search,
+  Play,
+  Pause,
+  Loader2,
 } from 'lucide-react';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
@@ -28,6 +34,8 @@ import type {
   AdminPrizeQueueEntry,
   PrizeQueueStatus,
   RubyQuestConfig,
+  RubyQuestAdminSubscription,
+  RubyQuestSubscriptionStatus,
   CreateRubyQuestSpawnRequest,
   CreateRubyRewardConfigRequest,
 } from '@/lib/types';
@@ -46,7 +54,7 @@ import { toast } from 'sonner';
  * logs every state change already; frontend just needs the UX.
  */
 
-type Tab = 'spawns' | 'rewards' | 'prizes' | 'config';
+type Tab = 'spawns' | 'rewards' | 'prizes' | 'subscriptions' | 'config';
 
 const RARITIES: RubyRarity[] = ['COMMON', 'RARE', 'LEGENDARY'];
 
@@ -83,6 +91,15 @@ const REWARD_TYPES: RubyRewardType[] = [
   'SCRATCH_CARD',
   'MANUAL_PRIZE',
 ];
+
+const REWARD_TYPE_OPTIONS: Record<RubyRewardType, { label: string; help: string; valueLabel: string; valueHelp: string; fulfilsAutomatically: boolean }> = {
+  POINTS: { label: 'Ruby points', help: 'Credits Ruby points to the customer after a successful claim.', valueLabel: 'Points', valueHelp: 'Number of Ruby points to award.', fulfilsAutomatically: true },
+  WALLET_CREDIT: { label: 'Wallet credit', help: 'Credits the customer’s Ruby+ wallet after a successful claim.', valueLabel: 'Amount (₦)', valueHelp: 'Amount to credit in naira.', fulfilsAutomatically: true },
+  PERCENT_OFF: { label: 'Percentage discount', help: 'Creates an ops fulfilment task until automatic promo codes are available.', valueLabel: 'Discount (%)', valueHelp: 'Percentage from 0 to 100.', fulfilsAutomatically: false },
+  FREE_DELIVERY: { label: 'Free delivery', help: 'Creates an ops fulfilment task until automatic delivery vouchers are available.', valueLabel: 'Value', valueHelp: 'Leave as 0; this reward is fulfilled manually for now.', fulfilsAutomatically: false },
+  SCRATCH_CARD: { label: 'Scratch card', help: 'Creates an ops fulfilment task until scratch-card automation is available.', valueLabel: 'Value', valueHelp: 'Leave as 0; prize details go in the customer message.', fulfilsAutomatically: false },
+  MANUAL_PRIZE: { label: 'Manual prize', help: 'Adds a fulfilment task to the admin prize queue after a claim.', valueLabel: 'Value', valueHelp: 'Leave as 0 unless you use it for internal tracking.', fulfilsAutomatically: false },
+};
 
 function formatDate(v?: string | null): string {
   if (!v) return '—';
@@ -126,6 +143,7 @@ export default function AdminRubyQuestPage() {
             { id: 'spawns', label: 'Spawns', icon: Gem },
             { id: 'rewards', label: 'Reward pool', icon: Gift },
             { id: 'prizes', label: 'Prize queue', icon: Package },
+            { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
             { id: 'config', label: 'Config', icon: Settings },
           ].map((t) => {
             const Icon = t.icon;
@@ -151,6 +169,7 @@ export default function AdminRubyQuestPage() {
       {tab === 'spawns' && <SpawnsTab />}
       {tab === 'rewards' && <RewardsTab />}
       {tab === 'prizes' && <PrizesTab />}
+      {tab === 'subscriptions' && <SubscriptionsTab />}
       {tab === 'config' && <ConfigTab />}
     </div>
   );
@@ -382,7 +401,9 @@ function CreateSpawnModal({
 
   const rewardsForRarity = useMemo(
     () =>
-      (rewards?.items ?? []).filter((r) => r.rarity === rarity && r.isActive),
+      (rewards?.items ?? []).filter(
+        (r) => r.allowedRarities.includes(rarity) && r.isActive,
+      ),
     [rewards, rarity],
   );
 
@@ -750,14 +771,16 @@ function RewardsTab() {
       render: (r) => <span className="font-medium text-gray-900">{r.name}</span>,
     },
     {
-      key: 'rarity',
-      header: 'Rarity',
+      key: 'allowedRarities',
+      header: 'Eligible rubies',
       render: (r) => (
-        <span
-          className={`px-2 py-0.5 rounded-full border text-[11px] font-semibold ${RARITY_COLORS[r.rarity]}`}
-        >
-          {r.rarity}
-        </span>
+        <div className="flex flex-wrap gap-1">
+          {r.allowedRarities.map((rarity) => (
+            <span key={rarity} className={`px-2 py-0.5 rounded-full border text-[11px] font-semibold ${RARITY_COLORS[rarity]}`}>
+              {rarity}
+            </span>
+          ))}
+        </div>
       ),
     },
     {
@@ -776,11 +799,11 @@ function RewardsTab() {
       render: (r) => <span className="text-sm text-gray-600">{r.weight}</span>,
     },
     {
-      key: 'copy',
-      header: 'Customer copy',
+      key: 'description',
+      header: 'Customer message',
       render: (r) => (
         <span className="text-xs text-gray-500 line-clamp-1 max-w-xs">
-          {r.copy || '—'}
+          {r.description}
         </span>
       ),
     },
@@ -816,8 +839,8 @@ function RewardsTab() {
     <div className="space-y-4">
       <div className="card p-4 flex items-center justify-between">
         <p className="text-sm text-gray-600">
-          Weighted reward pool. Every LIVE spawn draws from active rewards of
-          its rarity, weighted by <code>weight</code>.
+          Every live ruby draws from active rewards that match its rarity. A
+          higher weight makes a matching reward more likely to be picked.
         </p>
         <button
           onClick={() => setShowCreate(true)}
@@ -865,18 +888,26 @@ function RewardFormModal({
   const isEdit = !!initial;
   const [form, setForm] = useState<CreateRubyRewardConfigRequest>({
     name: initial?.name || '',
+    description: initial?.description || '',
     type: initial?.type || 'POINTS',
-    rarity: initial?.rarity || 'COMMON',
     value: initial?.value ?? 100,
+    allowedRarities: initial?.allowedRarities || ['COMMON'],
     weight: initial?.weight ?? 1,
-    copy: initial?.copy || '',
+    redemptionInstructions: initial?.redemptionInstructions || '',
     isActive: initial?.isActive ?? true,
   });
+
+  const rewardType = REWARD_TYPE_OPTIONS[form.type];
+  const canUseValue = form.type === 'POINTS' || form.type === 'WALLET_CREDIT' || form.type === 'PERCENT_OFF';
+  const hasValidValue = !canUseValue || (
+    (form.value ?? 0) > 0 &&
+    (form.type !== 'PERCENT_OFF' || (form.value ?? 0) <= 100)
+  );
 
   const { mutate: doSubmit, isLoading } = useMutation(
     (payload: CreateRubyRewardConfigRequest) =>
       isEdit
-        ? api.rubyQuest.updateReward(initial!._id, payload)
+        ? api.rubyQuest.updateReward(initial!._id, (({ type: _type, ...update }) => update)(payload))
         : api.rubyQuest.createReward(payload),
     {
       onSuccess: () => {
@@ -905,6 +936,19 @@ function RewardFormModal({
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
           />
         </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+            Customer message
+          </label>
+          <textarea
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="e.g. You earned 100 Ruby points."
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none"
+          />
+          <p className="text-[11px] text-gray-500 mt-1">This is shown to the customer when the ruby is collected.</p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
@@ -915,51 +959,59 @@ function RewardFormModal({
               onChange={(e) =>
                 setForm({ ...form, type: e.target.value as RubyRewardType })
               }
+              disabled={isEdit}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
             >
               {REWARD_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {REWARD_TYPE_OPTIONS[t].label}
                 </option>
               ))}
             </select>
+            <p className="text-[11px] text-gray-500 mt-1">{rewardType.help}</p>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-              Rarity
+              Eligible ruby rarities
             </label>
-            <select
-              value={form.rarity}
-              onChange={(e) =>
-                setForm({ ...form, rarity: e.target.value as RubyRarity })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            >
-              {RARITIES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {RARITIES.map((rarity) => {
+                const selected = form.allowedRarities.includes(rarity);
+                return (
+                  <button
+                    key={rarity}
+                    type="button"
+                    onClick={() => setForm({
+                      ...form,
+                      allowedRarities: selected
+                        ? form.allowedRarities.filter((value) => value !== rarity)
+                        : [...form.allowedRarities, rarity],
+                    })}
+                    className={`px-2.5 py-1.5 rounded-md border text-xs font-semibold ${selected ? RARITY_COLORS[rarity] : 'bg-white text-gray-500 border-gray-200'}`}
+                  >
+                    {rarity}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1">Choose every ruby rarity that can draw this reward.</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-              Value
+              {rewardType.valueLabel}
             </label>
             <input
               type="number"
               value={form.value}
+              disabled={!canUseValue}
               onChange={(e) =>
                 setForm({ ...form, value: parseFloat(e.target.value) || 0 })
               }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:bg-gray-50 disabled:text-gray-400"
             />
-            <p className="text-[11px] text-gray-500 mt-1">
-              POINTS: number of points. WALLET_CREDIT: NGN amount. PERCENT_OFF:
-              percent (0-100).
-            </p>
+            <p className="text-[11px] text-gray-500 mt-1">{rewardType.valueHelp}</p>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
@@ -981,14 +1033,17 @@ function RewardFormModal({
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-            Customer copy
+            Redemption instructions (optional)
           </label>
           <input
-            value={form.copy || ''}
-            onChange={(e) => setForm({ ...form, copy: e.target.value })}
-            placeholder='"Free jollof at Iya Basira"'
+            value={form.redemptionInstructions || ''}
+            onChange={(e) => setForm({ ...form, redemptionInstructions: e.target.value })}
+            placeholder="e.g. Show your claim code at the counter."
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
           />
+          {!rewardType.fulfilsAutomatically && (
+            <p className="text-[11px] text-amber-700 mt-1">This reward creates a prize-queue task for the admin team to fulfil.</p>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -1007,7 +1062,7 @@ function RewardFormModal({
             Cancel
           </button>
           <button
-            disabled={!form.name || isLoading}
+            disabled={!form.name || !form.description || form.allowedRarities.length === 0 || !hasValidValue || isLoading}
             onClick={() => doSubmit(form)}
             className="px-4 py-2 bg-ruby-600 text-white text-sm font-medium rounded-lg disabled:opacity-50"
           >
@@ -1574,6 +1629,290 @@ function ConfigTab() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Subscriptions tab — merchant Ruby Quest billing (wallet + Paystack)
+// ─────────────────────────────────────────────────────────────────────────
+
+const SUB_STATUS_COLORS: Record<RubyQuestSubscriptionStatus, string> = {
+  PENDING_PAYMENT: 'bg-amber-50 text-amber-700 border-amber-200',
+  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  PAUSED: 'bg-gray-50 text-gray-600 border-gray-200',
+  EXPIRED: 'bg-gray-50 text-gray-500 border-gray-200',
+  PAYMENT_FAILED: 'bg-red-50 text-red-700 border-red-200',
+};
+
+function subBusinessName(sub: RubyQuestAdminSubscription): string {
+  if (typeof sub.businessId === 'object' && sub.businessId) {
+    return sub.businessId.name || String(sub.businessId._id).slice(0, 8);
+  }
+  return String(sub.businessId).slice(0, 8);
+}
+
+function subCampaignStatus(sub: RubyQuestAdminSubscription): string {
+  if (typeof sub.campaignId === 'object' && sub.campaignId?.status) {
+    return sub.campaignId.status;
+  }
+  return '—';
+}
+
+function SubscriptionsTab() {
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [tierFilter, setTierFilter] = useState<string>('');
+  const [sourceFilter, setSourceFilter] = useState<'' | 'WALLET' | 'PAYSTACK'>('');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+
+  // Cheap debounce so the merchant-search box doesn't fire on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data, isLoading, refetch } = useApi(
+    () =>
+      api.rubyQuest.listSubscriptions({
+        status: statusFilter || undefined,
+        tier: tierFilter || undefined,
+        paymentSource: sourceFilter || undefined,
+        search: debouncedSearch || undefined,
+        page,
+        limit: 25,
+      }),
+    [statusFilter, tierFilter, sourceFilter, debouncedSearch, page],
+  );
+
+  const items: RubyQuestAdminSubscription[] = Array.isArray(data?.items) ? data.items : [];
+  const pagination = data?.pagination;
+
+  const { mutate: pauseSub, isLoading: pausing } = useMutation(
+    (args: { id: string; reason?: string }) =>
+      api.rubyQuest.pauseSubscription(args.id, args.reason),
+    {
+      onSuccess: () => {
+        toast.success('Subscription paused');
+        refetch();
+      },
+      onError: (m) => toast.error(m),
+    },
+  );
+  const { mutate: resumeSub, isLoading: resuming } = useMutation(
+    (id: string) => api.rubyQuest.resumeSubscription(id),
+    {
+      onSuccess: () => {
+        toast.success('Subscription resumed');
+        refetch();
+      },
+      onError: (m) => toast.error(m),
+    },
+  );
+
+  const columns: Column<RubyQuestAdminSubscription>[] = [
+    {
+      key: 'business',
+      header: 'Business',
+      render: (sub) => (
+        <div className="min-w-0">
+          <div className="font-medium text-gray-900 truncate">{subBusinessName(sub)}</div>
+          <div className="text-xs text-gray-500">#{sub._id.slice(-8)}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'tier',
+      header: 'Tier',
+      render: (sub) => (
+        <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border ${RARITY_COLORS[sub.tier]}`}>
+          {sub.tier}
+        </span>
+      ),
+    },
+    {
+      key: 'paymentSource',
+      header: 'Payment',
+      render: (sub) => (
+        <div className="flex items-center gap-1.5 text-sm">
+          {sub.paymentSource === 'WALLET' ? (
+            <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+          ) : (
+            <CreditCard className="w-3.5 h-3.5 text-blue-600" />
+          )}
+          <span className="text-gray-700">{sub.paymentSource}</span>
+          {sub.cardLast4 && (
+            <span className="text-xs text-gray-400">•••• {sub.cardLast4}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (sub) => (
+        <span
+          className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border uppercase tracking-wider ${SUB_STATUS_COLORS[sub.status]}`}
+        >
+          {sub.status.replace('_', ' ')}
+        </span>
+      ),
+    },
+    {
+      key: 'weekly',
+      header: 'Weekly',
+      render: (sub) => (
+        <span className="text-sm font-semibold text-gray-900">
+          ₦{sub.weeklyAmountNgn.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      key: 'renewal',
+      header: 'Renews / Ends',
+      render: (sub) => (
+        <div className="text-xs text-gray-600">
+          <div>{formatDate(sub.currentPeriodEnd)}</div>
+          <div className={sub.autoRenew ? 'text-emerald-600' : 'text-gray-400'}>
+            {sub.autoRenew ? 'Auto-renew ON' : 'Auto-renew OFF'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'campaign',
+      header: 'Campaign',
+      render: (sub) => (
+        <span className="text-xs text-gray-500">{subCampaignStatus(sub)}</span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      className: 'w-32 text-right',
+      render: (sub) => {
+        const canPause = sub.status === 'ACTIVE' || sub.status === 'PAYMENT_FAILED';
+        const canResume = sub.status === 'PAUSED';
+        return (
+          <div className="flex items-center justify-end gap-1">
+            {canPause && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const reason = window.prompt(
+                    `Pause ${sub.tier} subscription for ${subBusinessName(sub)}?\n\nEnter a reason (visible to ops audit log):`,
+                    '',
+                  );
+                  if (reason !== null) {
+                    pauseSub({ id: sub._id, reason });
+                  }
+                }}
+                disabled={pausing}
+                className="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600"
+                title="Force pause"
+              >
+                {pausing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5" />}
+              </button>
+            )}
+            {canResume && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  resumeSub(sub._id);
+                }}
+                disabled={resuming}
+                className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600"
+                title="Force resume"
+              >
+                {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Filter bar */}
+      <div className="card px-4 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400 placeholder:text-gray-400"
+              placeholder="Search business name..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          <select
+            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="PAUSED">Paused</option>
+            <option value="PAYMENT_FAILED">Payment failed</option>
+            <option value="PENDING_PAYMENT">Pending payment</option>
+            <option value="EXPIRED">Expired</option>
+          </select>
+          <select
+            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+            value={tierFilter}
+            onChange={(e) => {
+              setTierFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All tiers</option>
+            {RARITIES.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+          <select
+            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+            value={sourceFilter}
+            onChange={(e) => {
+              setSourceFilter((e.target.value || '') as '' | 'WALLET' | 'PAYSTACK');
+              setPage(1);
+            }}
+          >
+            <option value="">All payment sources</option>
+            <option value="WALLET">Wallet</option>
+            <option value="PAYSTACK">Paystack card</option>
+          </select>
+          <button
+            onClick={() => refetch()}
+            className="ml-auto p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+            title="Refresh"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={items}
+        isLoading={isLoading}
+        emptyMessage="No Ruby Quest subscriptions match these filters."
+        meta={pagination}
+        currentPage={page}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

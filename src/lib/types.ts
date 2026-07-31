@@ -3111,11 +3111,12 @@ export type RubyRewardType =
 export interface RubyRewardConfig {
   _id: string;
   name: string;
+  description: string;
   type: RubyRewardType;
-  rarity: RubyRarity;
-  value: number;
+  value: number | null;
+  allowedRarities: RubyRarity[];
   weight: number;
-  copy?: string;
+  redemptionInstructions?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -3123,17 +3124,19 @@ export interface RubyRewardConfig {
 
 export interface CreateRubyRewardConfigRequest {
   name: string;
+  description: string;
   type: RubyRewardType;
-  rarity: RubyRarity;
-  value: number;
+  value?: number;
+  allowedRarities: RubyRarity[];
   weight?: number;
-  copy?: string;
+  redemptionInstructions?: string;
   isActive?: boolean;
 }
 
-export type UpdateRubyRewardConfigRequest = Partial<
-  CreateRubyRewardConfigRequest
->;
+export type UpdateRubyRewardConfigRequest = Partial<Omit<
+  CreateRubyRewardConfigRequest,
+  "type"
+>>;
 
 export type PrizeQueueStatus =
   | "PENDING"
@@ -3174,6 +3177,52 @@ export interface AdminPrizeQueueEntry {
     | { _id: string; firstName?: string; lastName?: string; email?: string }
     | null;
   fulfilledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Ruby Quest merchant billing record — one per {business, tier} while the
+ * subscription is live. Mirrors the `RubyQuestSubscription` backend
+ * schema; the admin controller enriches responses with a derived
+ * `paymentSource` field ("WALLET" vs "PAYSTACK"). Populated fields
+ * (businessId, campaignId) can also arrive as plain string ids when the
+ * populate is skipped — the admin table handles both.
+ */
+export type RubyQuestSubscriptionStatus =
+  | "PENDING_PAYMENT"
+  | "ACTIVE"
+  | "PAUSED"
+  | "EXPIRED"
+  | "PAYMENT_FAILED";
+
+export interface RubyQuestAdminSubscription {
+  _id: string;
+  businessId:
+    | string
+    | { _id: string; name?: string; logoUrl?: string; ownerId?: string };
+  campaignId?:
+    | string
+    | {
+        _id: string;
+        status?: string;
+        endDate?: string;
+        lastSpawnedAt?: string | null;
+        paymentSource?: string;
+      };
+  tier: RubyRarity;
+  weeklyAmountNgn: number;
+  autoRenew: boolean;
+  status: RubyQuestSubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  /** Derived by backend from paystackSubscriptionCode presence. */
+  paymentSource: "WALLET" | "PAYSTACK";
+  paystackReference?: string;
+  paystackPlanCode?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+  lastRenewedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -1643,6 +1643,7 @@ const SUB_STATUS_COLORS: Record<RubyQuestSubscriptionStatus, string> = {
   PAUSED: 'bg-gray-50 text-gray-600 border-gray-200',
   EXPIRED: 'bg-gray-50 text-gray-500 border-gray-200',
   PAYMENT_FAILED: 'bg-red-50 text-red-700 border-red-200',
+  CANCELLED: 'bg-red-50 text-red-600 border-red-200',
 };
 
 function subBusinessName(sub: RubyQuestAdminSubscription): string {
@@ -1705,6 +1706,22 @@ function SubscriptionsTab() {
     {
       onSuccess: () => {
         toast.success('Subscription resumed');
+        refetch();
+      },
+      onError: (m) => toast.error(m),
+    },
+  );
+  const { mutate: cancelSub, isLoading: cancelling } = useMutation(
+    (args: { id: string; reason?: string }) =>
+      api.rubyQuest.cancelSubscription(args.id, args.reason),
+    {
+      onSuccess: (res) => {
+        const refunded = res?.refundedNgn ?? 0;
+        toast.success(
+          refunded > 0
+            ? `Subscription cancelled — ₦${refunded.toLocaleString()} refunded to business wallet`
+            : 'Subscription cancelled (no refund due — period already ended)',
+        );
         refetch();
       },
       onError: (m) => toast.error(m),
@@ -1794,6 +1811,8 @@ function SubscriptionsTab() {
       render: (sub) => {
         const canPause = sub.status === 'ACTIVE' || sub.status === 'PAYMENT_FAILED';
         const canResume = sub.status === 'PAUSED';
+        // Cancel only makes sense before the sub reaches a terminal state.
+        const canCancel = sub.status !== 'CANCELLED' && sub.status !== 'EXPIRED';
         return (
           <div className="flex items-center justify-end gap-1">
             {canPause && (
@@ -1826,6 +1845,36 @@ function SubscriptionsTab() {
                 title="Force resume"
               >
                 {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              </button>
+            )}
+            {canCancel && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Pre-compute the pro-rated refund preview so admin sees
+                  // the exact amount before confirming.
+                  const now = Date.now();
+                  const end = new Date(sub.currentPeriodEnd).getTime();
+                  const daysRemaining = Math.max(0, Math.min(7, Math.ceil((end - now) / 86_400_000)));
+                  const refundPreview = Math.round((sub.weeklyAmountNgn * daysRemaining) / 7);
+                  const reason = window.prompt(
+                    `Cancel ${sub.tier} subscription for ${subBusinessName(sub)}?\n\n` +
+                      `The business wallet will be refunded ₦${refundPreview.toLocaleString()} (${daysRemaining}d remaining).\n` +
+                      (sub.paymentSource === 'PAYSTACK'
+                        ? 'Paystack auto-renewal will be disabled.\n\n'
+                        : '\n') +
+                      'Enter a reason (visible to ops audit log + merchant):',
+                    '',
+                  );
+                  if (reason !== null) {
+                    cancelSub({ id: sub._id, reason });
+                  }
+                }}
+                disabled={cancelling}
+                className="p-1.5 rounded-lg hover:bg-red-50 text-red-600"
+                title="Cancel + refund to wallet"
+              >
+                {cancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
               </button>
             )}
           </div>

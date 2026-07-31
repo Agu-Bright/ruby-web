@@ -3194,7 +3194,8 @@ export type RubyQuestSubscriptionStatus =
   | "ACTIVE"
   | "PAUSED"
   | "EXPIRED"
-  | "PAYMENT_FAILED";
+  | "PAYMENT_FAILED"
+  | "CANCELLED";
 
 export interface RubyQuestAdminSubscription {
   _id: string;

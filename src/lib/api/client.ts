@@ -3431,6 +3431,16 @@ export const api = {
         `/admin/ruby-quest/subscriptions/${id}/resume`,
         { method: "POST", body: {} },
       ),
+    cancelSubscription: (id: string, reason?: string) =>
+      request<{
+        subscription: import("@/lib/types").RubyQuestAdminSubscription;
+        refundedNgn: number;
+        daysRemaining: number;
+        source: "WALLET" | "PAYSTACK";
+      }>(`/admin/ruby-quest/subscriptions/${id}/cancel`, {
+        method: "POST",
+        body: { reason },
+      }),
   },
 };
 

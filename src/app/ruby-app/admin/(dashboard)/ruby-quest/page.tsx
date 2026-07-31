@@ -196,17 +196,11 @@ function SpawnsTab() {
     [statusFilter, rarityFilter, page],
   );
 
-  const { mutate: doRevoke, isLoading: revoking } = useMutation(
-    (args: { id: string; reason?: string }) =>
-      api.rubyQuest.revokeSpawn(args.id, args.reason),
-    {
-      onSuccess: () => {
-        toast.success('Spawn revoked');
-        refetch();
-      },
-      onError: (m) => toast.error(m),
-    },
-  );
+  // Per-spawn revoke is intentionally not surfaced any more — the correct
+  // control is cancelling the subscription in the Subscriptions tab, which
+  // cascades to expire every LIVE spawn tied to the campaign in one action.
+  // Leaving one-off spawn deletion in the UI encourages ops to break the
+  // sub↔spawn linkage manually.
 
   const columns: Column<RubyQuestSpawn>[] = [
     {
@@ -255,28 +249,6 @@ function SpawnsTab() {
       render: (r) => (
         <span className="text-xs text-gray-500">{formatDate(r.expiresAt)}</span>
       ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (r) =>
-        r.status === 'LIVE' ? (
-          <button
-            onClick={() => {
-              const reason = window.prompt('Reason for revoke (optional)') || undefined;
-              if (window.confirm(`Revoke this ${r.rarity} spawn?`)) {
-                doRevoke({ id: r._id, reason });
-              }
-            }}
-            disabled={revoking}
-            className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
-          >
-            <Trash2 className="w-3.5 h-3.5 inline mr-1" />
-            Revoke
-          </button>
-        ) : (
-          <span className="text-xs text-gray-400">—</span>
-        ),
     },
   ];
 

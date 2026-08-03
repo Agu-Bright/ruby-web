@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Wallet,
   ArrowUpRight,
@@ -66,9 +67,24 @@ type Tab = 'payouts' | 'ledger' | 'wallets' | 'fees';
 
 const PAYOUT_STATUSES: PayoutStatus[] = ['PROCESSING', 'COMPLETED', 'FAILED', 'REJECTED', 'CANCELLED'];
 
+const TABS: readonly Tab[] = ['payouts', 'ledger', 'wallets', 'fees'];
+const isTab = (v: string | null): v is Tab =>
+  v !== null && (TABS as readonly string[]).includes(v);
+
 export default function FinancePage() {
   const { admin, isSuperAdmin } = useAuth();
-  const [tab, setTab] = useState<Tab>('payouts');
+  const searchParams = useSearchParams();
+  // Honour ?tab=<name> so deep-links from the dashboard's Recent
+  // Transactions card and other places land on the right tab.
+  const initialTab: Tab = isTab(searchParams?.get('tab') || null)
+    ? (searchParams!.get('tab') as Tab)
+    : 'payouts';
+  const [tab, setTab] = useState<Tab>(initialTab);
+  useEffect(() => {
+    const next = searchParams?.get('tab');
+    if (isTab(next || null) && next !== tab) setTab(next as Tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');

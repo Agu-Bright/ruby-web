@@ -5,8 +5,8 @@ import Link from 'next/link';
 import {
   Store, ShoppingCart, CalendarCheck, AlertTriangle,
   Wallet, MapPin, Clock, TrendingUp, TrendingDown, Activity,
-  Users, Gem, ArrowUpRight,
-  ChevronRight, Radio, Sparkles, Crown, Bell,
+  Users, Gem, ArrowUpRight, ArrowDownRight,
+  ChevronRight, Radio, Sparkles, Crown, Bell, Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/hooks';
@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
 import { formatCurrency, formatRelativeTime, toLocationId } from '@/lib/utils';
 import type {
   DashboardAnalytics, AuditLog, LivePulseData,
-  CategoryRanking, LocationPerformance,
+  CategoryRanking, LocationPerformance, LedgerEntry,
 } from '@/lib/types';
 
 /**
@@ -86,6 +86,16 @@ export default function DashboardPage() {
       ? api.auditLogs.list({ limit: 8, page: 1 })
       : Promise.resolve({ success: true, data: [] })),
     [canAuditLogs],
+  );
+
+  // Recent financial transactions (platform-wide ledger).
+  // Only fetched if the admin can see the Finance page — same gate as the
+  // rest of the money-flavoured cards on this dashboard.
+  const { data: recentTxns, isLoading: txnsLoading } = useApi<LedgerEntry[]>(
+    () => (canRevenue
+      ? api.ledger.list({ page: 1, limit: 10 })
+      : Promise.resolve({ success: true, data: [] })),
+    [canRevenue],
   );
 
   const totalRevenue = (summary?.orderRevenue ?? 0) + (summary?.bookingRevenue ?? 0);
@@ -251,6 +261,11 @@ export default function DashboardPage() {
           <RecentActivityCard logs={recentLogs ?? []} loading={logsLoading} />
         ) : null}
       </div>
+
+      {/* ═══ Recent financial transactions ═══ */}
+      {canRevenue && (
+        <RecentTransactionsCard entries={recentTxns ?? []} loading={txnsLoading} />
+      )}
 
       {/* Recent activity — full width for super_admin (Locations already
           showed above). Location/support admins already have it in the
@@ -894,6 +909,179 @@ function RecentActivityCard({
             <p className="text-xs text-gray-400">Activity will appear here as admins work.</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Recent Transactions (platform-wide ledger feed)
+// ═══════════════════════════════════════════════════════════════
+
+// Human-friendly labels for `referenceType` on ledger entries. Kept in sync
+// with the copy on the Finance page's ledger tab so an entry reads the same
+// wherever it appears. New enum values fall back to a de-underscored version
+// of the raw string, so a missing label degrades gracefully.
+const TXN_TYPE_LABELS: Record<string, string> = {
+  DEPOSIT: 'Wallet top-up',
+  WITHDRAWAL: 'Withdrawal',
+  ORDER_PAYMENT: 'Order payment',
+  BOOKING_PAYMENT: 'Booking payment',
+  TRANSFER_IN: 'Money received',
+  TRANSFER_OUT: 'Money sent',
+  REFUND_RECEIVED: 'Refund received',
+  REFUND_ISSUED: 'Refund issued',
+  PAYMENT_RECEIVED: 'Payment received',
+  PLATFORM_FEE: 'Platform fee',
+  DELIVERY_FEE: 'Delivery fee',
+  PAYOUT: 'Payout',
+  PAYOUT_REVERSAL: 'Payout reversal',
+  CANCELLATION_FEE: 'Cancellation fee',
+  AD_PURCHASE: 'Ad purchase',
+  AD_REFUND: 'Ad refund',
+  ADJUSTMENT_CREDIT: 'Adjustment (credit)',
+  ADJUSTMENT_DEBIT: 'Adjustment (debit)',
+  EVENT_TICKET_PURCHASE: 'Event ticket',
+  EVENT_TICKET_REFUND: 'Ticket refund',
+  DISPATCH_PAYMENT: 'Delivery dispatch',
+  DISPATCH_REFUND: 'Dispatch refund',
+  RUBY_QUEST_REWARD: 'Ruby Quest reward',
+  SUBSCRIPTION_PAYMENT: 'Subscription',
+  AD_TIER_PAYMENT: 'Ad-tier payment',
+};
+
+function humanizeReferenceType(refType?: string): string {
+  if (!refType) return 'Transaction';
+  return (
+    TXN_TYPE_LABELS[refType] ||
+    refType.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+function RecentTransactionsCard({
+  entries,
+  loading,
+}: {
+  entries: LedgerEntry[];
+  loading: boolean;
+}) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+            <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 text-sm">Recent transactions</h3>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Every credit + debit across the platform
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/ruby-app/admin/finance?tab=ledger"
+          className="text-[11px] text-gray-400 hover:text-ruby-600 flex items-center gap-0.5"
+        >
+          View all <ChevronRight className="w-3 h-3" />
+        </Link>
+      </div>
+      <div className="divide-y divide-gray-100">
+        {loading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="px-5 py-3.5 flex items-center gap-3">
+              <div className="skeleton w-9 h-9 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton h-3.5 w-48 rounded" />
+                <div className="skeleton h-2.5 w-32 rounded" />
+              </div>
+              <div className="skeleton h-4 w-20 rounded" />
+            </div>
+          ))
+        ) : entries.length ? (
+          entries.map((e) => (
+            <TransactionRow key={e._id} entry={e} />
+          ))
+        ) : (
+          <div className="px-5 py-12 text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Receipt className="w-5 h-5 text-gray-300" />
+            </div>
+            <p className="text-sm font-medium text-gray-500 mb-1">No transactions yet</p>
+            <p className="text-xs text-gray-400">
+              Money movements will appear here as customers pay and merchants get paid.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TransactionRow({ entry }: { entry: LedgerEntry }) {
+  const isCredit = entry.direction === 'CREDIT' || entry.type === 'CREDIT';
+  const purpose = humanizeReferenceType(entry.referenceType);
+  const status = entry.status || 'COMPLETED';
+  const statusClass =
+    status === 'COMPLETED'
+      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+      : status === 'PENDING'
+        ? 'bg-amber-50 text-amber-700 ring-amber-200'
+        : status === 'FAILED'
+          ? 'bg-red-50 text-red-700 ring-red-200'
+          : 'bg-gray-50 text-gray-700 ring-gray-200';
+
+  return (
+    <div className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50/60 transition-colors">
+      {/* Direction icon */}
+      <div
+        className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ring-1 ${
+          isCredit
+            ? 'bg-emerald-50 ring-emerald-200'
+            : 'bg-red-50 ring-red-200'
+        }`}
+      >
+        {isCredit ? (
+          <ArrowDownRight className="w-4 h-4 text-emerald-600" />
+        ) : (
+          <ArrowUpRight className="w-4 h-4 text-red-600" />
+        )}
+      </div>
+
+      {/* Purpose + description */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-semibold text-gray-900 truncate">
+            {purpose}
+          </p>
+          <span
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ring-1 ${statusClass}`}
+          >
+            {status}
+          </span>
+        </div>
+        <p className="text-[11px] text-gray-500 truncate mt-0.5">
+          {entry.description || '—'}
+        </p>
+        <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1.5">
+          <Clock className="w-3 h-3" />
+          {formatRelativeTime(entry.createdAt)}
+        </p>
+      </div>
+
+      {/* Amount */}
+      <div className="text-right shrink-0">
+        <p
+          className={`text-sm font-bold tabular-nums ${
+            isCredit ? 'text-emerald-600' : 'text-red-600'
+          }`}
+        >
+          {isCredit ? '+' : '-'}
+          {formatCurrency(entry.amount, entry.currency)}
+        </p>
+        <p className="text-[10px] text-gray-400 tabular-nums mt-0.5">
+          bal {formatCurrency(entry.balanceAfter, entry.currency)}
+        </p>
       </div>
     </div>
   );

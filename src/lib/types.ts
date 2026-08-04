@@ -2673,6 +2673,28 @@ export interface SystemAlertRecipient {
     adPayment: boolean;
     payoutRequested: boolean;
     businessSubmission: boolean;
+    /** Every message in a customer↔admin support chat. Noisy — default OFF. */
+    supportMessage?: boolean;
+    /** Dispute lifecycle emails (filed / message / status / resolved). */
+    disputeActivity?: boolean;
+    /** Customer SOS distress signal. Life-critical, default ON. */
+    emergencySos?: boolean;
+    /** A business submitted an event for approval. */
+    eventPendingReview?: boolean;
+    /** A merchant purchased a new ad campaign that needs admin review. */
+    adCampaignSubmitted?: boolean;
+    /** A Growth / Prime merchant requested an admin-scheduled push blast. */
+    pushBlastRequested?: boolean;
+    /** A customer reported a review, reel, chat, or user. */
+    contentReport?: boolean;
+    /** Fraud cluster alert (rewards farming, quest hoarding, ...). */
+    clusterAlert?: boolean;
+    /** Ad-tier subscription lifecycle (paused / resumed / expired / etc.). */
+    subscriptionLifecycle?: boolean;
+    /** A customer placed a new order. Very high volume — default OFF. */
+    newOrder?: boolean;
+    /** A customer created a new booking. High volume — default OFF. */
+    newBooking?: boolean;
   };
   createdAt: string;
   updatedAt: string;

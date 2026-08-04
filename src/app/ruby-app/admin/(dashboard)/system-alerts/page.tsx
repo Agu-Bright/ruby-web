@@ -34,11 +34,31 @@ import type {
  * create/edit, send-test self-service button.
  */
 
+// Order matters — rendered top-to-bottom in the form drawer. Grouped
+// loosely by domain: platform-wide firehose first, then money/ops, then
+// customer-triggered / moderation / fraud, then the noisy transactional
+// ones (order, booking) at the bottom.
 const FLAG_LABELS: Record<keyof SystemAlertRecipient["alerts"], string> = {
   allNotifications: "All platform notifications",
+  // Money in / out
   adPayment: "Ad payment received",
-  payoutRequested: "Payout requested (V1.1)",
-  businessSubmission: "New business submitted (V1.1)",
+  payoutRequested: "Payout requested",
+  adCampaignSubmitted: "New ad campaign pending review",
+  subscriptionLifecycle: "Ad subscription lifecycle (pause / expire / etc.)",
+  // Business + content ops
+  businessSubmission: "New business submitted",
+  eventPendingReview: "Event pending review",
+  pushBlastRequested: "Push-blast request from merchant",
+  contentReport: "Content report filed (review / reel / chat / user)",
+  // Safety + fraud
+  emergencySos: "Emergency SOS alert",
+  clusterAlert: "Fraud cluster alert",
+  // Support inbox
+  supportMessage: "Support chat message (noisy)",
+  disputeActivity: "Dispute activity (personal copy)",
+  // Very high volume — bottom of the list
+  newOrder: "New order placed (very noisy)",
+  newBooking: "New booking created (noisy)",
 };
 
 export default function SystemAlertsPage() {
@@ -93,11 +113,26 @@ export default function SystemAlertsPage() {
       key: "alerts",
       header: "Subscribed to",
       render: (r) => {
-        // Older recipient records predate the general flag. Treat them as
-        // opted in until an admin explicitly changes the saved preference.
-        const alerts = {
-          ...r.alerts,
-          allNotifications: r.alerts.allNotifications ?? true,
+        // Older recipient records predate the per-event flags. Fill in
+        // defaults so every flag renders as a pill (green when the recipient
+        // is opted in, grey when off). Ops-critical flags default ON; noisy
+        // flags default OFF — matches the schema defaults exactly.
+        const alerts: Required<SystemAlertRecipient["alerts"]> = {
+          allNotifications: r.alerts.allNotifications ?? false,
+          adPayment: r.alerts.adPayment ?? true,
+          payoutRequested: r.alerts.payoutRequested ?? true,
+          businessSubmission: r.alerts.businessSubmission ?? true,
+          supportMessage: r.alerts.supportMessage ?? false,
+          disputeActivity: r.alerts.disputeActivity ?? false,
+          emergencySos: r.alerts.emergencySos ?? true,
+          eventPendingReview: r.alerts.eventPendingReview ?? false,
+          adCampaignSubmitted: r.alerts.adCampaignSubmitted ?? true,
+          pushBlastRequested: r.alerts.pushBlastRequested ?? true,
+          contentReport: r.alerts.contentReport ?? false,
+          clusterAlert: r.alerts.clusterAlert ?? false,
+          subscriptionLifecycle: r.alerts.subscriptionLifecycle ?? false,
+          newOrder: r.alerts.newOrder ?? false,
+          newBooking: r.alerts.newBooking ?? false,
         };
         return (
         <div className="flex flex-wrap gap-1">
@@ -243,10 +278,21 @@ function RecipientFormModal({
   const [email, setEmail] = useState(recipient?.email || "");
   const [label, setLabel] = useState(recipient?.label || "");
   const [alerts, setAlerts] = useState<SystemAlertRecipient["alerts"]>(() => ({
-    allNotifications: recipient?.alerts?.allNotifications ?? true,
+    allNotifications: recipient?.alerts?.allNotifications ?? false,
     adPayment: recipient?.alerts?.adPayment ?? true,
     payoutRequested: recipient?.alerts?.payoutRequested ?? true,
     businessSubmission: recipient?.alerts?.businessSubmission ?? true,
+    supportMessage: recipient?.alerts?.supportMessage ?? false,
+    disputeActivity: recipient?.alerts?.disputeActivity ?? false,
+    emergencySos: recipient?.alerts?.emergencySos ?? true,
+    eventPendingReview: recipient?.alerts?.eventPendingReview ?? false,
+    adCampaignSubmitted: recipient?.alerts?.adCampaignSubmitted ?? true,
+    pushBlastRequested: recipient?.alerts?.pushBlastRequested ?? true,
+    contentReport: recipient?.alerts?.contentReport ?? false,
+    clusterAlert: recipient?.alerts?.clusterAlert ?? false,
+    subscriptionLifecycle: recipient?.alerts?.subscriptionLifecycle ?? false,
+    newOrder: recipient?.alerts?.newOrder ?? false,
+    newBooking: recipient?.alerts?.newBooking ?? false,
   }));
 
   const createMut = useMutation((data: CreateSystemAlertRecipientRequest) =>

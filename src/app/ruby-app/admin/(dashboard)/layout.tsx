@@ -42,6 +42,7 @@ import {
   Bell,
   Gem,
   Crown,
+  BookOpen,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { AdminSocketsProvider } from "@/lib/admin-sockets";
@@ -160,6 +161,7 @@ const navGroups: NavGroup[] = [
       // merchant's POV — daily admin ops are marketing / revenue work.
       { label: "Ad Subscriptions", href: "/ruby-app/admin/ad-subscriptions", icon: Crown },
       { label: "Promos", href: "/ruby-app/admin/promos", icon: Tag },
+      { label: "Blog", href: "/ruby-app/admin/blog", icon: BookOpen, hiddenForRoles: ["location_admin"] },
       { label: "Broadcasts", href: "/ruby-app/admin/broadcasts", icon: Radio },
     ],
   },

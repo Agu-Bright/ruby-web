@@ -2522,6 +2522,14 @@ export const api = {
       request<any>(`/admin/legal-documents/${id}`, { method: "DELETE" }),
   },
 
+  blogPosts: {
+    list: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
+      request<any>("/admin/blog-posts", { params }),
+    create: (data: any) => request<any>("/admin/blog-posts", { method: "POST", body: data }),
+    update: (id: string, data: any) => request<any>(`/admin/blog-posts/${id}`, { method: "PUT", body: data }),
+    delete: (id: string) => request<any>(`/admin/blog-posts/${id}`, { method: "DELETE" }),
+  },
+
   // ─────────────────────────────────────────────────────────────────
   // Marketers / referral codes
   // ─────────────────────────────────────────────────────────────────

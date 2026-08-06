@@ -236,7 +236,7 @@ function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
   });
 
   items.push({
-    label: business.isFeatured ? 'Remove Featured' : 'Set Featured',
+    label: business.isFeatured ? 'Remove from featured' : 'Set as featured',
     icon: Star,
     action: () => { onAction(business, 'feature'); setOpen(false); },
     variant: 'warning',
@@ -2035,6 +2035,9 @@ export default function BusinessesPage() {
                   {displayBusiness.budgetMin !== undefined && displayBusiness.budgetMax !== undefined && (
                     <DetailField label="Budget Range" value={`${formatCurrency(displayBusiness.budgetMin, displayBusiness.currency || 'NGN')} - ${formatCurrency(displayBusiness.budgetMax, displayBusiness.currency || 'NGN')}`} />
                   )}
+                  {displayBusiness.budgetForTwo !== undefined && displayBusiness.budgetForTwo > 0 && (
+                    <DetailField label="Budget for Two" value={formatCurrency(displayBusiness.budgetForTwo, displayBusiness.currency || 'NGN')} />
+                  )}
                   {displayBusiness.viewCount !== undefined && (
                     <DetailField label="Stats" value={`${displayBusiness.viewCount} views, ${displayBusiness.orderCount || 0} orders, ${displayBusiness.bookingCount || 0} bookings`} />
                   )}
@@ -2635,7 +2638,7 @@ export default function BusinessesPage() {
                 onClick={() => openAction(displayBusiness, 'feature')}
               >
                 <Star className={`w-3.5 h-3.5 ${displayBusiness.isFeatured ? 'fill-amber-500' : ''}`} />
-                {displayBusiness.isFeatured ? 'Remove Featured' : 'Set Featured'}
+                {displayBusiness.isFeatured ? 'Remove from featured' : 'Set as featured'}
               </button>
               <button
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors"

@@ -612,6 +612,9 @@ export interface Business {
   // Budget
   budgetMin?: number;
   budgetMax?: number;
+  // Restaurant "budget for two" — total spend estimate for a couple
+  // (NGN). Restaurant category only; optional everywhere else.
+  budgetForTwo?: number;
   operationModes?: string[];
   // Merchant Agreement
   merchantAgreementAcceptedAt?: string;

@@ -208,6 +208,10 @@ const navGroups: NavGroup[] = [
       // P135 — Merchant support contact singleton. WhatsApp number +
       // intro message the business app's "Talk to Ruby+" card uses.
       { label: "Merchant Support", href: "/ruby-app/admin/merchant-support", icon: MessageCircle, superOnly: true },
+      // Daily Business Promo — full-screen interstitial the customer app
+      // shows once per day. Admin picks the business + uploads creative;
+      // customer app gates display client-side.
+      { label: "Daily Promo", href: "/ruby-app/admin/daily-promo", icon: Sparkles, superOnly: true },
     ],
   },
 ];

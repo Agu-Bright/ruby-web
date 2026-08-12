@@ -2499,6 +2499,23 @@ export const api = {
       ),
   },
 
+  // Daily Business Promo — full-screen interstitial shown on customer
+  // app first-open each day. Singleton config, SUPER_ADMIN only on the
+  // backend. Same singleton pattern as merchantSupport above.
+  dailyBusinessPromo: {
+    get: () =>
+      request<import("@/lib/types").DailyBusinessPromo>(
+        "/admin/daily-business-promo",
+      ),
+    update: (
+      data: import("@/lib/types").UpdateDailyBusinessPromoPayload,
+    ) =>
+      request<import("@/lib/types").DailyBusinessPromo>(
+        "/admin/daily-business-promo",
+        { method: "PUT", body: data },
+      ),
+  },
+
   legalDocuments: {
     list: (params?: { page?: number; limit?: number; type?: string; isActive?: string; search?: string }) => {
       const searchParams = new URLSearchParams();

@@ -2135,6 +2135,42 @@ export interface MerchantSupportConfig {
   updatedAt: string;
 }
 
+/**
+ * Daily Business Promo — full-screen interstitial the customer app
+ * shows on first launch of each calendar day. Singleton config edited
+ * from the admin dashboard. When null / inactive / missing image, the
+ * mobile skips the modal entirely.
+ */
+export interface DailyBusinessPromo {
+  _id: string;
+  /** Master switch. When false the customer app skips the modal. */
+  isActive: boolean;
+  /** Featured business ObjectId (populated as summary on read). */
+  businessId?:
+    | string
+    | { _id: string; name?: string; slug?: string; primaryImageUrl?: string; coverImageUrl?: string };
+  /** Marketing flyer / creative image URL. */
+  heroImageUrl?: string;
+  /** Modal headline (e.g. "Stock Up & Save Big Today"). */
+  title?: string;
+  /** Optional secondary line under the title. */
+  subtitle?: string;
+  /** CTA button label. Defaults to "Visit" if unset. */
+  ctaLabel?: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateDailyBusinessPromoPayload {
+  isActive?: boolean;
+  businessId?: string;
+  heroImageUrl?: string;
+  title?: string;
+  subtitle?: string;
+  ctaLabel?: string;
+}
+
 export interface UpdateMerchantSupportConfigPayload {
   whatsappPhone?: string;
   whatsappIntroMessage?: string;

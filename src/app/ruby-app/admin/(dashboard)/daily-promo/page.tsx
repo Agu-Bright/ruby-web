@@ -107,27 +107,76 @@ export default function DailyPromoPage() {
     return match?.label;
   }, [businesses, businessId]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const payload: UpdateDailyBusinessPromoPayload = {
-        isActive,
-        businessId: businessId || "",
-        heroImageUrl: heroImageUrl || "",
-        title: title.trim(),
-        subtitle: subtitle.trim(),
-        ctaLabel: ctaLabel.trim(),
-      };
-      const res = await api.dailyBusinessPromo.update(payload);
-      const data = (res.data || res) as DailyBusinessPromo;
-      setConfig(data);
-      toast.success("Daily promo config saved");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to save daily promo config");
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Single persistence path. `overrides` lets the toggle / business
+  // picker / image upload force-save the NEW value instead of the
+  // still-stale one that lives in local state until React re-renders.
+  const persist = useCallback(
+    async (overrides: Partial<UpdateDailyBusinessPromoPayload> = {}) => {
+      setSaving(true);
+      try {
+        const payload: UpdateDailyBusinessPromoPayload = {
+          isActive,
+          heroImageUrl: heroImageUrl || undefined,
+          title: title.trim(),
+          subtitle: subtitle.trim(),
+          ctaLabel: ctaLabel.trim(),
+          ...overrides,
+        };
+        // Only send businessId when we have a real ObjectId — the DTO
+        // validates @IsMongoId, which rejects empty strings with a 400.
+        const nextBusinessId =
+          overrides.businessId !== undefined ? overrides.businessId : businessId;
+        if (nextBusinessId) payload.businessId = nextBusinessId;
+        const res = await api.dailyBusinessPromo.update(payload);
+        const data = (res.data || res) as DailyBusinessPromo;
+        setConfig(data);
+        toast.success("Saved");
+        return true;
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to save daily promo config");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [isActive, businessId, heroImageUrl, title, subtitle, ctaLabel],
+  );
+
+  const handleSave = () => persist();
+
+  // Toggle master switch — flip local state AND persist immediately so
+  // the on/off state survives refresh without needing the Save button.
+  const handleToggleActive = useCallback(async () => {
+    const next = !isActive;
+    setIsActive(next);
+    const ok = await persist({ isActive: next });
+    if (!ok) setIsActive(!next); // rollback on failure
+  }, [isActive, persist]);
+
+  // Business picker — auto-save the new selection. Skip if the user
+  // clears the picker (empty string) — the DTO rejects that anyway.
+  const handleBusinessChange = useCallback(
+    async (v: string) => {
+      const prev = businessId;
+      setBusinessId(v);
+      if (!v) return;
+      const ok = await persist({ businessId: v });
+      if (!ok) setBusinessId(prev);
+    },
+    [businessId, persist],
+  );
+
+  // Hero image — auto-save when the upload completes (URL arrives) or
+  // when the admin clears it back to undefined.
+  const handleHeroImageChange = useCallback(
+    async (v: string | undefined) => {
+      const prev = heroImageUrl;
+      setHeroImageUrl(v);
+      const ok = await persist({ heroImageUrl: v || undefined });
+      if (!ok) setHeroImageUrl(prev);
+    },
+    [heroImageUrl, persist],
+  );
 
   if (loading) {
     return (
@@ -193,8 +242,9 @@ export default function DailyPromoPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setIsActive((v) => !v)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
+                onClick={handleToggleActive}
+                disabled={saving}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors disabled:opacity-60 disabled:cursor-wait ${
                   isActive ? "bg-ruby-500" : "bg-gray-300"
                 }`}
                 aria-pressed={isActive}
@@ -217,7 +267,7 @@ export default function DailyPromoPage() {
               <SearchableSelect
                 options={businesses}
                 value={businessId}
-                onChange={(v) => setBusinessId(v)}
+                onChange={handleBusinessChange}
                 placeholder={
                   businesses.length === 0
                     ? "Loading businesses…"
@@ -233,7 +283,7 @@ export default function DailyPromoPage() {
             <div>
               <ImageUpload
                 value={heroImageUrl}
-                onChange={setHeroImageUrl}
+                onChange={handleHeroImageChange}
                 folder="daily-promo"
                 label="Marketing creative"
                 helpText="The flyer image shown in the middle of the modal. 4:5 or square works best. Max 5 MB."

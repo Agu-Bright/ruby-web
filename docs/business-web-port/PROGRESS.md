@@ -1109,3 +1109,11 @@ _Appended by each session so a fresh agent can `git diff` intelligently._
 **Verification:** `git diff --check` completed without whitespace errors. `pnpm exec tsc --noEmit -p tsconfig.json` passed in both the web and backend repositories. Required smoke test: log in as a Hotels/Shortlets merchant, create an ACTIVE room with one image, change dates in availability, edit/archive it, then change category + subcategory from Profile and confirm the refreshed sidebar reflects the new classification.
 
 **Next task for next agent:** Browser-smoke the room flow and validate category changes against an existing business with template data; add a migration/review decision if historic template data should be transformed rather than retained.
+
+### 2026-08-13 — Web deployment route-type correction
+
+**Fix:** Corrected the Hotel Rooms edit route for Next.js 15's async route parameters. `src/app/business/dashboard/rooms/[id]/page.tsx` now unwraps `params: Promise<{ id: string }>` with React `use()` before rendering the editor.
+
+**Cause:** The first version used the pre-Next-15 synchronous `params: { id: string }` contract. Production compilation correctly rejected it during the route type check.
+
+**Verification:** `pnpm exec tsc --noEmit -p tsconfig.json` passed. A local optimized build exceeded this environment's 120-second command cap while generating routes, but it passed the earlier type-checking stage where the deployment failed.

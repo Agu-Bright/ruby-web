@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Megaphone,
   Save,
   Loader2,
   AlertCircle,
@@ -76,7 +75,7 @@ export default function DailyPromoPage() {
   const loadBusinesses = useCallback(async () => {
     try {
       const res = await api.businesses.list({ limit: 200, status: "LIVE" as any });
-      const items = (res.data?.items || res.items || []) as any[];
+      const items = ((res.data as any[]) || []) as any[];
       const options: SelectOption[] = items
         .map((b) => ({
           value: b._id,
@@ -141,7 +140,6 @@ export default function DailyPromoPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <PageHeader
-        icon={Megaphone}
         title="Daily Promo"
         description="Full-screen interstitial shown on the customer app once per day. Pick a business + upload the marketing creative."
       />

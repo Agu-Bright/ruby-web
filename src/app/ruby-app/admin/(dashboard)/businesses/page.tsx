@@ -389,7 +389,7 @@ export default function BusinessesPage() {
     [],
   );
   const [detailBusiness, setDetailBusiness] = useState<Business | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog' | 'branches' | 'wallet'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'media' | 'cac' | 'hours' | 'catalog' | 'rooms' | 'branches' | 'wallet'>('info');
   const [showFundBusinessModal, setShowFundBusinessModal] = useState(false);
   const [showDebitBusinessModal, setShowDebitBusinessModal] = useState(false);
   // Bumping this forces BusinessWalletTab to refetch wallet + transactions.
@@ -684,6 +684,15 @@ export default function BusinessesPage() {
   );
 
   const displayBusiness = fullDetail || detailBusiness;
+  const isHotelBusiness = ['hotels', 'shortlets'].includes(
+    typeof displayBusiness?.subcategoryId === 'object' ? (displayBusiness.subcategoryId as any).slug : '',
+  );
+
+  const { data: hotelRooms, isLoading: loadingHotelRooms } = useApi<Array<{ _id: string; name: string; roomType: string; pricePerNightNgn: number; maxGuests: number; totalUnits: number; status: string; amenities?: string[] }>>(
+    () => detailBusiness ? api.businesses.rooms(detailBusiness._id) : Promise.resolve({ success: true, data: [] }),
+    [detailBusiness?._id, detailTab],
+    { enabled: detailTab === 'rooms' && !!detailBusiness && isHotelBusiness },
+  );
 
   // Catalog data fetching
   const catalogType = displayBusiness?.type === 'SHOPPING' ? 'products' : displayBusiness?.type === 'SERVICE' ? 'services' : 'both';
@@ -2000,7 +2009,7 @@ export default function BusinessesPage() {
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-gray-100">
-              {(['info', 'media', 'cac', 'hours', 'catalog', ...(!isSupport ? ['wallet'] as const : []), ...(displayBusiness.isParent || displayBusiness.parentBusinessId ? ['branches'] as const : [])] as const).map(tab => (
+              {(['info', 'media', 'cac', 'hours', 'catalog', ...(isHotelBusiness ? ['rooms'] as const : []), ...(!isSupport ? ['wallet'] as const : []), ...(displayBusiness.isParent || displayBusiness.parentBusinessId ? ['branches'] as const : [])] as const).map(tab => (
                 <button
                   key={tab}
                   className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
@@ -2010,13 +2019,25 @@ export default function BusinessesPage() {
                   }`}
                   onClick={() => { setDetailTab(tab as any); if (tab === 'catalog') { setCatalogSearch(''); setCatalogStatusFilter(''); } }}
                 >
-                  {tab === 'info' ? 'Info' : tab === 'media' ? 'Media' : tab === 'cac' ? 'CAC' : tab === 'hours' ? 'Hours' : tab === 'branches' ? 'Branches' : tab === 'wallet' ? 'Wallet' : 'Catalog'}
+                  {tab === 'info' ? 'Info' : tab === 'media' ? 'Media' : tab === 'cac' ? 'CAC' : tab === 'hours' ? 'Hours' : tab === 'branches' ? 'Branches' : tab === 'wallet' ? 'Wallet' : tab === 'rooms' ? 'Rooms' : 'Catalog'}
                   {tab === 'cac' && displayBusiness.cacDocumentUrl && displayBusiness.cacDocumentStatus === 'PENDING' && (
                     <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse" />
                   )}
                 </button>
               ))}
             </div>
+
+            {detailTab === 'rooms' && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500">Read-only inventory. Room availability is calculated from reservation dates, not edited from admin.</p>
+                {loadingHotelRooms ? <div className="py-10 text-center text-sm text-gray-400">Loading rooms…</div> : hotelRooms?.length ? hotelRooms.map(room => (
+                  <div key={room._id} className="rounded-xl border border-gray-200 p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div><div className="flex items-center gap-2"><span className="font-semibold text-gray-900">{room.name}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${room.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{room.status}</span></div><p className="text-sm text-gray-500 mt-1">{room.roomType.replace(/_/g, ' ')} · {room.totalUnits} unit{room.totalUnits === 1 ? '' : 's'} · up to {room.maxGuests} guests</p>{room.amenities?.length ? <p className="text-xs text-gray-400 mt-1">{room.amenities.join(' · ')}</p> : null}</div>
+                    <div className="font-semibold text-gray-900">{formatCurrency(room.pricePerNightNgn)} <span className="text-xs font-normal text-gray-400">/ night</span></div>
+                  </div>
+                )) : <div className="rounded-xl border border-dashed border-gray-200 p-10 text-center text-sm text-gray-400">This hotel has not created any rooms.</div>}
+              </div>
+            )}
 
             {/* Tab: Info */}
             {detailTab === 'info' && (

@@ -26,6 +26,7 @@ export interface BusinessVisibility {
   isReady: boolean;
   showProducts: boolean;
   showServices: boolean;
+  showHotelRooms: boolean;
   isOrderDelivery: boolean;
   isVisitOnly: boolean;
   isBookingVisit: boolean;
@@ -45,6 +46,7 @@ export function useBusinessVisibility(): BusinessVisibility {
       isReady,
       showProducts: true,
       showServices: true,
+      showHotelRooms: true,
       isOrderDelivery: false,
       isVisitOnly: false,
       isBookingVisit: false,
@@ -61,11 +63,13 @@ export function useBusinessVisibility(): BusinessVisibility {
   const showProducts =
     typeof sellsProducts === 'boolean' ? sellsProducts : isOrderDelivery;
   const showServices = isVisitOnly || isBookingVisit;
+  const showHotelRooms = ['hotels', 'shortlets'].includes(business?.subcategorySlug ?? '');
 
   return {
     isReady,
     showProducts,
     showServices,
+    showHotelRooms,
     isOrderDelivery,
     isVisitOnly,
     isBookingVisit,

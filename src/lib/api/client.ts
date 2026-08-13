@@ -900,6 +900,14 @@ export const api = {
   businessOrganization: { branches:(id:string)=>request<any[]>(`/business/${id}/branches`), enableMultiBranch:(id:string,data:any)=>request<any>(`/business/${id}/enable-multi-branch`,{method:'POST',body:data}), createBranch:(id:string,data:any)=>request<any>(`/business/${id}/branches`,{method:'POST',body:data}), catalogMode:(id:string,data:any)=>request<any>(`/business/${id}/catalog-mode`,{method:'PATCH',body:data}), staff:(id:string)=>request<any[]>(`/business/${id}/staff`), assignStaff:(id:string,data:any)=>request<any>(`/business/${id}/staff`,{method:'POST',body:data}), updateStaff:(id:string,staffId:string,data:any)=>request<any>(`/business/${id}/staff/${staffId}`,{method:'PATCH',body:data}), removeStaff:(id:string,staffId:string)=>request<any>(`/business/${id}/staff/${staffId}`,{method:'DELETE'}), referral:(id:string)=>request<any>(`/business/${id}/referrals/me`) },
   businessSettings:{ changePassword:(data:any)=>request<any>('/auth/change-password',{method:'POST',body:data}), updateProfile:(data:any)=>request<any>('/auth/profile',{method:'PUT',body:data}), requestEmailChange:(newEmail:string)=>request<any>('/auth/email-change/request',{method:'POST',body:{newEmail}}), verifyEmailChange:(otp:string)=>request<any>('/auth/email-change/verify',{method:'POST',body:{otp}}), resendEmailChange:()=>request<any>('/auth/email-change/resend',{method:'POST',body:{}}), cancelEmailChange:()=>request<any>('/auth/email-change/cancel',{method:'POST',body:{}}), sendPhoneOtp:(phone?:string)=>request<any>('/auth/phone/send-code',{method:'POST',body:phone?{phone}:{}}), verifyPhoneOtp:(otp:string)=>request<any>('/auth/phone/verify',{method:'POST',body:{otp}}), notificationPreferences:(id:string)=>request<any>(`/business/${id}/notification-preferences`), updateNotificationPreferences:(id:string,data:any)=>request<any>(`/business/${id}/notification-preferences`,{method:'PATCH',body:data}) },
   businessOnboarding:{ profile:(id:string)=>request<any>(`/business/${id}`), update:(id:string,data:any)=>request<any>(`/business/${id}`,{method:'PUT',body:data}), locations:(type?:string)=>request<any[]>('/locations/public',{params:type?{type}:undefined}), validateCoordinates:(locationId:string,latitude:number,longitude:number)=>request<{valid:boolean;message:string}>('/locations/public/validate-coordinates',{method:'POST',body:{locationId,latitude,longitude}}), categories:()=>request<any[]>('/public/taxonomy/categories'), subcategories:(categorySlug:string,locationId?:string)=>request<any[]>(`/public/taxonomy/categories/${categorySlug}/subcategories`,{params:locationId?{locationId}:undefined}), checkName:(name:string)=>request<{available:boolean;slug:string;suggestion?:string}>('/public/businesses/check-name',{params:{name}}), legalDocument:(type:string)=>request<any>(`/public/legal-documents/${type}`), submit:(id:string)=>request<any>(`/business/${id}/submit-for-review`,{method:'POST',body:{}}), verifyLocation:(id:string,data:any)=>request<any>(`/business/${id}/verify-location`,{method:'PATCH',body:data}) },
+  businessHotelRooms: {
+    list: () => request<import('@/lib/business-api/hotel-rooms').HotelRoom[]>('/business/hotel-rooms'),
+    detail: (roomId: string) => request<import('@/lib/business-api/hotel-rooms').HotelRoom>(`/business/hotel-rooms/${roomId}`),
+    create: (data: import('@/lib/business-api/hotel-rooms').CreateHotelRoomPayload) => request<import('@/lib/business-api/hotel-rooms').HotelRoom>('/business/hotel-rooms', { method: 'POST', body: data }),
+    update: (roomId: string, data: import('@/lib/business-api/hotel-rooms').UpdateHotelRoomPayload) => request<import('@/lib/business-api/hotel-rooms').HotelRoom>(`/business/hotel-rooms/${roomId}`, { method: 'PATCH', body: data }),
+    archive: (roomId: string) => request<import('@/lib/business-api/hotel-rooms').HotelRoom>(`/business/hotel-rooms/${roomId}`, { method: 'DELETE' }),
+    occupancy: (startDate: string, endDate: string) => request<import('@/lib/business-api/hotel-rooms').RoomOccupancy[]>('/business/hotel-rooms/occupancy', { params: { startDate, endDate } }),
+  },
 
   // ============================================================
   // Business delivery (M2 stretch)
@@ -1368,6 +1376,8 @@ export const api = {
       }),
     get: (id: string) =>
       request<import("@/lib/types").Business>(`/admin/businesses/${id}`),
+    rooms: (id: string) =>
+      request<Array<{ _id: string; name: string; roomType: string; pricePerNightNgn: number; maxGuests: number; totalUnits: number; status: string; amenities?: string[] }>>(`/admin/businesses/${id}/rooms`),
     approve: (id: string, data?: { notes?: string }) =>
       request<import("@/lib/types").Business>(
         `/admin/businesses/${id}/approve`,

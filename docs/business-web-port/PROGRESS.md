@@ -1097,3 +1097,15 @@ _Appended by each session so a fresh agent can `git diff` intelligently._
 - `src/app/business/dashboard/page.tsx` — NEW placeholder home (real content in M1)
 - `src/components/business/BusinessSidebar.tsx` — NEW 8-group nav (Overview / Commerce / Catalog / Marketing / Finance / Analytics / Organization / Support)
 - `src/components/business/BusinessTopbar.tsx` — NEW header with business identity + status pill + notifications icon + profile menu
+
+### 2026-08-13 — Hotel room management and business classification parity
+
+**What works:** Hotel/Shortlet businesses now have a dedicated **Hotel rooms** workspace in the business web portal. Merchants can create and edit room inventory with photo uploads, a cover photo, room type, nightly price, capacity, units, beds, amenities, stay limits, cancellation terms, status, and smoking preference. The rooms list shows an availability snapshot for selected dates and supports safe archival. The Business Profile editor also has a Category tab where merchants can choose a category and its matching subcategory.
+
+**Safety/design decisions:** Room tools only appear for Hotels and Shortlets. Direct API requests remain protected by the backend hotel-category guard. Profile classification updates now validate the category/subcategory pair server-side and update the selected subcategory template linkage atomically. The same validation is used for owner, assisted-support, and admin profile updates.
+
+**Files touched:** `src/app/business/dashboard/rooms/**`, `src/components/business/rooms/RoomEditor.tsx`, `src/components/business/BusinessSidebar.tsx`, `src/app/business/dashboard/profile/page.tsx`, `src/lib/api/client.ts`, `src/lib/business-api/hotel-rooms.ts`, `src/lib/business-api/index.ts`, `src/lib/business-auth/use-business-visibility.ts`; backend `src/modules/businesses/businesses.service.ts`.
+
+**Verification:** `git diff --check` completed without whitespace errors. `pnpm exec tsc --noEmit -p tsconfig.json` passed in both the web and backend repositories. Required smoke test: log in as a Hotels/Shortlets merchant, create an ACTIVE room with one image, change dates in availability, edit/archive it, then change category + subcategory from Profile and confirm the refreshed sidebar reflects the new classification.
+
+**Next task for next agent:** Browser-smoke the room flow and validate category changes against an existing business with template data; add a migration/review decision if historic template data should be transformed rather than retained.

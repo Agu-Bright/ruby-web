@@ -75,6 +75,8 @@ export { useServices, useServiceDetail, useCreateService, useUpdateService, useD
 export type { BusinessService, CreateServicePayload, UpdateServicePayload, PricingType, FulfillmentMode, ServiceStatus } from './services';
 export { useBusinessWallets, useWalletDetail, useWalletTransactions, useFundBusinessWallet } from './wallet';
 export type { BusinessWallet } from './wallet';
+export { useHotelRooms, useHotelRoom, useRoomOccupancy, useCreateHotelRoom, useUpdateHotelRoom, useArchiveHotelRoom } from './hotel-rooms';
+export type { HotelRoom, CreateHotelRoomPayload, UpdateHotelRoomPayload, RoomType, RoomStatus, BedType, RoomOccupancy } from './hotel-rooms';
 export { useBankAccounts, useCreateBankAccount, usePayouts, useCreatePayout } from './payouts';
 export type { BankAccount, Payout } from './payouts';
 export { useAdCampaigns, useAdCampaign, useAdStats, useCreateAdCampaign, useCreateOrganicReel, useMyOrganicReels, useRequestPushBlast, usePushBlastRequests, useAdAction } from './ads';

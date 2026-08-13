@@ -8,6 +8,7 @@
  *   - Media      : logo + cover image (via shared ImageUpload)
  *   - Contact    : phone/email/website + socials (WA / IG / FB / X / TikTok / YT / LinkedIn)
  *   - Hours      : 7-day open/close with per-day closed toggle
+ *   - Classification: category + subcategory (validated server-side as one pair)
  *   - Verification: CAC number/status (display + link to CAC card if not registered)
  *   - More       : operation mode + acceptsOrders/acceptsBookings + branch label (parent view only)
  *
@@ -38,6 +39,7 @@ import {
   Shield,
   Sliders,
   MapPin,
+  Tags,
   Loader2,
   Save,
 } from 'lucide-react';
@@ -200,6 +202,7 @@ type TabKey =
   | 'contact'
   | 'hours'
   | 'location'
+  | 'classification'
   | 'verification'
   | 'more';
 
@@ -213,6 +216,7 @@ const TABS: Array<{
   { key: 'contact', label: 'Contact', icon: Phone },
   { key: 'hours', label: 'Hours', icon: Clock },
   { key: 'location', label: 'Location', icon: MapPin },
+  { key: 'classification', label: 'Category', icon: Tags },
   { key: 'verification', label: 'Verification', icon: Shield },
   { key: 'more', label: 'More', icon: Sliders },
 ];
@@ -230,6 +234,11 @@ export default function BusinessProfilePage() {
   });
   const doc = query.data as BusinessDoc | null | undefined;
   const { isLoading, error, refetch } = query;
+  const categoriesQuery = useBusinessQuery(
+    () => api.businessOnboarding.categories(),
+    [businessId],
+    { enabled: !!businessId },
+  );
 
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
 
@@ -252,7 +261,18 @@ export default function BusinessProfilePage() {
   const [pinChanged, setPinChanged] = useState(false);
   const [branchLabel, setBranchLabel] = useState('');
   const [operationMode, setOperationMode] = useState<BusinessModel | undefined>();
+  const [categoryId, setCategoryId] = useState('');
+  const [subcategoryId, setSubcategoryId] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const categories = (categoriesQuery.data ?? []) as Array<{ _id: string; name: string; slug: string; isActive?: boolean }>;
+  const selectedCategory = categories.find((category) => category._id === categoryId);
+  const subcategoriesQuery = useBusinessQuery(
+    () => selectedCategory ? api.businessOnboarding.subcategories(selectedCategory.slug) : Promise.resolve({ data: [], meta: {} } as any),
+    [selectedCategory?.slug],
+    { enabled: !!selectedCategory?.slug },
+  );
+  const subcategories = (subcategoriesQuery.data ?? []) as Array<{ _id: string; name: string; slug: string; businessModel?: BusinessModel; isActive?: boolean }>;
 
   // Hydrate form state whenever the fetched doc changes.
   useEffect(() => {
@@ -306,6 +326,8 @@ export default function BusinessProfilePage() {
     setAddressChanged(false);
     setPinChanged(false);
     setBranchLabel(doc.branchLabel ?? '');
+    setCategoryId(typeof doc.categoryId === 'object' ? doc.categoryId._id : doc.categoryId ?? '');
+    setSubcategoryId(typeof doc.subcategoryId === 'object' ? doc.subcategoryId._id : doc.subcategoryId ?? '');
     const populatedSub =
       typeof doc.subcategoryId === 'object' ? doc.subcategoryId : null;
     setOperationMode(populatedSub?.businessModel);
@@ -347,6 +369,8 @@ export default function BusinessProfilePage() {
         sellsProducts,
         acceptsOrders,
         acceptsBookings,
+        categoryId,
+        subcategoryId,
         contact: sanitizeContact(contact),
         hours: hours.map((h) => ({
           dayOfWeek: h.dayOfWeek,
@@ -383,6 +407,8 @@ export default function BusinessProfilePage() {
     sellsProducts,
     acceptsOrders,
     acceptsBookings,
+    categoryId,
+    subcategoryId,
     contact,
     hours,
     branchLabel,
@@ -532,6 +558,17 @@ export default function BusinessProfilePage() {
           }}
         />
       )}
+      {activeTab === 'classification' && (
+        <ClassificationPanel
+          categoryId={categoryId}
+          setCategoryId={(next) => { setCategoryId(next); setSubcategoryId(''); }}
+          subcategoryId={subcategoryId}
+          setSubcategoryId={setSubcategoryId}
+          categories={categories}
+          subcategories={subcategories}
+          isLoading={categoriesQuery.isLoading || subcategoriesQuery.isLoading}
+        />
+      )}
       {activeTab === 'verification' && (
         <VerificationPanel doc={doc} />
       )}
@@ -584,6 +621,42 @@ function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
         props.className ?? ''
       }`}
     />
+  );
+}
+
+function ClassificationPanel(props: {
+  categoryId: string;
+  setCategoryId: (value: string) => void;
+  subcategoryId: string;
+  setSubcategoryId: (value: string) => void;
+  categories: Array<{ _id: string; name: string; slug: string; isActive?: boolean }>;
+  subcategories: Array<{ _id: string; name: string; slug: string; businessModel?: BusinessModel; isActive?: boolean }>;
+  isLoading: boolean;
+}) {
+  return (
+    <Panel>
+      <div>
+        <h2 className="font-semibold text-gray-900">Business classification</h2>
+        <p className="mt-1 text-sm leading-6 text-gray-500">Choose the category that best describes your business. This controls the customer experience, catalogue and booking tools available to you.</p>
+      </div>
+      <div className="grid gap-5 md:grid-cols-2">
+        <div>
+          <FieldLabel>Category</FieldLabel>
+          <select value={props.categoryId} onChange={(event) => props.setCategoryId(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white p-3 text-sm focus:border-ruby-red focus:outline-none focus:ring-2 focus:ring-ruby-red/20" disabled={props.isLoading}>
+            <option value="">Select a category</option>
+            {props.categories.filter((category) => category.isActive !== false).map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <FieldLabel>Subcategory</FieldLabel>
+          <select value={props.subcategoryId} onChange={(event) => props.setSubcategoryId(event.target.value)} className="w-full rounded-lg border border-gray-200 bg-white p-3 text-sm focus:border-ruby-red focus:outline-none focus:ring-2 focus:ring-ruby-red/20" disabled={!props.categoryId || props.isLoading}>
+            <option value="">{props.categoryId ? 'Select a subcategory' : 'Choose a category first'}</option>
+            {props.subcategories.filter((subcategory) => subcategory.isActive !== false).map((subcategory) => <option key={subcategory._id} value={subcategory._id}>{subcategory.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"><span className="font-semibold">Before saving:</span> changing your classification may change whether customers order products, make bookings, or see hotel rooms. Your existing information remains on your profile for review.</div>
+    </Panel>
   );
 }
 

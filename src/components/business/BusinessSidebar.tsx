@@ -37,6 +37,7 @@ import {
   Settings,
   Sparkles,
   Store,
+  BedDouble,
 } from 'lucide-react';
 import { useBusinessAuth, useBusinessVisibility } from '@/lib/business-auth';
 
@@ -95,6 +96,7 @@ export const BUSINESS_NAV_GROUPS: NavGroup[] = [
         href: '/business/dashboard/services',
         icon: Wrench,
       },
+      { label: 'Hotel rooms', href: '/business/dashboard/rooms', icon: BedDouble },
     ],
   },
   {
@@ -209,15 +211,16 @@ export function BusinessSidebar() {
         if (item.href === '/business/dashboard/services') {
           return visibility.showServices;
         }
+        if (item.href === '/business/dashboard/rooms') return visibility.showHotelRooms;
         return true;
       });
       if (restrictedAssistedSession) {
-        const allowed = new Set(['/business/dashboard', '/business/dashboard/products', '/business/dashboard/services', '/business/dashboard/profile']);
+        const allowed = new Set(['/business/dashboard', '/business/dashboard/products', '/business/dashboard/services', '/business/dashboard/rooms', '/business/dashboard/profile']);
         items = items.filter((item) => allowed.has(item.href));
       }
       return { ...group, items };
     }).filter((group) => group.items.length > 0);
-  }, [visibility.showProducts, visibility.showServices, restrictedAssistedSession]);
+  }, [visibility.showProducts, visibility.showServices, visibility.showHotelRooms, restrictedAssistedSession]);
 
   return (
     <aside

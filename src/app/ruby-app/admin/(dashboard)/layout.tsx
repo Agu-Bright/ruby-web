@@ -43,6 +43,7 @@ import {
   Gem,
   Crown,
   BookOpen,
+  Activity,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { AdminSocketsProvider } from "@/lib/admin-sockets";
@@ -199,6 +200,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Audit Logs", href: "/ruby-app/admin/audit-logs", icon: ScrollText },
       { label: "App Versions", href: "/ruby-app/admin/app-versions", icon: Smartphone },
+      { label: "Analytics diagnostics", href: "/ruby-app/admin/diagnostics", icon: Activity },
       { label: "Deolu health", href: "/ruby-app/admin/deolu", icon: Sparkles },
       // Admin-managed email recipients for platform-wide ops alerts.
       { label: "System Alerts", href: "/ruby-app/admin/system-alerts", icon: Bell, hiddenForRoles: ["location_admin"] },

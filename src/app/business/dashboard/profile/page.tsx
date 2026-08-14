@@ -106,6 +106,8 @@ interface BusinessDoc {
   tagline?: string;
   logoUrl?: string;
   coverImageUrl?: string;
+  menuImageUrls?: string[];
+  budgetForTwo?: number;
   media?: Array<{
     url: string;
     type?: string;
@@ -249,6 +251,8 @@ export default function BusinessProfilePage() {
   const [logoUrl, setLogoUrl] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+  const [menuImageUrls, setMenuImageUrls] = useState<string[]>([]);
+  const [budgetForTwo, setBudgetForTwo] = useState('');
   const [sellsProducts, setSellsProducts] = useState(false);
   const [acceptsOrders, setAcceptsOrders] = useState(false);
   const [acceptsBookings, setAcceptsBookings] = useState(false);
@@ -299,6 +303,8 @@ export default function BusinessProfilePage() {
         .map((media) => media.url)
         .slice(0, 8),
     );
+    setMenuImageUrls((doc.menuImageUrls ?? []).filter(Boolean).slice(0, 12));
+    setBudgetForTwo(doc.budgetForTwo ? String(doc.budgetForTwo) : '');
     setSellsProducts(!!doc.sellsProducts);
     setAcceptsOrders(!!doc.acceptsOrders);
     setAcceptsBookings(!!doc.acceptsBookings);
@@ -348,6 +354,9 @@ export default function BusinessProfilePage() {
     if (loc && typeof loc === 'object') return loc.name ?? '';
     return '';
   }, [doc?.locationId]);
+  const isFoodBusiness = /restaurant|dining|food|buka|takeout|cafe|catering/i.test(
+    `${categoryName} ${subcategoryName}`,
+  );
 
   const handleSave = useCallback(async () => {
     if (!businessId) return;
@@ -379,6 +388,10 @@ export default function BusinessProfilePage() {
           isClosed: !!h.isClosed,
         })),
       };
+      if (isFoodBusiness) {
+        payload.menuImageUrls = menuImageUrls;
+        payload.budgetForTwo = budgetForTwo.trim() ? Number(budgetForTwo) : 0;
+      }
       if (branchLabel.trim()) payload.branchLabel = branchLabel.trim();
       if (addressChanged) payload.address = sanitizeAddress(address);
       if (pinChanged) {
@@ -404,6 +417,9 @@ export default function BusinessProfilePage() {
     logoUrl,
     coverImageUrl,
     galleryUrls,
+    menuImageUrls,
+    budgetForTwo,
+    isFoodBusiness,
     sellsProducts,
     acceptsOrders,
     acceptsBookings,
@@ -524,6 +540,9 @@ export default function BusinessProfilePage() {
           acceptsBookings={acceptsBookings}
           setAcceptsBookings={setAcceptsBookings}
           operationMode={operationMode}
+          isFoodBusiness={isFoodBusiness}
+          budgetForTwo={budgetForTwo}
+          setBudgetForTwo={setBudgetForTwo}
         />
       )}
       {activeTab === 'media' && (
@@ -534,6 +553,9 @@ export default function BusinessProfilePage() {
           setCoverImageUrl={setCoverImageUrl}
           galleryUrls={galleryUrls}
           setGalleryUrls={setGalleryUrls}
+          isFoodBusiness={isFoodBusiness}
+          menuImageUrls={menuImageUrls}
+          setMenuImageUrls={setMenuImageUrls}
         />
       )}
       {activeTab === 'contact' && (
@@ -713,6 +735,9 @@ function BasicPanel(props: {
   acceptsBookings: boolean;
   setAcceptsBookings: (v: boolean) => void;
   operationMode: BusinessModel | undefined;
+  isFoodBusiness: boolean;
+  budgetForTwo: string;
+  setBudgetForTwo: (v: string) => void;
 }) {
   return (
     <Panel>
@@ -743,6 +768,21 @@ function BasicPanel(props: {
           placeholder="Tell customers about your business, what you offer, your story…"
         />
       </div>
+
+      {props.isFoodBusiness && (
+        <div>
+          <FieldLabel>Budget for two (₦)</FieldLabel>
+          <p className="mb-2 text-xs text-gray-500">
+            Estimated average spend for two diners. This appears on your customer page.
+          </p>
+          <TextInput
+            value={props.budgetForTwo}
+            onChange={(event) => props.setBudgetForTwo(event.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="e.g. 20000"
+            inputMode="numeric"
+          />
+        </div>
+      )}
 
       <div className="space-y-3 pt-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
@@ -783,6 +823,9 @@ function MediaPanel(props: {
   setCoverImageUrl: (v: string) => void;
   galleryUrls: string[];
   setGalleryUrls: (urls: string[]) => void;
+  isFoodBusiness: boolean;
+  menuImageUrls: string[];
+  setMenuImageUrls: (urls: string[]) => void;
 }) {
   return (
     <Panel>
@@ -847,6 +890,43 @@ function MediaPanel(props: {
           )}
         </div>
       </div>
+      {props.isFoodBusiness && (
+        <div>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <FieldLabel>Menu images</FieldLabel>
+            <span className="text-xs font-medium text-gray-500">{props.menuImageUrls.length}/12 pages</span>
+          </div>
+          <p className="mb-3 text-xs text-gray-500">
+            Upload readable menu pages separately from your gallery. Customers can open them as a full menu on your public profile.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {props.menuImageUrls.map((url, index) => (
+              <div key={url} className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                <img src={url} alt={`Menu page ${index + 1}`} className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => props.setMenuImageUrls(props.menuImageUrls.filter((item) => item !== url))}
+                  className="absolute right-2 top-2 rounded-full bg-black/65 px-2 py-1 text-xs font-semibold text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                  aria-label={`Remove menu page ${index + 1}`}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            {props.menuImageUrls.length < 12 && (
+              <div className="min-h-28">
+                <ImageUpload
+                  scope="business"
+                  onChange={(url) => {
+                    if (url) props.setMenuImageUrls([...props.menuImageUrls, url].slice(0, 12));
+                  }}
+                  folder="business/menus"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </Panel>
   );
 }

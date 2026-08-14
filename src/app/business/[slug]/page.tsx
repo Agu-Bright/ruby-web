@@ -128,6 +128,9 @@ export default async function BusinessPublicProfile({
     (m: { type?: string; url?: string }) =>
       m.type === "IMAGE" && m.url !== business.logoUrl,
   );
+  const menuImages: string[] = Array.isArray(business.menuImageUrls)
+    ? business.menuImageUrls.filter((url: unknown): url is string => typeof url === 'string' && url.length > 0)
+    : [];
   const ratingValue = business.weightedRating ?? business.averageRating ?? null;
   const reviewCount =
     business.weightedRatingCount ?? business.totalReviews ?? 0;
@@ -410,10 +413,35 @@ export default async function BusinessPublicProfile({
               </div>
             </div>
           )}
+
+          {menuImages.length > 0 && (
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="font-playfair text-2xl font-bold text-ruby-black">Menu</h2>
+                <div className="flex-1 h-px bg-gray-100" />
+              </div>
+              <p className="mb-4 text-sm text-gray-600">Browse the restaurant&apos;s menu pages.</p>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                {menuImages.map((url, index) => (
+                  <a key={url} href={url} target="_blank" rel="noreferrer" className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-gray-200 bg-ruby-gray">
+                    <Image src={url} alt={`${business.name} menu page ${index + 1}`} fill className="object-cover transition-transform duration-300 group-hover:scale-105" sizes="(max-width: 768px) 50vw, 33vw" />
+                    <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-2 py-1 text-xs font-semibold text-white">Menu {index + 1}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right — contact + hours + app CTA */}
         <aside className="space-y-5">
+          {typeof business.budgetForTwo === 'number' && business.budgetForTwo > 0 && (
+            <div className="rounded-2xl border border-red-100 bg-red-50 p-5">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.15em] text-ruby-red">Budget for two</h3>
+              <p className="mt-1 text-xl font-bold text-ruby-black">₦{business.budgetForTwo.toLocaleString('en-NG')}</p>
+              <p className="mt-1 text-xs text-gray-600">Estimated total spend for two people</p>
+            </div>
+          )}
           {address && (
             <div className="bg-ruby-gray rounded-2xl p-5 border border-gray-100">
               <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em] mb-3">

@@ -2171,6 +2171,33 @@ export interface UpdateDailyBusinessPromoPayload {
   ctaLabel?: string;
 }
 
+/**
+ * P158 — Personalization tile. Rendered in the customer onboarding
+ * "What do you use Ruby for?" picker; picks reorder the customer home
+ * tab so matching sections float to the top.
+ */
+export interface PersonalizationTile {
+  _id: string;
+  title: string;
+  iconKey: string;
+  subcategorySlugs: string[];
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePersonalizationTilePayload {
+  title: string;
+  iconKey: string;
+  subcategorySlugs?: string[];
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
+export type UpdatePersonalizationTilePayload =
+  Partial<CreatePersonalizationTilePayload>;
+
 export interface UpdateMerchantSupportConfigPayload {
   whatsappPhone?: string;
   whatsappIntroMessage?: string;

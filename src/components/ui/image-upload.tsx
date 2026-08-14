@@ -13,6 +13,7 @@ interface ImageUploadProps {
   helpText?: string;
   maxSizeMB?: number;
   disabled?: boolean;
+  scope?: 'admin' | 'business';
 }
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
@@ -26,12 +27,21 @@ export function ImageUpload({
   helpText,
   maxSizeMB = 5,
   disabled = false,
+  scope,
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // A shared uploader is used in both dashboards. Infer the business portal
+  // when callers do not provide a scope so its token is never sent to admin
+  // media routes.
+  const resolvedScope = scope ?? (
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/business/')
+      ? 'business'
+      : 'admin'
+  );
 
   const validateFile = useCallback(
     (file: File): string | null => {
@@ -63,7 +73,9 @@ export function ImageUpload({
         setIsCompressing(false);
 
         setIsUploading(true);
-        const res = await api.media.upload(compressed, folder);
+        const res = resolvedScope === 'business'
+          ? await api.businessMedia.upload(compressed)
+          : await api.media.upload(compressed, folder);
         onChange(res.data.url);
       } catch (err: unknown) {
         const message =
@@ -74,7 +86,7 @@ export function ImageUpload({
         setIsUploading(false);
       }
     },
-    [folder, onChange, validateFile],
+    [folder, onChange, resolvedScope, validateFile],
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

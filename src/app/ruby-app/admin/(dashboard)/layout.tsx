@@ -212,6 +212,10 @@ const navGroups: NavGroup[] = [
       // shows once per day. Admin picks the business + uploads creative;
       // customer app gates display client-side.
       { label: "Daily Promo", href: "/ruby-app/admin/daily-promo", icon: Sparkles, superOnly: true },
+      // P158 — Personalization tiles power the customer onboarding
+      // "What do you use Ruby for?" picker. Picks reorder home-tab
+      // sections so matching categories float to the top for that user.
+      { label: "Personalization", href: "/ruby-app/admin/personalization", icon: LayoutGrid, superOnly: true },
     ],
   },
 ];

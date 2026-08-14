@@ -1117,3 +1117,15 @@ _Appended by each session so a fresh agent can `git diff` intelligently._
 **Cause:** The first version used the pre-Next-15 synchronous `params: { id: string }` contract. Production compilation correctly rejected it during the route type check.
 
 **Verification:** `pnpm exec tsc --noEmit -p tsconfig.json` passed. A local optimized build exceeded this environment's 120-second command cap while generating routes, but it passed the earlier type-checking stage where the deployment failed.
+
+### 2026-08-13 — Business portal media-upload authorization fix
+
+**What works:** Image uploads from the Business portal now use the authenticated business-media endpoints, including service cover images, hotel-room photos, and business profile logo, cover, and gallery images. An upload no longer sends a business token to an admin-only media endpoint.
+
+**Cause and design decision:** The shared `ImageUpload` component always called `/admin/media/*`. That endpoint only accepts admin roles, so a business owner upload was rejected and the shared client handled the auth failure by clearing the session and redirecting to login. The uploader now supports an explicit `business` scope and safely infers it for the `/business/` portal; scoped requests use `/business/media/presigned-url` with `/business/media/upload` as the fallback. The folder field is omitted for that scoped route so the backend enforces its `businesses` storage folder.
+
+**Files touched:** `src/lib/api/client.ts`, `src/components/ui/image-upload.tsx`, `src/app/business/dashboard/profile/page.tsx`. The shared uploader automatically covers existing service and hotel-room upload controls inside the Business portal.
+
+**Verification:** `pnpm exec tsc --noEmit -p tsconfig.json` passed and `git diff --check` reported no whitespace errors. Required browser smoke test: from `/business/dashboard/services/new`, upload a JPEG or PNG while signed in as a business owner, confirm the preview remains visible and the session stays open, then save the service.
+
+**Next task for next agent:** Browser-smoke both direct R2 upload and the multipart fallback with a business/assisted-business session.

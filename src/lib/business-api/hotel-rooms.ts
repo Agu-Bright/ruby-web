@@ -5,7 +5,8 @@ import { api } from '@/lib/api';
 import { useMutation } from '@/lib/hooks';
 import { useBusinessQuery } from './hooks';
 
-export type RoomType = 'STANDARD' | 'DELUXE' | 'SUITE' | 'EXECUTIVE' | 'FAMILY' | 'PENTHOUSE' | 'STUDIO' | 'APARTMENT';
+/** A hotel-defined label, e.g. "Garden Cottage" or "Executive King Room". */
+export type RoomType = string;
 export type RoomStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
 export type BedType = 'KING' | 'QUEEN' | 'DOUBLE' | 'SINGLE' | 'BUNK' | 'SOFA_BED';
 export interface HotelRoomMedia { url: string; type?: 'IMAGE' | 'VIDEO'; order?: number; }

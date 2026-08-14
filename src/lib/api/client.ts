@@ -290,6 +290,10 @@ async function uploadFile(
 async function uploadDirect(
   file: File,
   folder?: string,
+  paths: { presignedUrl: string; uploadUrl: string } = {
+    presignedUrl: "/admin/media/presigned-url",
+    uploadUrl: "/admin/media/upload",
+  },
 ): Promise<ApiResponse<UploadResult>> {
   try {
     // 1. Get presigned URL from backend
@@ -298,9 +302,15 @@ async function uploadDirect(
       key: string;
       publicUrl: string;
       expiresIn: number;
-    }>("/admin/media/presigned-url", {
+    }>(paths.presignedUrl, {
       method: "POST",
-      body: { fileName: file.name, mimeType: file.type, folder: folder || "uploads" },
+      // Omit the folder for scoped upload endpoints so the backend applies its
+      // protected default (for example, `businesses` for business media).
+      body: {
+        fileName: file.name,
+        mimeType: file.type,
+        ...(folder ? { folder } : {}),
+      },
     });
 
     // 2. PUT file directly to R2
@@ -330,7 +340,7 @@ async function uploadDirect(
     };
   } catch {
     // Fallback to multipart upload through backend
-    return uploadFile("/admin/media/upload", file, folder);
+    return uploadFile(paths.uploadUrl, file, folder);
   }
 }
 
@@ -1091,6 +1101,15 @@ export const api = {
     delete: (key: string) =>
       request<void>(`/admin/media/${encodeURIComponent(key)}`, {
         method: "DELETE",
+      }),
+  },
+
+  // Business uploads must not be sent to admin-only media endpoints.
+  businessMedia: {
+    upload: (file: File) =>
+      uploadDirect(file, undefined, {
+        presignedUrl: "/business/media/presigned-url",
+        uploadUrl: "/business/media/upload",
       }),
   },
 
@@ -2495,6 +2514,37 @@ export const api = {
 
   // P135 — admin-editable singleton powering the business app's
   // "Talk to Ruby+" support card. SUPER_ADMIN only on the backend.
+  // P158 — Home personalization tiles (admin CRUD). Powers the customer
+  // onboarding picker + Profile → Preferences edit screen.
+  personalizationTiles: {
+    list: () =>
+      request<import("@/lib/types").PersonalizationTile[]>(
+        "/admin/personalization/tiles",
+      ),
+    get: (id: string) =>
+      request<import("@/lib/types").PersonalizationTile>(
+        `/admin/personalization/tiles/${id}`,
+      ),
+    create: (data: import("@/lib/types").CreatePersonalizationTilePayload) =>
+      request<import("@/lib/types").PersonalizationTile>(
+        "/admin/personalization/tiles",
+        { method: "POST", body: data },
+      ),
+    update: (
+      id: string,
+      data: import("@/lib/types").UpdatePersonalizationTilePayload,
+    ) =>
+      request<import("@/lib/types").PersonalizationTile>(
+        `/admin/personalization/tiles/${id}`,
+        { method: "PUT", body: data },
+      ),
+    remove: (id: string) =>
+      request<{ deleted: true }>(
+        `/admin/personalization/tiles/${id}`,
+        { method: "DELETE" },
+      ),
+  },
+
   merchantSupport: {
     get: () =>
       request<import("@/lib/types").MerchantSupportConfig>(

@@ -792,6 +792,7 @@ function MediaPanel(props: {
           Square, at least 200×200. Shown as your avatar across the app.
         </p>
         <ImageUpload
+          scope="business"
           value={props.logoUrl}
           onChange={(url) => props.setLogoUrl(url ?? '')}
           folder="business/logo"
@@ -803,6 +804,7 @@ function MediaPanel(props: {
           Wide banner (16:9 or wider). This is the main image behind your profile header.
         </p>
         <ImageUpload
+          scope="business"
           value={props.coverImageUrl}
           onChange={(url) => props.setCoverImageUrl(url ?? '')}
           folder="business/cover"
@@ -835,6 +837,7 @@ function MediaPanel(props: {
           {props.galleryUrls.length < 8 && (
             <div className="min-h-28">
               <ImageUpload
+                scope="business"
                 onChange={(url) => {
                   if (url) props.setGalleryUrls([...props.galleryUrls, url].slice(0, 8));
                 }}

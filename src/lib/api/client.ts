@@ -555,6 +555,7 @@ export const api = {
           parentBusinessId?: string;
           logoUrl?: string;
           sellsProducts?: boolean;
+          offersServiceReservations?: boolean;
           subcategoryId?:
             | string
             | {
@@ -583,6 +584,7 @@ export const api = {
         parentBusinessId?: string;
         logoUrl?: string;
         sellsProducts?: boolean;
+        offersServiceReservations?: boolean;
         subcategoryId?:
           | string
           | {

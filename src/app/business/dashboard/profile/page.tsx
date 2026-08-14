@@ -118,6 +118,7 @@ interface BusinessDoc {
   cacNumber?: string;
   cacStatus?: string;
   sellsProducts?: boolean;
+  offersServiceReservations?: boolean;
   acceptsOrders?: boolean;
   acceptsBookings?: boolean;
   contact?: BusinessContact;
@@ -254,6 +255,7 @@ export default function BusinessProfilePage() {
   const [menuImageUrls, setMenuImageUrls] = useState<string[]>([]);
   const [budgetForTwo, setBudgetForTwo] = useState('');
   const [sellsProducts, setSellsProducts] = useState(false);
+  const [offersServiceReservations, setOffersServiceReservations] = useState(false);
   const [acceptsOrders, setAcceptsOrders] = useState(false);
   const [acceptsBookings, setAcceptsBookings] = useState(false);
   const [contact, setContact] = useState<BusinessContact>({});
@@ -306,6 +308,7 @@ export default function BusinessProfilePage() {
     setMenuImageUrls((doc.menuImageUrls ?? []).filter(Boolean).slice(0, 12));
     setBudgetForTwo(doc.budgetForTwo ? String(doc.budgetForTwo) : '');
     setSellsProducts(!!doc.sellsProducts);
+    setOffersServiceReservations(doc.offersServiceReservations === true);
     setAcceptsOrders(!!doc.acceptsOrders);
     setAcceptsBookings(!!doc.acceptsBookings);
     setContact(doc.contact ?? {});
@@ -376,6 +379,7 @@ export default function BusinessProfilePage() {
         coverImageUrl: coverImageUrl.trim() || undefined,
         media: buildBusinessMedia(logoUrl, coverImageUrl, galleryUrls),
         sellsProducts,
+        offersServiceReservations,
         acceptsOrders,
         acceptsBookings,
         categoryId,
@@ -421,6 +425,7 @@ export default function BusinessProfilePage() {
     budgetForTwo,
     isFoodBusiness,
     sellsProducts,
+    offersServiceReservations,
     acceptsOrders,
     acceptsBookings,
     categoryId,
@@ -535,6 +540,8 @@ export default function BusinessProfilePage() {
           setTagline={setTagline}
           sellsProducts={sellsProducts}
           setSellsProducts={setSellsProducts}
+          offersServiceReservations={offersServiceReservations}
+          setOffersServiceReservations={setOffersServiceReservations}
           acceptsOrders={acceptsOrders}
           setAcceptsOrders={setAcceptsOrders}
           acceptsBookings={acceptsBookings}
@@ -730,6 +737,8 @@ function BasicPanel(props: {
   setTagline: (v: string) => void;
   sellsProducts: boolean;
   setSellsProducts: (v: boolean) => void;
+  offersServiceReservations: boolean;
+  setOffersServiceReservations: (v: boolean) => void;
   acceptsOrders: boolean;
   setAcceptsOrders: (v: boolean) => void;
   acceptsBookings: boolean;
@@ -793,6 +802,12 @@ function BasicPanel(props: {
           description="Show a Products tab on your profile and enable the online catalogue. Off = services / bookings only."
           value={props.sellsProducts}
           onChange={props.setSellsProducts}
+        />
+        <ToggleRow
+          title="Offer bookable services"
+          description="Publish services customers can choose and reserve. When off, customers use Request a Quote instead."
+          value={props.offersServiceReservations}
+          onChange={props.setOffersServiceReservations}
         />
         {props.operationMode !== 'VISIT_ONLY' && (
           <ToggleRow

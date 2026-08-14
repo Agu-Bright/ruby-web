@@ -91,6 +91,7 @@ export interface SelectedBusiness {
   // = "still hydrating" — the sidebar defaults to showing everything.
   businessModel?: BusinessModel;
   sellsProducts?: boolean;
+  offersServiceReservations?: boolean;
   subcategoryId?: string;
   subcategorySlug?: string;
   productFields?: CustomField[];
@@ -184,6 +185,8 @@ export function BusinessAuthProvider({ children }: { children: React.ReactNode }
         parentBusinessId:
           profile.parentBusinessId ?? current.parentBusinessId,
         sellsProducts: profile.sellsProducts ?? current.sellsProducts,
+        offersServiceReservations:
+          profile.offersServiceReservations ?? current.offersServiceReservations,
         businessModel:
           populatedSub?.businessModel ?? current.businessModel,
         subcategoryId:

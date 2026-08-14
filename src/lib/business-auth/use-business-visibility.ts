@@ -9,8 +9,8 @@
  *     `true` for ORDER_DELIVERY subcategories, `false` for the rest.
  *     Merchants can override on their business profile — e.g. a salon
  *     (VISIT_ONLY) that also sells shampoo can flip it on.
- *   - Services show whenever the business model is `VISIT_ONLY` or
- *     `BOOKING_VISIT`. ORDER_DELIVERY businesses don't book.
+ *   - Services show only when the merchant explicitly enables the
+ *     bookable-service catalogue from Business Profile.
  *
  * While the hydrated fields are still loading (right after login, before
  * `refreshBusinessProfile` resolves), `isReady` is `false` and we default
@@ -37,6 +37,7 @@ export function useBusinessVisibility(): BusinessVisibility {
   const { business } = useBusinessAuth();
   const businessModel = business?.businessModel;
   const sellsProducts = business?.sellsProducts;
+  const offersServiceReservations = business?.offersServiceReservations;
 
   // Not hydrated yet — default to showing everything so the sidebar
   // doesn't briefly hide a valid tab and jerk on hydration.
@@ -62,7 +63,7 @@ export function useBusinessVisibility(): BusinessVisibility {
   // to the model-based default (ORDER_DELIVERY = true, otherwise false).
   const showProducts =
     typeof sellsProducts === 'boolean' ? sellsProducts : isOrderDelivery;
-  const showServices = isVisitOnly || isBookingVisit;
+  const showServices = offersServiceReservations === true;
   const showHotelRooms = ['hotels', 'shortlets'].includes(business?.subcategorySlug ?? '');
 
   return {

@@ -2157,12 +2157,26 @@ export interface DailyBusinessPromo {
   subtitle?: string;
   /** CTA button label. Defaults to "Visit" if unset. */
   ctaLabel?: string;
+  /** Ordered promo cards displayed as the customer-app daily carousel. */
+  items?: DailyBusinessPromoItem[];
   updatedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface DailyBusinessPromoItem {
+  _id?: string;
+  isActive: boolean;
+  businessId?: string | { _id: string; name?: string; slug?: string; primaryImageUrl?: string; coverImageUrl?: string };
+  heroImageUrl?: string;
+  title?: string;
+  subtitle?: string;
+  ctaLabel?: string;
+  displayOrder: number;
+}
+
 export interface UpdateDailyBusinessPromoPayload {
+  items?: Array<Partial<DailyBusinessPromoItem>>;
   isActive?: boolean;
   businessId?: string;
   heroImageUrl?: string;

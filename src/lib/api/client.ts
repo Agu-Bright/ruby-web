@@ -3339,15 +3339,9 @@ export const api = {
       if (params?.search) query.set("search", params.search);
       if (params?.unreadOnly) query.set("unreadOnly", "true");
       const qs = query.toString();
-      return request<{
-        items: import("@/lib/types").SupportConversationAdmin[];
-        pagination: {
-          page: number;
-          limit: number;
-          total: number;
-          totalPages: number;
-        };
-      }>(`/admin/support-chat/conversations${qs ? `?${qs}` : ""}`);
+      return request<import("@/lib/types").SupportConversationAdmin[]>(
+        `/admin/support-chat/conversations${qs ? `?${qs}` : ""}`,
+      );
     },
     get: (id: string) =>
       request<import("@/lib/types").SupportConversationAdmin>(
@@ -3358,15 +3352,7 @@ export const api = {
       if (params?.page) query.set("page", String(params.page));
       if (params?.limit) query.set("limit", String(params.limit));
       const qs = query.toString();
-      return request<{
-        items: import("@/lib/types").SupportMessage[];
-        pagination: {
-          page: number;
-          limit: number;
-          total: number;
-          totalPages: number;
-        };
-      }>(
+      return request<import("@/lib/types").SupportMessage[]>(
         `/admin/support-chat/conversations/${id}/messages${
           qs ? `?${qs}` : ""
         }`,

@@ -36,10 +36,7 @@ export default function SupportChatPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const { data: convData, isLoading: loadingList, refetch: refetchList } =
-    useApi<{
-      items: SupportConversationAdmin[];
-      pagination: { page: number; limit: number; total: number; totalPages: number };
-    }>(
+    useApi<SupportConversationAdmin[]>(
       () =>
         api.supportChat.list({
           page: 1,
@@ -50,19 +47,16 @@ export default function SupportChatPage() {
       [search, unreadOnly],
     );
 
-  const conversations = convData?.items ?? [];
+  const conversations = Array.isArray(convData) ? convData : [];
 
   const { data: messagesData, isLoading: loadingMessages, refetch: refetchMessages } =
-    useApi<{
-      items: SupportMessage[];
-      pagination: { page: number; limit: number; total: number; totalPages: number };
-    }>(
+    useApi<SupportMessage[]>(
       () => api.supportChat.messages(selectedId!, { page: 1, limit: 200 }),
       [selectedId],
       { enabled: !!selectedId },
     );
 
-  const messages = messagesData?.items ?? [];
+  const messages = Array.isArray(messagesData) ? messagesData : [];
 
   const { mutate: markRead } = useMutation((id: string) =>
     api.supportChat.markRead(id),

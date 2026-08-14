@@ -1,428 +1,56 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Save,
-  Loader2,
-  AlertCircle,
-  CheckCircle,
-  Building2,
-  Image as ImageIcon,
-  X,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Building2, CheckCircle, Image as ImageIcon, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { PageHeader } from "@/components/ui";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { PageHeader } from "@/components/ui";
 import { SearchableSelect, type SelectOption } from "@/components/ui/searchable-select";
-import type {
-  DailyBusinessPromo,
-  UpdateDailyBusinessPromoPayload,
-} from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import type { DailyBusinessPromo, DailyBusinessPromoItem } from "@/lib/types";
 
-/**
- * Daily Business Promo — admin editor.
- *
- * Edits the singleton config that powers the customer app's once-per-
- * day full-screen interstitial. SUPER_ADMIN only on the backend
- * (@Roles guard on the controller). When `isActive` is false OR the
- * required fields (businessId + heroImageUrl) are missing, the mobile
- * skips the modal entirely.
- */
+const empty = (displayOrder: number): DailyBusinessPromoItem => ({ isActive: false, displayOrder, title: "", subtitle: "", ctaLabel: "" });
+const normalize = (config: DailyBusinessPromo): DailyBusinessPromoItem[] => config.items?.length
+  ? [...config.items].sort((a, b) => a.displayOrder - b.displayOrder)
+  : (config.businessId || config.heroImageUrl || config.title ? [{ _id: config._id, isActive: !!config.isActive, businessId: config.businessId, heroImageUrl: config.heroImageUrl, title: config.title || "", subtitle: config.subtitle || "", ctaLabel: config.ctaLabel || "", displayOrder: 0 }] : []);
+
 export default function DailyPromoPage() {
-  const [config, setConfig] = useState<DailyBusinessPromo | null>(null);
+  const [items, setItems] = useState<DailyBusinessPromoItem[]>([]);
+  const [selected, setSelected] = useState(0);
+  const [businesses, setBusinesses] = useState<SelectOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [businesses, setBusinesses] = useState<SelectOption[]>([]);
-
-  // Form state — separate from loaded config so admin can edit + cancel
-  // without refetch.
-  const [isActive, setIsActive] = useState(false);
-  const [businessId, setBusinessId] = useState("");
-  const [heroImageUrl, setHeroImageUrl] = useState<string | undefined>(undefined);
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [ctaLabel, setCtaLabel] = useState("");
-
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const res = await api.dailyBusinessPromo.get();
-      const data = (res.data || res) as DailyBusinessPromo;
-      setConfig(data);
-      setIsActive(!!data.isActive);
-      const bizId =
-        typeof data.businessId === "object" && data.businessId !== null
-          ? data.businessId._id
-          : (data.businessId as string) || "";
-      setBusinessId(bizId);
-      setHeroImageUrl(data.heroImageUrl || undefined);
-      setTitle(data.title || "");
-      setSubtitle(data.subtitle || "");
-      setCtaLabel(data.ctaLabel || "");
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load daily promo config");
-    } finally {
-      setLoading(false);
-    }
+    try { const response = await api.dailyBusinessPromo.get(); setItems(normalize((response.data || response) as DailyBusinessPromo)); setSelected(0); }
+    catch (error: any) { toast.error(error?.message || "Could not load daily promos"); }
+    finally { setLoading(false); }
   }, []);
-
-  // Business list for the SearchableSelect. Pull LIVE businesses only
-  // (approved + published) so the admin doesn't pick a draft that
-  // customers can't visit. Limit 200 covers current platform scale;
-  // if the list grows beyond that we'll switch to server-side search.
-  const loadBusinesses = useCallback(async () => {
-    try {
-      const res = await api.businesses.list({ limit: 200, status: "LIVE" as any });
-      const items = ((res.data as any[]) || []) as any[];
-      const options: SelectOption[] = items
-        .map((b) => ({
-          value: b._id,
-          label: b.name || "(unnamed)",
-          description: b.categoryName || b.address?.city || undefined,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label));
-      setBusinesses(options);
-    } catch (err) {
-      // Silent — the picker just stays empty. Admin can still save by
-      // pasting a businessId if they had one from a URL.
-    }
-  }, []);
-
   useEffect(() => {
     load();
-    loadBusinesses();
-  }, [load, loadBusinesses]);
-
-  // ── Validation ────────────────────────────────────────────────────
-  // The mobile requires businessId AND heroImageUrl AND isActive to
-  // actually show the modal. If admin flips isActive on without those,
-  // warn — the row saves fine but the modal will silently no-op.
-  const readyToDisplay = isActive && !!businessId && !!heroImageUrl;
-  const activeWithoutReqs = isActive && (!businessId || !heroImageUrl);
-
-  const currentBusinessName = useMemo(() => {
-    const match = businesses.find((b) => b.value === businessId);
-    return match?.label;
-  }, [businesses, businessId]);
-
-  // Single persistence path. `overrides` lets the toggle / business
-  // picker / image upload force-save the NEW value instead of the
-  // still-stale one that lives in local state until React re-renders.
-  const persist = useCallback(
-    async (overrides: Partial<UpdateDailyBusinessPromoPayload> = {}) => {
-      setSaving(true);
-      try {
-        const payload: UpdateDailyBusinessPromoPayload = {
-          isActive,
-          heroImageUrl: heroImageUrl || undefined,
-          title: title.trim(),
-          subtitle: subtitle.trim(),
-          ctaLabel: ctaLabel.trim(),
-          ...overrides,
-        };
-        // Only send businessId when we have a real ObjectId — the DTO
-        // validates @IsMongoId, which rejects empty strings with a 400.
-        const nextBusinessId =
-          overrides.businessId !== undefined ? overrides.businessId : businessId;
-        if (nextBusinessId) payload.businessId = nextBusinessId;
-        const res = await api.dailyBusinessPromo.update(payload);
-        const data = (res.data || res) as DailyBusinessPromo;
-        setConfig(data);
-        toast.success("Saved");
-        return true;
-      } catch (err: any) {
-        toast.error(err?.message || "Failed to save daily promo config");
-        return false;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [isActive, businessId, heroImageUrl, title, subtitle, ctaLabel],
-  );
-
-  const handleSave = () => persist();
-
-  // Toggle master switch — flip local state AND persist immediately so
-  // the on/off state survives refresh without needing the Save button.
-  const handleToggleActive = useCallback(async () => {
-    const next = !isActive;
-    setIsActive(next);
-    const ok = await persist({ isActive: next });
-    if (!ok) setIsActive(!next); // rollback on failure
-  }, [isActive, persist]);
-
-  // Business picker — auto-save the new selection. Skip if the user
-  // clears the picker (empty string) — the DTO rejects that anyway.
-  const handleBusinessChange = useCallback(
-    async (v: string) => {
-      const prev = businessId;
-      setBusinessId(v);
-      if (!v) return;
-      const ok = await persist({ businessId: v });
-      if (!ok) setBusinessId(prev);
-    },
-    [businessId, persist],
-  );
-
-  // Hero image — auto-save when the upload completes (URL arrives) or
-  // when the admin clears it back to undefined.
-  const handleHeroImageChange = useCallback(
-    async (v: string | undefined) => {
-      const prev = heroImageUrl;
-      setHeroImageUrl(v);
-      const ok = await persist({ heroImageUrl: v || undefined });
-      if (!ok) setHeroImageUrl(prev);
-    },
-    [heroImageUrl, persist],
-  );
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <PageHeader
-        title="Daily Promo"
-        description="Full-screen interstitial shown on the customer app once per day. Pick a business + upload the marketing creative."
-      />
-
-      {/* Status banner */}
-      <div
-        className={`rounded-lg border px-4 py-3 flex items-start gap-3 ${
-          readyToDisplay
-            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-            : activeWithoutReqs
-            ? "bg-amber-50 border-amber-200 text-amber-800"
-            : "bg-gray-50 border-gray-200 text-gray-700"
-        }`}
-      >
-        {readyToDisplay ? (
-          <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-        ) : (
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-        )}
-        <div className="text-sm">
-          {readyToDisplay ? (
-            <>
-              <strong>Live.</strong> Customers who open the app for the first time today will see this promo.
-              {currentBusinessName ? ` Featuring: ${currentBusinessName}.` : ""}
-            </>
-          ) : activeWithoutReqs ? (
-            <>
-              <strong>Not shown.</strong> Toggle is on, but the promo needs BOTH a business AND a hero image before it displays. Add them below.
-            </>
-          ) : (
-            <>
-              <strong>Off.</strong> No promo will show on the customer app. Fill in the fields below and toggle On to enable.
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ── Form column ─────────────────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-5">
-            {/* Active toggle */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <div>
-                <label className="text-sm font-semibold text-gray-900">
-                  Show on customer app
-                </label>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Master switch. Off → no modal displays regardless of other fields.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleToggleActive}
-                disabled={saving}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors disabled:opacity-60 disabled:cursor-wait ${
-                  isActive ? "bg-ruby-500" : "bg-gray-300"
-                }`}
-                aria-pressed={isActive}
-                aria-label="Toggle daily promo active"
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition ${
-                    isActive ? "translate-x-[22px]" : "translate-x-[2px]"
-                  } mt-[2px]`}
-                />
-              </button>
-            </div>
-
-            {/* Business picker */}
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                <Building2 className="w-3.5 h-3.5" />
-                Featured business
-              </label>
-              <SearchableSelect
-                options={businesses}
-                value={businessId}
-                onChange={handleBusinessChange}
-                placeholder={
-                  businesses.length === 0
-                    ? "Loading businesses…"
-                    : "Pick a business…"
-                }
-              />
-              <p className="text-xs text-gray-500 mt-1.5">
-                Only LIVE businesses. Tapping the modal CTA opens this business's detail screen.
-              </p>
-            </div>
-
-            {/* Hero image */}
-            <div>
-              <ImageUpload
-                value={heroImageUrl}
-                onChange={handleHeroImageChange}
-                folder="daily-promo"
-                label="Marketing creative"
-                helpText="The flyer image shown in the middle of the modal. 4:5 or square works best. Max 5 MB."
-                maxSizeMB={5}
-              />
-            </div>
-
-            {/* Text fields */}
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
-                Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={80}
-                placeholder="e.g. Stock Up & Save Big Today"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ruby-400 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Shown at the top of the modal. Keep it short — ~40 chars fits without wrap.
-              </p>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
-                Subtitle (optional)
-              </label>
-              <input
-                type="text"
-                value={subtitle}
-                onChange={(e) => setSubtitle(e.target.value)}
-                maxLength={140}
-                placeholder="e.g. Free Delivery on SPAR"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ruby-400 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
-                CTA button label (optional)
-              </label>
-              <input
-                type="text"
-                value={ctaLabel}
-                onChange={(e) => setCtaLabel(e.target.value)}
-                maxLength={40}
-                placeholder='Defaults to "Visit"'
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ruby-400 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Match the campaign — "Shop now", "Order now", "Book now"…
-              </p>
-            </div>
-
-            <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-              <div className="text-xs text-gray-400">
-                {config?.updatedAt
-                  ? `Last saved ${formatDate(config.updatedAt)}`
-                  : "Not saved yet"}
-              </div>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-ruby-500 text-white rounded-md text-sm font-semibold hover:bg-ruby-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving…
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Save
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Preview column ──────────────────────────────────────── */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-6">
-            <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Live preview
-            </div>
-            <div className="bg-gray-100 rounded-3xl p-3 border border-gray-200 shadow-sm">
-              <div className="bg-[#B8DBDA] rounded-2xl overflow-hidden relative aspect-[9/16]">
-                {/* Close X */}
-                <div className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center">
-                  <X className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
-                </div>
-
-                <div className="p-4 pt-6 flex flex-col h-full">
-                  {/* Title + subtitle */}
-                  <h3 className="text-[15px] font-bold text-gray-900 leading-tight mb-1">
-                    {title || "Your headline here"}
-                  </h3>
-                  {subtitle && (
-                    <p className="text-[11px] text-gray-700 mb-3">{subtitle}</p>
-                  )}
-
-                  {/* Hero image */}
-                  <div className="flex-1 bg-white/30 rounded-lg overflow-hidden mt-2 flex items-center justify-center">
-                    {heroImageUrl ? (
-                      <img
-                        src={heroImageUrl}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-gray-400 p-4">
-                        <ImageIcon className="w-8 h-8" />
-                        <span className="text-[10px] text-center">
-                          Marketing creative appears here
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  <div className="mt-3">
-                    <div className="w-full py-2.5 bg-black rounded-md text-center text-white text-[11px] font-semibold">
-                      {ctaLabel.trim() || "Visit"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
-              Preview approximates the customer app modal. Actual colors + fonts render in the app's theme.
-            </p>
-          </div>
-        </div>
-      </div>
+    api.businesses.list({ limit: 200, status: "LIVE" as any }).then((response) => setBusinesses(((response.data as any[]) || []).map((business) => ({ value: business._id, label: business.name || "(unnamed business)", description: business.categoryName || business.address?.city })).sort((a, b) => a.label.localeCompare(b.label)))).catch(() => undefined);
+  }, [load]);
+  const current = items[selected];
+  const ready = useMemo(() => items.filter((item) => item.isActive && item.businessId && item.heroImageUrl).length, [items]);
+  const update = (patch: Partial<DailyBusinessPromoItem>) => setItems((all) => all.map((item, index) => index === selected ? { ...item, ...patch } : item));
+  const add = () => { setItems((all) => [...all, empty(all.length)]); setSelected(items.length); };
+  const remove = () => { setItems((all) => all.filter((_, index) => index !== selected).map((item, index) => ({ ...item, displayOrder: index }))); setSelected((index) => Math.max(0, index - 1)); };
+  const save = async () => {
+    if (items.some((item) => item.isActive && (!item.businessId || !item.heroImageUrl))) { toast.error("Every active promo needs a business and marketing creative."); return; }
+    setSaving(true);
+    try {
+      await api.dailyBusinessPromo.update({ items: items.map((item, index) => ({ ...item, businessId: typeof item.businessId === "object" ? item.businessId._id : item.businessId, displayOrder: index })) });
+      toast.success("Daily promo carousel saved"); await load();
+    } catch (error: any) { toast.error(error?.message || "Could not save daily promos"); }
+    finally { setSaving(false); }
+  };
+  if (loading) return <div className="flex min-h-[400px] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>;
+  return <div className="mx-auto max-w-6xl space-y-6">
+    <PageHeader title="Daily Promo" description="Create several full-screen promos. Active promos appear as a swipeable carousel when customers first open the app each day." />
+    <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><CheckCircle className="mt-0.5 h-5 w-5 shrink-0" /><div><strong>{ready} promo{ready === 1 ? "" : "s"} ready to display.</strong> Customers can swipe through every active card. Incomplete or switched-off cards are never sent to the customer app.</div></div>
+    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="rounded-xl border bg-white p-3"><div className="mb-3 flex items-center justify-between px-1"><h2 className="font-semibold">Carousel cards</h2><button onClick={add} className="rounded-lg bg-ruby-500 p-2 text-white" aria-label="Add daily promo"><Plus className="h-4 w-4" /></button></div><div className="space-y-2">{items.length === 0 ? <p className="px-2 py-5 text-sm text-gray-500">No daily promos yet.</p> : items.map((item, index) => { const businessId = typeof item.businessId === "object" ? item.businessId._id : item.businessId; const businessName = typeof item.businessId === "object" ? item.businessId.name : businesses.find((b) => b.value === businessId)?.label; return <button key={item._id || index} onClick={() => setSelected(index)} className={`w-full rounded-lg border p-3 text-left ${index === selected ? "border-ruby-400 bg-ruby-50" : "border-gray-200 hover:bg-gray-50"}`}><div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${item.isActive ? "bg-emerald-500" : "bg-gray-300"}`} /><span className="truncate text-sm font-semibold">{item.title || `Promo ${index + 1}`}</span></div><p className="mt-1 truncate text-xs text-gray-500">{businessName || "Choose a business"}</p></button>; })}</div></aside>
+      {current ? <section className="space-y-5 rounded-xl border bg-white p-5 sm:p-6"><div className="flex items-start justify-between gap-4 border-b pb-4"><div><h2 className="font-semibold">Promo {selected + 1}</h2><p className="mt-1 text-sm text-gray-500">Changes apply when you save the carousel.</p></div><button onClick={remove} className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600"><Trash2 className="h-4 w-4" />Remove</button></div><label className="flex cursor-pointer items-center justify-between rounded-lg bg-gray-50 p-4"><span><strong className="block text-sm">Show on customer app</strong><span className="text-xs text-gray-500">Active cards require a business and image.</span></span><input type="checkbox" checked={current.isActive} onChange={(event) => update({ isActive: event.target.checked })} className="h-5 w-5 accent-[#FD362F]" /></label><div><label className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500"><Building2 className="h-3.5 w-3.5" />Featured business</label><SearchableSelect options={businesses} value={typeof current.businessId === "object" ? current.businessId._id : current.businessId || ""} onChange={(businessId) => update({ businessId })} placeholder="Pick a live business…" /></div><ImageUpload value={current.heroImageUrl} onChange={(heroImageUrl) => update({ heroImageUrl })} folder="daily-promo" label="Marketing creative" helpText="One flyer per carousel card. 4:5 or square works best." maxSizeMB={5} /><div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-medium">Title<input value={current.title || ""} onChange={(event) => update({ title: event.target.value })} maxLength={120} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 font-normal" placeholder="Campaign headline" /></label><label className="text-sm font-medium">CTA label<input value={current.ctaLabel || ""} onChange={(event) => update({ ctaLabel: event.target.value })} maxLength={40} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 font-normal" placeholder="Visit" /></label></div><label className="block text-sm font-medium">Subtitle <span className="font-normal text-gray-400">(optional)</span><input value={current.subtitle || ""} onChange={(event) => update({ subtitle: event.target.value })} maxLength={200} className="mt-1.5 w-full rounded-lg border px-3 py-2.5 font-normal" placeholder="Short supporting message" /></label><div className="flex justify-end border-t pt-5"><button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-ruby-500 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{saving ? "Saving…" : "Save carousel"}</button></div></section> : <section className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed bg-white text-center"><ImageIcon className="h-8 w-8 text-gray-300" /><p className="mt-3 text-sm text-gray-500">Create the first card for today&apos;s daily promo carousel.</p><button onClick={add} className="mt-4 text-sm font-semibold text-ruby-600">Add daily promo</button></section>}
     </div>
-  );
+  </div>;
 }

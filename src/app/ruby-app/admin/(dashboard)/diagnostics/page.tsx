@@ -1,7 +1,9 @@
 'use client';
 
-import { Activity, AlertCircle, CheckCircle2, Database, Info } from 'lucide-react';
+import { Activity, AlertCircle, CheckCircle2, Database, Info, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/ui';
+import { api } from '@/lib/api';
+import { useApi } from '@/lib/hooks';
 
 type Diagnostic = {
   name: string;
@@ -24,6 +26,11 @@ const diagnostics: Diagnostic[] = [
 ];
 
 export default function AnalyticsDiagnosticsPage() {
+  const { data, isLoading, error, refetch } = useApi(() => api.analytics.diagnostics());
+  const readyCount = data?.diagnostics.filter((item) => item.status === 'READY').length ?? 0;
+  const live = (name: string) => data?.diagnostics.find((item) => item.name === name);
+  const formatValue = (item?: { value: number | null }) => item?.value == null ? 'Collecting' : `${item.value}%`;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -31,13 +38,13 @@ export default function AnalyticsDiagnosticsPage() {
         description="The on-demand measurements used to explain movement in Ruby+ headline metrics."
       />
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+      <div className={`rounded-2xl border p-5 ${data ? 'border-blue-200 bg-blue-50' : 'border-amber-200 bg-amber-50'}`}>
         <div className="flex gap-3">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
           <div>
-            <p className="font-semibold text-amber-950">Instrumentation status: event stream not connected</p>
-            <p className="mt-1 text-sm leading-6 text-amber-900">
-              The current analytics service stores legacy aggregate counters, but it does not yet persist the raw named events in the Analytics Implementation Specification. Figures are intentionally not shown until the required events are available; showing estimates here would be misleading.
+            <p className="font-semibold text-gray-950">Instrumentation status: {data ? 'raw event stream connected' : 'connecting to raw event stream'}</p>
+            <p className="mt-1 text-sm leading-6 text-gray-700">
+              {data ? `${data.rawEventCount.toLocaleString()} raw events received. Diagnostics only become live after their denominator event is available; no values are estimated.` : error || 'Loading the event stream health…'}
             </p>
           </div>
         </div>
@@ -46,48 +53,52 @@ export default function AnalyticsDiagnosticsPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <Database className="h-5 w-5 text-ruby-500" />
-          <p className="mt-4 text-2xl font-semibold text-gray-950">0 / 10</p>
+          <p className="mt-4 text-2xl font-semibold text-gray-950">{readyCount} / 10</p>
           <p className="mt-1 text-sm text-gray-500">Diagnostics ready from raw events</p>
         </div>
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <Activity className="h-5 w-5 text-blue-600" />
-          <p className="mt-4 text-2xl font-semibold text-gray-950">10</p>
-          <p className="mt-1 text-sm text-gray-500">Defined diagnostics to monitor</p>
+          <p className="mt-4 text-2xl font-semibold text-gray-950">{data?.rawEventCount.toLocaleString() ?? '—'}</p>
+          <p className="mt-1 text-sm text-gray-500">Raw events in the current 30-day window</p>
         </div>
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <Info className="h-5 w-5 text-violet-600" />
-          <p className="mt-4 text-2xl font-semibold text-gray-950">Raw events required</p>
-          <p className="mt-1 text-sm text-gray-500">No fabricated or standalone counters</p>
+          <p className="mt-4 text-2xl font-semibold text-gray-950">{data?.lastEventAt ? new Date(data.lastEventAt).toLocaleString() : 'No events yet'}</p>
+          <p className="mt-1 text-sm text-gray-500">Last received event</p>
         </div>
       </div>
 
       <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
         <div className="border-b px-5 py-4">
           <h2 className="font-semibold text-gray-950">Diagnostic catalogue</h2>
-          <p className="mt-1 text-sm text-gray-500">Definitions are taken directly from the approved Ruby Analytics specification.</p>
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500"><span>Definitions are taken directly from the approved Ruby Analytics specification.</span><button onClick={() => refetch()} disabled={isLoading} className="inline-flex items-center gap-1.5 font-medium text-ruby-600 disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Refresh</button></div>
         </div>
         <div className="divide-y">
-          {diagnostics.map((diagnostic) => (
+          {diagnostics.map((diagnostic) => {
+            const current = live(diagnostic.name);
+            const isReady = current?.status === 'READY';
+            return (
             <article key={diagnostic.name} className="p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="font-semibold text-gray-950">{diagnostic.name}</h3>
                   <p className="mt-1 text-sm leading-6 text-gray-600">{diagnostic.formula}</p>
                 </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                  <AlertCircle className="h-3.5 w-3.5" /> Awaiting instrumentation
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${isReady ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {isReady ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />} {isReady ? `${formatValue(current)} live` : 'Collecting'}
                 </span>
               </div>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div className="rounded-xl bg-gray-50 p-3"><dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Source events</dt><dd className="mt-1 text-gray-800">{diagnostic.events}</dd></div>
                 <div className="rounded-xl bg-gray-50 p-3"><dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Explains movement in</dt><dd className="mt-1 text-gray-800">{diagnostic.explains}</dd></div>
               </dl>
+              {current?.note && <p className="mt-3 text-xs text-gray-500">{current.note}</p>}
             </article>
-          ))}
+          )})}
         </div>
       </section>
 
-      <p className="flex items-center gap-2 text-sm text-gray-500"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> This page is the single admin surface that will show the diagnostic values once raw event tracking is connected.</p>
+      <p className="flex items-center gap-2 text-sm text-gray-500"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> This page uses append-only raw events; it never fills metrics with fabricated estimates.</p>
     </div>
   );
 }

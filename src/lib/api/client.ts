@@ -2039,6 +2039,18 @@ export const api = {
           >,
         },
       ),
+    diagnostics: (params?: { locationId?: string; startDate?: string; endDate?: string }) =>
+      request<{
+        rawEventCount: number;
+        lastEventAt: string | null;
+        diagnostics: Array<{
+          key: string; name: string; requiredEvents: string[]; status: 'READY' | 'COLLECTING';
+          value: number | null; numerator: number; denominator: number; note?: string;
+        }>;
+        eventCoverage: Array<{ name: string; count: number }>;
+      }>("/admin/analytics/diagnostics", {
+        params: params as Record<string, string | number | boolean | undefined>,
+      }),
   },
 
   // Promos

@@ -357,7 +357,11 @@ export default function BusinessProfilePage() {
     if (loc && typeof loc === 'object') return loc.name ?? '';
     return '';
   }, [doc?.locationId]);
-  const isFoodBusiness = /restaurant|dining|food|buka|takeout|cafe|catering/i.test(
+  // Menus and a "budget for two" are useful across the three hospitality
+  // verticals. This deliberately keys from the parent category so every
+  // current and future subcategory beneath Restaurants, Nightlife, and
+  // Hotels & Travel receives the same tools.
+  const supportsMenuAndBudget = /restaurant|nightlife|hotel|shortlet|dining|food|buka|takeout|cafe|catering|club|lounge|beach bar|live music/i.test(
     `${categoryName} ${subcategoryName}`,
   );
 
@@ -392,7 +396,7 @@ export default function BusinessProfilePage() {
           isClosed: !!h.isClosed,
         })),
       };
-      if (isFoodBusiness) {
+      if (supportsMenuAndBudget) {
         payload.menuImageUrls = menuImageUrls;
         payload.budgetForTwo = budgetForTwo.trim() ? Number(budgetForTwo) : 0;
       }
@@ -423,7 +427,7 @@ export default function BusinessProfilePage() {
     galleryUrls,
     menuImageUrls,
     budgetForTwo,
-    isFoodBusiness,
+    supportsMenuAndBudget,
     sellsProducts,
     offersServiceReservations,
     acceptsOrders,
@@ -547,7 +551,7 @@ export default function BusinessProfilePage() {
           acceptsBookings={acceptsBookings}
           setAcceptsBookings={setAcceptsBookings}
           operationMode={operationMode}
-          isFoodBusiness={isFoodBusiness}
+          isFoodBusiness={supportsMenuAndBudget}
           budgetForTwo={budgetForTwo}
           setBudgetForTwo={setBudgetForTwo}
         />
@@ -560,7 +564,7 @@ export default function BusinessProfilePage() {
           setCoverImageUrl={setCoverImageUrl}
           galleryUrls={galleryUrls}
           setGalleryUrls={setGalleryUrls}
-          isFoodBusiness={isFoodBusiness}
+          isFoodBusiness={supportsMenuAndBudget}
           menuImageUrls={menuImageUrls}
           setMenuImageUrls={setMenuImageUrls}
         />
@@ -782,7 +786,7 @@ function BasicPanel(props: {
         <div>
           <FieldLabel>Budget for two (₦)</FieldLabel>
           <p className="mb-2 text-xs text-gray-500">
-            Estimated average spend for two diners. This appears on your customer page.
+            Estimated average spend for two guests. This appears on your customer page.
           </p>
           <TextInput
             value={props.budgetForTwo}

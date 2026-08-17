@@ -11,7 +11,7 @@ import {
 
 // P128-LAND — Featured Services scoped to the city currently picked
 // in the RedStrip location picker (defaults to Lagos). Fetches the
-// backend `whats-hot` feed (admin-curated + merchant-paid promotions
+// backend `whats-hot` feed (featured businesses + merchant-paid promotions
 // + organic high-rated, sorted by promotion then rating) for the
 // selected location and refetches when the user changes city. Falls
 // back to a small placeholder set if the fetch fails so the section

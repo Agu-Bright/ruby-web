@@ -32,8 +32,8 @@ interface Review {
   photos?: string[];
   isVerified: boolean;
   // P103 — admin-curated Featured pin for the home tab reviews
-  // marquee. Distinct from `isVerified` (which controls whether the
-  // review surfaces on the home screen at all). Featured reviews
+  // marquee. Distinct from `isVerified`, which only records the
+  // review's verification status. Featured reviews
   // sort FIRST and get a purple "Featured" pill on the customer card.
   isFeatured?: boolean;
   featuredUntil?: string;
@@ -67,10 +67,8 @@ export default function ReviewsPage() {
     (id: string) => api.reviews.verify(id)
   );
 
-  // P103 — admin-curated Feature toggle for the home tab reviews
-  // marquee. Distinct from Verify (which controls whether a review
-  // surfaces on the home screen at all). Featured reviews sort first
-  // and get a purple "Featured" pill on the customer card.
+  // Admin-curated home pick. This is the explicit manual route for a
+  // review to appear in the customer home reviews section.
   const { mutate: featureReview, isLoading: featuring } = useMutation(
     ({ id, isFeatured }: { id: string; isFeatured: boolean }) =>
       api.reviews.feature(id, { isFeatured })
@@ -97,7 +95,7 @@ export default function ReviewsPage() {
   const handleVerify = useCallback(async (review: Review) => {
     const result = await verifyReview(review._id);
     if (result) {
-      toast.success(review.isVerified ? 'Review unverified' : 'Review verified — it will show on the home screen');
+      toast.success(review.isVerified ? 'Review verification removed' : 'Review marked as verified');
       refetch();
     }
   }, [verifyReview, refetch]);
@@ -110,8 +108,8 @@ export default function ReviewsPage() {
     if (result) {
       toast.success(
         review.isFeatured
-          ? 'Review unfeatured'
-          : 'Review featured — it will sort first on the home tab marquee with a purple pill',
+          ? 'Review removed from the home reviews section'
+          : 'Review selected for the home reviews section',
       );
       refetch();
     }
@@ -198,11 +196,10 @@ export default function ReviewsPage() {
       header: 'Status',
       render: (r) => (
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* P103 — Featured is the new admin-curated marquee pin
-              (purple). It outranks Verified in the home marquee. */}
+          {/* Explicit admin placement in the customer home reviews row. */}
           {r.isFeatured && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
-              <Sparkles className="w-3 h-3" /> Featured
+              <Sparkles className="w-3 h-3" /> Home pick
             </span>
           )}
           {r.isVerified && (
@@ -244,13 +241,11 @@ export default function ReviewsPage() {
             className={`p-1.5 rounded-md hover:bg-gray-100 ${
               r.isVerified ? 'text-green-600' : 'text-gray-400'
             }`}
-            title={r.isVerified ? 'Remove Verified' : 'Verify for Home Screen'}
+            title={r.isVerified ? 'Remove verified status' : 'Mark as verified'}
           >
             <ShieldCheck className="w-4 h-4" />
           </button>
-          {/* P103 — Feature toggle. Distinct from Verify: Featured
-              reviews sort FIRST on the home marquee with a purple
-              pill. Use sparingly — editorial spotlight. */}
+          {/* Explicit manual placement in the home reviews section. */}
           <button
             onClick={() => handleFeature(r)}
             disabled={featuring}
@@ -259,8 +254,8 @@ export default function ReviewsPage() {
             }`}
             title={
               r.isFeatured
-                ? 'Unfeature this review'
-                : 'Feature on home tab marquee (purple pill, sorts first)'
+                ? 'Remove from home reviews'
+                : 'Show in home reviews'
             }
           >
             <Sparkles className="w-4 h-4" />
@@ -283,7 +278,7 @@ export default function ReviewsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Reviews"
-        description="Manage customer reviews. Verified reviews appear on the home screen."
+        description="Manage reviews and choose specific reviews for the customer home screen."
       />
 
       {/* Filter bar */}
@@ -414,7 +409,7 @@ export default function ReviewsPage() {
             <div className="flex items-center gap-2 pt-2 border-t">
               {selectedReview.isVerified && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Featured — showing on home screen
+                  <ShieldCheck className="w-3.5 h-3.5" /> Verified review
                 </span>
               )}
               {selectedReview.isFlagged && (
@@ -436,7 +431,7 @@ export default function ReviewsPage() {
                 }`}
               >
                 <ShieldCheck className="w-4 h-4" />
-                {selectedReview.isVerified ? 'Unverify' : 'Verify for Home Screen'}
+                {selectedReview.isVerified ? 'Remove verification' : 'Mark as verified'}
               </button>
               {admin?.roles?.includes('super_admin') && (
                 <button

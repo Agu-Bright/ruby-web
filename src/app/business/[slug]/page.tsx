@@ -420,7 +420,7 @@ export default async function BusinessPublicProfile({
                 <h2 className="font-playfair text-2xl font-bold text-ruby-black">Menu</h2>
                 <div className="flex-1 h-px bg-gray-100" />
               </div>
-              <p className="mb-4 text-sm text-gray-600">Browse the restaurant&apos;s menu pages.</p>
+              <p className="mb-4 text-sm text-gray-600">Browse this business&apos;s menu pages.</p>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {menuImages.map((url, index) => (
                   <a key={url} href={url} target="_blank" rel="noreferrer" className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-gray-200 bg-ruby-gray">

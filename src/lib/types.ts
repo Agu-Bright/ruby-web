@@ -612,8 +612,8 @@ export interface Business {
   // Budget
   budgetMin?: number;
   budgetMax?: number;
-  // Restaurant "budget for two" — total spend estimate for a couple
-  // (NGN). Restaurant category only; optional everywhere else.
+  // Typical spend for two people (NGN), used by Restaurants, Nightlife,
+  // Hotels and Shortlets when provided by the business.
   budgetForTwo?: number;
   operationModes?: string[];
   // Merchant Agreement
@@ -723,6 +723,10 @@ export interface AdminCreateBusinessRequest {
   logoUrl?: string;
   coverImageUrl?: string;
   media?: { url: string; type?: string; caption?: string; order?: number; isPrimary?: boolean }[];
+  /** Menu pages for Restaurants, Nightlife, Hotels and Shortlets. */
+  menuImageUrls?: string[];
+  /** Typical spend for two people (NGN) where the business provides it. */
+  budgetForTwo?: number;
   hours?: BusinessHoursEntry[];
   claimContactPhone?: string;
   claimContactEmail?: string;

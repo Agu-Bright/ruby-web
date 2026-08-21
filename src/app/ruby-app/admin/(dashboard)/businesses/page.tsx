@@ -4509,10 +4509,16 @@ function BusinessGalleryUploader({
   value,
   onChange,
   max = 8,
+  folder = 'businesses/gallery',
+  label = 'Gallery',
+  helpText,
 }: {
   value: string[];
   onChange: (urls: string[]) => void;
   max?: number;
+  folder?: string;
+  label?: string;
+  helpText?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -4536,7 +4542,7 @@ function BusinessGalleryUploader({
     const uploaded: string[] = [];
     for (const file of toUpload) {
       try {
-        const res = await api.media.upload(file, 'businesses/gallery');
+        const res = await api.media.upload(file, folder);
         if (res.data?.url) uploaded.push(res.data.url);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Upload failed';
@@ -4555,7 +4561,7 @@ function BusinessGalleryUploader({
     <div>
       <div className="flex items-center justify-between mb-1.5">
         <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-          Gallery
+          {label}
         </label>
         <span className="text-[11px] text-gray-400">{value.length}/{max}</span>
       </div>
@@ -4592,7 +4598,7 @@ function BusinessGalleryUploader({
         )}
       </div>
       <p className="text-[11px] text-gray-400 mt-1.5">
-        Up to {max} images shown on the public profile. JPEG, PNG, WebP — max 5MB each.
+        {helpText || `Up to ${max} images shown on the public profile. JPEG, PNG, WebP — max 5MB each.`}
       </p>
       <input
         ref={inputRef}
@@ -4604,6 +4610,12 @@ function BusinessGalleryUploader({
       />
     </div>
   );
+}
+
+/** These verticals publish visual menus across the customer mobile and web profiles. */
+function supportsBusinessMenus(category?: Pick<Category, 'name' | 'slug'> | null) {
+  const value = `${category?.name || ''} ${category?.slug || ''}`.toLowerCase();
+  return /restaurant|nightlife|hotel|shortlet/.test(value);
 }
 
 // ─── Create Business Modal ───
@@ -4631,6 +4643,8 @@ function CreateBusinessModal({
     logoUrl: '',
     coverImageUrl: '',
     gallery: [] as string[],
+    menuImageUrls: [] as string[],
+    budgetForTwo: '',
     claimContactPhone: '',
     claimContactEmail: '',
     address: { street: '', city: '', state: '' } as { street: string; city: string; state: string },
@@ -4646,6 +4660,8 @@ function CreateBusinessModal({
   );
 
   const update = (key: string, value: unknown) => setForm(f => ({ ...f, [key]: value }));
+  const selectedCategory = (categories || []).find((category) => category._id === form.categoryId);
+  const menuSupported = supportsBusinessMenus(selectedCategory);
 
   const handleSubmit = () => {
     if (!form.name || !form.locationId || !form.categoryId || !form.subcategoryId) {
@@ -4672,6 +4688,15 @@ function CreateBusinessModal({
         isPrimary: false,
       }));
     }
+    if (menuSupported && form.menuImageUrls.length > 0) data.menuImageUrls = form.menuImageUrls;
+    if (menuSupported && form.budgetForTwo.trim()) {
+      const budgetForTwo = Number(form.budgetForTwo);
+      if (!Number.isFinite(budgetForTwo) || budgetForTwo < 0) {
+        toast.error('Budget for two must be a valid amount');
+        return;
+      }
+      data.budgetForTwo = budgetForTwo;
+    }
     if (form.claimContactPhone) data.claimContactPhone = form.claimContactPhone;
     if (form.claimContactEmail) data.claimContactEmail = form.claimContactEmail;
     if (form.address.street) data.address = form.address;
@@ -4685,7 +4710,7 @@ function CreateBusinessModal({
       setStep(0);
       setForm({
         name: '', description: '', tagline: '', locationId: '', categoryId: '', subcategoryId: '',
-        longitude: 0, latitude: 0, logoUrl: '', coverImageUrl: '', gallery: [],
+        longitude: 0, latitude: 0, logoUrl: '', coverImageUrl: '', gallery: [], menuImageUrls: [], budgetForTwo: '',
         claimContactPhone: '', claimContactEmail: '',
         address: { street: '', city: '', state: '' },
         contact: { phone: '', email: '', whatsapp: '' },
@@ -4693,7 +4718,7 @@ function CreateBusinessModal({
     }
   }, [isOpen]);
 
-  const steps = ['Basic Info', 'Location & Category', 'Contact & Claim'];
+  const steps = ['Basic Info', 'Location & Category', 'Menu & budget', 'Contact & Claim'];
   const canNext = step === 0 ? !!form.name : step === 1 ? !!(form.locationId && form.categoryId && form.subcategoryId) : true;
 
   return (
@@ -4849,8 +4874,43 @@ function CreateBusinessModal({
           </div>
         )}
 
-        {/* Step 2: Contact & Claim */}
+        {/* Step 2: Menu & budget */}
         {step === 2 && (
+          menuSupported ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                These menu pages will appear on this business&apos;s public Ruby+ profile.
+              </div>
+              <BusinessGalleryUploader
+                value={form.menuImageUrls}
+                onChange={(urls) => update('menuImageUrls', urls)}
+                max={12}
+                folder="businesses/menus"
+                label="Menu images"
+                helpText="Upload up to 12 menu pages. Customers can open and browse them on the business profile."
+              />
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Budget for two (NGN)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.budgetForTwo}
+                  onChange={(e) => update('budgetForTwo', e.target.value)}
+                  placeholder="e.g. 50000"
+                />
+                <p className="mt-1 text-xs text-gray-500">Optional typical spend for two people.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              Menu uploads are available for businesses under Restaurants, Nightlife, Hotels, and Shortlets. Select one of those categories in the previous step to enable this section.
+            </div>
+          )
+        )}
+
+        {/* Step 3: Contact & Claim */}
+        {step === 3 && (
           <div className="space-y-4">
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-700">
@@ -4919,7 +4979,7 @@ function CreateBusinessModal({
           >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
-          {step < 2 ? (
+          {step < steps.length - 1 ? (
             <button
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-ruby-600 text-white text-sm font-medium rounded-lg hover:bg-ruby-700 transition-colors disabled:opacity-50"
               onClick={() => setStep(s => s + 1)}
@@ -4988,6 +5048,10 @@ function EditBusinessModal({
     latitude: (business as any).latitude || 6.5244,
     logoUrl: business.logoUrl || '',
     coverImageUrl: business.coverImageUrl || '',
+    menuImageUrls: Array.isArray((business as any).menuImageUrls)
+      ? (business as any).menuImageUrls.filter((url: unknown): url is string => typeof url === 'string').slice(0, 12)
+      : [],
+    budgetForTwo: typeof (business as any).budgetForTwo === 'number' ? String((business as any).budgetForTwo) : '',
     // Gallery is the `media[]` array minus anything that looks like the
     // logo/cover (so we don't double-render them as gallery thumbs).
     gallery: ((business.media || []) as any[])
@@ -5025,6 +5089,8 @@ function EditBusinessModal({
   );
 
   const update = (key: string, value: unknown) => setForm(f => ({ ...f, [key]: value }));
+  const selectedCategory = (categories || []).find((category) => category._id === form.categoryId);
+  const menuSupported = supportsBusinessMenus(selectedCategory);
 
   const handleSave = async () => {
     if (!form.name) { toast.error('Business name is required'); return; }
@@ -5033,7 +5099,7 @@ function EditBusinessModal({
       // Strip the local-only `gallery` field and translate it into the
       // backend's `media[]` shape. Sending `[]` is intentional — that lets
       // admins clear the gallery on edit.
-      const { gallery, ...rest } = form;
+      const { gallery, budgetForTwo, menuImageUrls, ...rest } = form;
       const data: any = { ...rest };
       data.media = gallery.map((url, idx) => ({
         url,
@@ -5043,6 +5109,19 @@ function EditBusinessModal({
       }));
       if (data.address && !data.address.street) delete data.address;
       if (data.contact && !data.contact.phone && !data.contact.email) delete data.contact;
+      if (menuSupported) {
+        data.menuImageUrls = menuImageUrls;
+        if (budgetForTwo.trim()) {
+          const value = Number(budgetForTwo);
+          if (!Number.isFinite(value) || value < 0) {
+            toast.error('Budget for two must be a valid amount');
+            return;
+          }
+          data.budgetForTwo = value;
+        } else {
+          data.budgetForTwo = 0;
+        }
+      }
       await onSubmit(data);
     } catch {
       toast.error('Failed to update business');
@@ -5051,7 +5130,7 @@ function EditBusinessModal({
     }
   };
 
-  const steps = ['Basic Info', 'Location & Category', 'Contact & Claim'];
+  const steps = ['Basic Info', 'Location & Category', 'Menu & budget', 'Contact & Claim'];
 
   return (
     <Modal isOpen onClose={onClose} title={`Edit: ${business.name}`} subtitle="Update business details" size="lg">
@@ -5203,8 +5282,43 @@ function EditBusinessModal({
           </div>
         )}
 
-        {/* Step 2: Contact & Claim */}
+        {/* Step 2: Menu & budget */}
         {step === 2 && (
+          menuSupported ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                These menu pages will appear on this business&apos;s public Ruby+ profile.
+              </div>
+              <BusinessGalleryUploader
+                value={form.menuImageUrls}
+                onChange={(urls) => update('menuImageUrls', urls)}
+                max={12}
+                folder="businesses/menus"
+                label="Menu images"
+                helpText="Upload up to 12 menu pages. Customers can open and browse them on the business profile."
+              />
+              <div>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Budget for two (NGN)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-full mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ruby-500/20 focus:border-ruby-400"
+                  value={form.budgetForTwo}
+                  onChange={(e) => update('budgetForTwo', e.target.value)}
+                  placeholder="e.g. 50000"
+                />
+                <p className="mt-1 text-xs text-gray-500">Optional typical spend for two people.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              Menu uploads are available for businesses under Restaurants, Nightlife, Hotels, and Shortlets. Select one of those categories in the previous step to enable this section.
+            </div>
+          )
+        )}
+
+        {/* Step 3: Contact & Claim */}
+        {step === 3 && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>

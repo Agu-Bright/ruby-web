@@ -224,7 +224,15 @@ export default function RubySelectPage() {
             >
               {/* Thumbnail */}
               <div className="w-24 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                {post.imageUrl ? (
+                {post.mediaType === 'VIDEO' && post.videoUrl ? (
+                  <video
+                    src={post.videoUrl}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-cover"
+                  />
+                ) : post.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={post.imageUrl}

@@ -133,10 +133,12 @@ export default function RubySelectPage() {
     };
     try {
       if (editor.post) {
-        await update.mutate({ id: editor.post._id, data: payload });
+        const updated = await update.mutate({ id: editor.post._id, data: payload });
+        if (!updated) return;
         toast.success('Post updated');
       } else {
-        await create.mutate(payload);
+        const created = await create.mutate(payload);
+        if (!created) return;
         toast.success(publishNow ? 'Post published' : 'Draft saved');
       }
       closeEditor();
@@ -148,7 +150,8 @@ export default function RubySelectPage() {
 
   const handlePublishExisting = async (post: RubySelectPost) => {
     try {
-      await publish.mutate(post._id);
+      const published = await publish.mutate(post._id);
+      if (!published) return;
       toast.success('Published');
       refetch();
     } catch (err: any) {
@@ -159,7 +162,8 @@ export default function RubySelectPage() {
   const handleArchive = async (post: RubySelectPost) => {
     if (!confirm(`Archive "${post.title}"? It will stop appearing on the customer home.`)) return;
     try {
-      await archive.mutate(post._id);
+      const archived = await archive.mutate(post._id);
+      if (!archived) return;
       toast.success('Archived');
       refetch();
     } catch (err: any) {

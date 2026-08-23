@@ -125,8 +125,12 @@ export default function RubySelectPage() {
       toast.error(form.mediaType === 'VIDEO' ? 'Upload a video clip' : 'Upload a hero image');
       return;
     }
+    // Do not send an empty URL for the unused media field. Empty strings are
+    // not valid URLs and Nest correctly rejects them during DTO validation.
     const payload: CreateRubySelectPostRequest = {
       ...form,
+      imageUrl: form.mediaType === 'IMAGE' ? (form.imageUrl || '').trim() : undefined,
+      videoUrl: form.mediaType === 'VIDEO' ? (form.videoUrl || '').trim() : undefined,
       status: publishNow ? 'ACTIVE' : (form.status || 'DRAFT'),
       startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : undefined,
       endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,

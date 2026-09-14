@@ -8,7 +8,7 @@ import { useState, useCallback, useRef, useEffect, Fragment } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import {
   Store, Search, CheckCircle, XCircle, Ban, Eye, MapPin, Clock,
-  Phone, Mail, Globe, Star, ShieldCheck, ShieldX, RotateCcw, RefreshCw,
+  Phone, Mail, Globe, Star, Flame, ShieldCheck, ShieldX, RotateCcw, RefreshCw,
   FileText, ExternalLink, AlertTriangle, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Trash2,
   Plus, Minus, Copy, Loader2, Package, Wrench, Edit2, Archive, Power, Image as ImageIcon, GitBranch,
   Wallet as WalletIcon, AlertCircle, X as XIcon, ArrowDownLeft, ArrowUpRight, DollarSign,
@@ -112,7 +112,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 // go-live flow. Without this the business is invisible on the customer
 // app even though the admin has approved it — the customer discover
 // filter is `status: LIVE`.
-type ActionType = 'approve' | 'set-live' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'vip' | 'delete' | 'update-status' | 'edit' | 'verify-deolu' | 'unverify-deolu';
+type ActionType = 'approve' | 'set-live' | 'reject' | 'suspend' | 'reinstate' | 'verify-cac' | 'reject-cac' | 'feature' | 'whats-hot' | 'vip' | 'delete' | 'update-status' | 'edit' | 'verify-deolu' | 'unverify-deolu';
 
 // ─── Action Dropdown Component ───
 function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
@@ -241,6 +241,15 @@ function ActionDropdown({ business, onAction, onView, supportOnly = false }: {
     action: () => { onAction(business, 'feature'); setOpen(false); },
     variant: 'warning',
   });
+
+  if (business.status === 'LIVE') {
+    items.push({
+      label: business.isWhatsHot ? 'Remove from What\'s Hot' : 'Add to What\'s Hot',
+      icon: Flame,
+      action: () => { onAction(business, 'whats-hot'); setOpen(false); },
+      variant: 'warning',
+    });
+  }
 
   // Per-category commission VIP override (5% flat regardless of category).
   // SUPER_ADMIN only — the row action still fires but the backend enforces
@@ -608,6 +617,9 @@ export default function BusinessesPage() {
   const { mutate: featureBusiness, isLoading: featuring } = useMutation(
     ({ id, data }: { id: string; data: { isFeatured: boolean; featuredUntil?: string } }) => api.businesses.feature(id, data), mutationOpts
   );
+  const { mutate: setWhatsHotBusiness, isLoading: settingWhatsHot } = useMutation(
+    ({ id, data }: { id: string; data: { isWhatsHot: boolean } }) => api.businesses.setWhatsHot(id, data), mutationOpts,
+  );
   const { mutate: setVipBusiness, isLoading: settingVip } = useMutation(
     ({ id, isVip }: { id: string; isVip: boolean }) => api.businesses.setVip(id, isVip), mutationOpts,
   );
@@ -638,6 +650,7 @@ export default function BusinessesPage() {
     reinstating ||
     verifyingCac ||
     featuring ||
+    settingWhatsHot ||
     deleting ||
     verifyingDeolu ||
     unverifyingDeolu;
@@ -813,6 +826,12 @@ export default function BusinessesPage() {
         result = await featureBusiness({ id: business._id, data: { isFeatured: !business.isFeatured } });
         successMsg = business.isFeatured ? 'Business unfeatured' : 'Business featured';
         break;
+      case 'whats-hot':
+        result = await setWhatsHotBusiness({ id: business._id, data: { isWhatsHot: !business.isWhatsHot } });
+        successMsg = business.isWhatsHot
+          ? `"${business.name}" removed from What's Hot`
+          : `"${business.name}" added to What's Hot`;
+        break;
       case 'vip':
         result = await setVipBusiness({ id: business._id, isVip: !business.isVip });
         successMsg = business.isVip
@@ -870,7 +889,7 @@ export default function BusinessesPage() {
       }
     }
     // Error toasts are handled automatically by the onError callback in each mutation
-  }, [actionModal, reason, selectedStatus, approveBusiness, rejectBusiness, suspendBusiness, reinstateBusiness, verifyCac, featureBusiness, deleteBusiness, refetch, detailBusiness]);
+  }, [actionModal, reason, selectedStatus, approveBusiness, rejectBusiness, suspendBusiness, reinstateBusiness, verifyCac, featureBusiness, setWhatsHotBusiness, deleteBusiness, refetch, detailBusiness]);
 
   const openAction = (business: Business, action: ActionType) => {
     // Edit doesn't go through the generic confirm-modal flow — it has its
@@ -1136,6 +1155,13 @@ export default function BusinessesPage() {
         label: 'Confirm',
         variant: 'primary',
         icon: Star,
+      },
+      'whats-hot': {
+        title: 'Toggle What\'s Hot placement',
+        description: (name) => `Add or remove "${name}" from its city\'s What\'s Hot section? This does not change its Featured or advertising status.`,
+        label: 'Confirm',
+        variant: 'primary',
+        icon: Flame,
       },
       vip: {
         title: 'Toggle VIP Commission',
@@ -2661,6 +2687,19 @@ export default function BusinessesPage() {
                 <Star className={`w-3.5 h-3.5 ${displayBusiness.isFeatured ? 'fill-amber-500' : ''}`} />
                 {displayBusiness.isFeatured ? 'Remove from featured' : 'Set as featured'}
               </button>
+              {displayBusiness.status === 'LIVE' && (
+                <button
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                    displayBusiness.isWhatsHot
+                      ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                  }`}
+                  onClick={() => openAction(displayBusiness, 'whats-hot')}
+                >
+                  <Flame className={`w-3.5 h-3.5 ${displayBusiness.isWhatsHot ? 'fill-orange-500' : ''}`} />
+                  {displayBusiness.isWhatsHot ? 'Remove from What\'s Hot' : 'Add to What\'s Hot'}
+                </button>
+              )}
               <button
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
                 onClick={() => { setDetailBusiness(null); openAction(displayBusiness, 'delete'); }}

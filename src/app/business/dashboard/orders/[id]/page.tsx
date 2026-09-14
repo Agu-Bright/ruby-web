@@ -116,7 +116,7 @@ export default function OrderDetailPage() {
     refetch();
   });
   const cancel = useCancelOrder(() => {
-    toast.success('Order cancelled.');
+    toast.success('Order cancelled. Full refund issued to the customer.');
     refetch();
   });
 
@@ -160,7 +160,7 @@ export default function OrderDetailPage() {
   const isPending = order.status === 'PLACED';
   const canCancel =
     !isTerminal &&
-    (order.status === 'ACCEPTED' || order.status === 'PREPARING');
+    ['PLACED', 'ACCEPTED', 'PREPARING', 'READY'].includes(order.status);
   const busy =
     accept.isLoading ||
     reject.isLoading ||
@@ -301,26 +301,26 @@ export default function OrderDetailPage() {
                   {updateStatus.isLoading ? 'Working…' : a.label}
                 </button>
               ))}
-              {canCancel && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    const reason = window.prompt(
-                      'Cancel this order? Enter a short reason:',
-                    );
-                    if (!reason?.trim()) return;
-                    cancel.mutate({
-                      orderId: order._id,
-                      reason: reason.trim(),
-                    });
-                  }}
-                  className="px-4 py-2.5 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 font-medium text-sm"
-                >
-                  Cancel order
-                </button>
-              )}
             </div>
+          )}
+          {canCancel && !showRejectReason && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                const reason = window.prompt(
+                  'Cancel this order and issue the customer a full refund. Enter a short reason:',
+                );
+                if (!reason?.trim()) return;
+                cancel.mutate({
+                  orderId: order._id,
+                  reason: reason.trim(),
+                });
+              }}
+              className="mt-3 w-full py-2.5 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 font-semibold text-sm disabled:opacity-60"
+            >
+              Cancel order & issue full refund
+            </button>
           )}
         </div>
       )}

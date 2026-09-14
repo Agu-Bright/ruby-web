@@ -1434,6 +1434,11 @@ export const api = {
         `/admin/businesses/${id}/feature`,
         { method: "PATCH", body: data },
       ),
+    setWhatsHot: (id: string, data: { isWhatsHot: boolean }) =>
+      request<import("@/lib/types").Business>(
+        `/admin/businesses/${id}/whats-hot`,
+        { method: "PATCH", body: data },
+      ),
     // Per-category commission override: SUPER_ADMIN sets isVip=true on a
     // hand-picked merchant and CommissionService returns a flat 5% for that
     // business regardless of category rate.

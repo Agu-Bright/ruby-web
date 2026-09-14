@@ -629,6 +629,8 @@ export interface Business {
   // Flags
   isFeatured?: boolean;
   featuredUntil?: string;
+  /** Admin-curated inclusion in the location-scoped What's Hot home row. */
+  isWhatsHot?: boolean;
   isPromoted?: boolean;
   /**
    * VIP override for merchant commission. When true, CommissionService

@@ -51,48 +51,105 @@ export function BlogEditor({
   const [tags, setTags] = useState<string[]>(post?.tags || []);
   const [tagDraft, setTagDraft] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState(post?.coverImageUrl || '');
-  const [status, setStatus] = useState<'DRAFT' | 'PUBLISHED'>(post?.status || 'DRAFT');
+  const [status] = useState<'DRAFT' | 'PUBLISHED'>(post?.status || 'DRAFT');
   const [saving, setSaving] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [inlineUploading, setInlineUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const editorWrapRef = useRef<HTMLDivElement>(null);
 
   const words = useMemo(() => wordCount(content), [content]);
   const minutes = useMemo(() => readingTimeMinutes(content), [content]);
 
-  // ── Inline image upload command for the markdown toolbar ──
-  const imageUpload: commands.ICommand = {
+  // ── Robust image insertion ──────────────────────────────────────────────
+  // Insert markdown into `content` state directly (cursor-aware via the live
+  // textarea, append as fallback). This does NOT rely on the editor's internal
+  // text API, which loses the selection across the async upload — that was why
+  // inline images silently failed before.
+  const insertMarkdown = (md: string) => {
+    const textarea = editorWrapRef.current?.querySelector<HTMLTextAreaElement>('textarea');
+    setContent((prev) => {
+      if (textarea && typeof textarea.selectionStart === 'number') {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const next = prev.slice(0, start) + md + prev.slice(end);
+        requestAnimationFrame(() => {
+          try {
+            textarea.focus();
+            const pos = start + md.length;
+            textarea.setSelectionRange(pos, pos);
+          } catch {
+            /* noop */
+          }
+        });
+        return next;
+      }
+      return prev + md;
+    });
+  };
+
+  const uploadAndInsert = async (file?: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files can be added');
+      return;
+    }
+    setInlineUploading(true);
+    const toastId = toast.loading('Uploading image…');
+    try {
+      const res = await api.media.upload(file, 'blog');
+      const url = uploadedUrl(res);
+      if (!url) throw new Error('no url');
+      const alt = file.name.replace(/\.[^.]+$/, '');
+      insertMarkdown(`\n![${alt}](${url})\n`);
+      toast.success('Image added', { id: toastId });
+    } catch {
+      toast.error('Image upload failed', { id: toastId });
+    } finally {
+      setInlineUploading(false);
+    }
+  };
+
+  const pickInlineImage = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => uploadAndInsert(input.files?.[0]);
+    input.click();
+  };
+
+  // Toolbar image button (opens the same picker; insertion is state-based).
+  const imageCommand: commands.ICommand = {
     name: 'image-upload',
     keyCommand: 'image-upload',
     buttonProps: { 'aria-label': 'Upload image', title: 'Upload image' },
     icon: <ImagePlus style={{ width: 12, height: 12 }} />,
-    execute: (_state, apiText) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        const toastId = toast.loading('Uploading image…');
-        try {
-          const res = await api.media.upload(file, 'blog');
-          const url = uploadedUrl(res);
-          if (!url) throw new Error('no url');
-          const alt = file.name.replace(/\.[^.]+$/, '');
-          apiText.replaceSelection(`\n![${alt}](${url})\n`);
-          toast.success('Image inserted', { id: toastId });
-        } catch {
-          toast.error('Image upload failed', { id: toastId });
-        }
-      };
-      input.click();
-    },
+    execute: () => pickInlineImage(),
   };
 
   const toolbar = useMemo(() => {
     const base = typeof commands.getCommands === 'function' ? commands.getCommands() : [];
-    return [...base, commands.divider, imageUpload].filter(Boolean);
+    return [...base, commands.divider, imageCommand].filter(Boolean);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const onEditorDrop = (e: React.DragEvent) => {
+    const file = e.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      e.preventDefault();
+      setDragOver(false);
+      uploadAndInsert(file);
+    }
+  };
+
+  const onEditorPaste = (e: React.ClipboardEvent) => {
+    const file = Array.from(e.clipboardData?.files || [])[0];
+    if (file && file.type.startsWith('image/')) {
+      e.preventDefault();
+      uploadAndInsert(file);
+    }
+  };
 
   const addTag = (raw: string) => {
     const t = raw.trim().toLowerCase().replace(/^#/, '');
@@ -100,7 +157,7 @@ export function BlogEditor({
     setTagDraft('');
   };
 
-  const onCover = async (file?: File) => {
+  const onCover = async (file?: File | null) => {
     if (!file) return;
     setCoverUploading(true);
     const toastId = toast.loading('Uploading cover…');
@@ -117,12 +174,12 @@ export function BlogEditor({
     }
   };
 
-  const save = async (publish?: boolean) => {
-    if (!title.trim() || !excerpt.trim() || !content.trim()) {
-      toast.error('Title, excerpt and content are required');
-      return;
-    }
-    const nextStatus = publish === undefined ? status : publish ? 'PUBLISHED' : 'DRAFT';
+  const save = async (publish: boolean) => {
+    // Specific, actionable validation — no more vague "everything is required".
+    if (!title.trim()) return toast.error('Please add a title');
+    if (!excerpt.trim()) return toast.error('Please add a short excerpt');
+    if (!content.trim()) return toast.error('Please write the article content');
+
     const payload = {
       title: title.trim(),
       excerpt: excerpt.trim(),
@@ -130,7 +187,7 @@ export function BlogEditor({
       category: category.trim() || undefined,
       coverImageUrl: coverImageUrl || undefined,
       tags,
-      status: nextStatus,
+      status: publish ? ('PUBLISHED' as const) : ('DRAFT' as const),
     };
     setSaving(true);
     try {
@@ -139,7 +196,7 @@ export function BlogEditor({
       } else {
         await api.blogPosts.create(payload);
       }
-      toast.success(post ? 'Post updated' : 'Post created');
+      toast.success(publish ? 'Post published' : 'Draft saved');
       onSaved();
     } catch {
       toast.error('Failed to save post');
@@ -157,37 +214,28 @@ export function BlogEditor({
             <X className="h-5 w-5" />
           </button>
           <div>
-            <h2 className="text-sm font-bold text-gray-900">
-              {post ? 'Edit post' : 'New post'}
-            </h2>
-            <p className="text-xs text-gray-400">
-              /blog/{title ? slugPreview(title) : '…'}
-            </p>
+            <h2 className="text-sm font-bold text-gray-900">{post ? 'Edit post' : 'New post'}</h2>
+            <p className="text-xs text-gray-400">/blog/{title ? slugPreview(title) : '…'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className={`hidden rounded-full px-2.5 py-1 text-xs font-semibold sm:inline ${
-              status === 'PUBLISHED'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            {status === 'PUBLISHED' ? 'Published' : 'Draft'}
-          </span>
-          <button
-            onClick={() => save(false)}
-            disabled={saving}
-            className="btn-secondary"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save draft'}
+          <button onClick={() => save(false)} disabled={saving} className="btn-secondary">
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : status === 'PUBLISHED' ? (
+              'Unpublish'
+            ) : (
+              'Save draft'
+            )}
           </button>
-          <button
-            onClick={() => save(true)}
-            disabled={saving}
-            className="btn-primary"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Publish'}
+          <button onClick={() => save(true)} disabled={saving} className="btn-primary">
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : status === 'PUBLISHED' ? (
+              'Update'
+            ) : (
+              'Publish'
+            )}
           </button>
         </div>
       </header>
@@ -195,39 +243,90 @@ export function BlogEditor({
       {/* Body */}
       <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5 lg:flex-row">
         {/* Main column */}
-        <div className="flex-1 space-y-4">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={160}
-            placeholder="Post title"
-            className="w-full rounded-xl border-0 bg-transparent px-1 text-3xl font-bold text-gray-900 outline-none placeholder:text-gray-300"
-          />
-          <textarea
-            value={excerpt}
-            onChange={(e) => setExcerpt(e.target.value)}
-            maxLength={320}
-            rows={2}
-            placeholder="Short excerpt shown on cards and search results…"
-            className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none focus:border-ruby-red"
-          />
-          <p className="-mt-2 text-right text-xs text-gray-400">{excerpt.length}/320</p>
-
-          <div data-color-mode="light" className="overflow-hidden rounded-xl border border-gray-200">
-            <MDEditor
-              value={content}
-              onChange={(v) => setContent(v || '')}
-              height={520}
-              preview="live"
-              commands={toolbar}
-              textareaProps={{ placeholder: 'Write your story in Markdown…' }}
+        <div className="flex-1 space-y-5">
+          {/* Title */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Title
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={160}
+              placeholder="e.g. How to use Ruby+"
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-2xl font-bold text-gray-900 outline-none focus:border-ruby-red placeholder:font-normal placeholder:text-gray-300"
             />
+          </div>
+
+          {/* Excerpt */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Excerpt <span className="font-normal normal-case text-gray-400">— short summary shown on cards</span>
+            </label>
+            <textarea
+              value={excerpt}
+              onChange={(e) => setExcerpt(e.target.value)}
+              maxLength={320}
+              rows={2}
+              placeholder="One or two sentences summarising the article…"
+              className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none focus:border-ruby-red"
+            />
+            <p className="mt-1 text-right text-xs text-gray-400">{excerpt.length}/320</p>
+          </div>
+
+          {/* Content */}
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Content
+              </label>
+              <button
+                onClick={pickInlineImage}
+                disabled={inlineUploading}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 transition hover:border-ruby-red hover:text-ruby-red disabled:opacity-50"
+              >
+                {inlineUploading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-3.5 w-3.5" />
+                )}
+                Add image
+              </button>
+            </div>
+            <div
+              ref={editorWrapRef}
+              data-color-mode="light"
+              onDrop={onEditorDrop}
+              onDragOver={(e) => {
+                if (e.dataTransfer?.types?.includes('Files')) {
+                  e.preventDefault();
+                  setDragOver(true);
+                }
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onPaste={onEditorPaste}
+              className={`overflow-hidden rounded-xl border ${
+                dragOver ? 'border-ruby-red ring-2 ring-ruby-red/20' : 'border-gray-200'
+              }`}
+            >
+              <MDEditor
+                value={content}
+                onChange={(v) => setContent(v || '')}
+                height={480}
+                preview="live"
+                commands={toolbar}
+                textareaProps={{ placeholder: 'Write your story in Markdown…' }}
+              />
+            </div>
+            <p className="mt-1.5 text-xs text-gray-400">
+              Tip: drag &amp; drop or paste an image straight into the editor, or use{' '}
+              <span className="font-semibold">Add image</span>.
+            </p>
           </div>
         </div>
 
         {/* Sidebar */}
         <aside className="w-full space-y-4 lg:w-80">
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-2">
             <Stat icon={TypeIcon} label="Words" value={words.toLocaleString()} />
             <Stat icon={Clock} label="Read" value={`${minutes}m`} />
@@ -319,7 +418,6 @@ export function BlogEditor({
             />
           </div>
 
-          {/* Preview link */}
           {post?.slug && status === 'PUBLISHED' && (
             <a
               href={`/blog/${post.slug}`}

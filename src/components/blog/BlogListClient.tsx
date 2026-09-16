@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Search, Clock, ArrowRight } from 'lucide-react';
+import { Search, Clock } from 'lucide-react';
 import { readingTimeMinutes, formatBlogDate, type BlogPost } from '@/lib/blog';
 
 function readingLabel(post: BlogPost): string | null {
@@ -28,25 +28,25 @@ function Card({ post }: { post: BlogPost }) {
           </div>
         )}
       </Link>
-      <div className="flex flex-1 flex-col p-4">
+      <div className="flex flex-1 flex-col p-3">
         {post.category && (
-          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-ruby-red">
+          <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-ruby-red">
             {post.category}
           </p>
         )}
-        <h2 className="text-base font-bold leading-snug text-gray-900">
+        <h2 className="text-sm font-bold leading-snug text-gray-900">
           <Link href={`/blog/${post.slug}`} className="line-clamp-2 hover:text-ruby-red">
             {post.title}
           </Link>
         </h2>
-        <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 text-gray-500">{post.excerpt}</p>
-        <div className="mt-auto flex items-center gap-2.5 pt-3 text-[11px] text-gray-400">
+        <p className="mt-1 line-clamp-2 text-xs leading-4 text-gray-500">{post.excerpt}</p>
+        <div className="mt-auto flex items-center gap-2 pt-2.5 text-[10px] text-gray-400">
           <span>{formatBlogDate(post.publishedAt)}</span>
           {mins && (
             <>
               <span aria-hidden>•</span>
               <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" /> {mins}
+                <Clock className="h-2.5 w-2.5" /> {mins}
               </span>
             </>
           )}
@@ -80,10 +80,6 @@ export function BlogListClient({ posts }: { posts: BlogPost[] }) {
     });
   }, [posts, query, activeCategory]);
 
-  const isDefaultView = !query.trim() && activeCategory === 'All';
-  const featured = isDefaultView ? filtered[0] : undefined;
-  const rest = featured ? filtered.slice(1) : filtered;
-
   return (
     <div>
       {/* Controls */}
@@ -114,53 +110,18 @@ export function BlogListClient({ posts }: { posts: BlogPost[] }) {
         </div>
       </div>
 
-      {/* Featured */}
-      {featured && (
-        <Link
-          href={`/blog/${featured.slug}`}
-          className="group mb-10 grid overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition hover:shadow-lg md:grid-cols-2"
-        >
-          {featured.coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={featured.coverImageUrl}
-              alt={featured.title}
-              className="h-56 w-full object-cover transition duration-500 group-hover:scale-105 md:h-full"
-            />
-          ) : (
-            <div className="flex h-56 items-center justify-center bg-gradient-to-br from-ruby-red/15 to-rose-100 text-6xl md:h-full">
-              ♦
-            </div>
-          )}
-          <div className="flex flex-col justify-center p-8 md:p-10">
-            <span className="mb-3 w-fit rounded-full bg-ruby-red/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-ruby-red">
-              {featured.category || 'Featured'}
-            </span>
-            <h2 className="text-2xl font-bold leading-tight text-gray-950 md:text-3xl">
-              {featured.title}
-            </h2>
-            <p className="mt-3 line-clamp-3 text-gray-600">{featured.excerpt}</p>
-            <span className="mt-6 flex items-center gap-1.5 text-sm font-semibold text-ruby-red">
-              Read article <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
-            </span>
-          </div>
-        </Link>
-      )}
-
-      {/* Grid */}
-      {rest.length > 0 ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {rest.map((post) => (
+      {/* Compact uniform grid */}
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          {filtered.map((post) => (
             <Card key={post._id} post={post} />
           ))}
         </div>
       ) : (
-        !featured && (
-          <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-20 text-center">
-            <h2 className="text-xl font-bold text-gray-900">No articles found</h2>
-            <p className="mt-2 text-gray-600">Try a different search or category.</p>
-          </div>
-        )
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
+          <h2 className="text-lg font-bold text-gray-900">No articles found</h2>
+          <p className="mt-2 text-sm text-gray-600">Try a different search or category.</p>
+        </div>
       )}
     </div>
   );

@@ -4,6 +4,16 @@ import { useState } from 'react';
 import Image from 'next/image';
 import ScrollReveal from '../landing/ScrollReveal';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+const SERVICES = [
+  { value: 'partnership', label: 'Partnership' },
+  { value: 'advertising', label: 'Advertising' },
+  { value: 'listing', label: 'Business Listing' },
+  { value: 'support', label: 'General Support' },
+  { value: 'other', label: 'Other' },
+];
+
 export default function ContactForm() {
   const [form, setForm] = useState({
     name: '',
@@ -11,14 +21,37 @@ export default function ContactForm() {
     company: '',
     service: '',
   });
+  const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: handle form submission
+    if (status === 'sending') return;
+    setStatus('sending');
+    setErrorMsg('');
+    try {
+      const res = await fetch(`${API_URL}/public/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          company: form.company.trim() || undefined,
+          // Send the human-readable label so the founder inbox reads nicely.
+          service: SERVICES.find((s) => s.value === form.service)?.label || form.service,
+        }),
+      });
+      if (!res.ok) throw new Error('request failed');
+      setStatus('success');
+      setForm({ name: '', email: '', company: '', service: '' });
+    } catch {
+      setStatus('error');
+      setErrorMsg('Something went wrong. Please try again or email founder@rubylabs.net directly.');
+    }
   };
 
   return (
@@ -93,26 +126,45 @@ export default function ContactForm() {
                     name="service"
                     value={form.service}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-ruby-red transition-colors text-gray-500 bg-white"
+                    disabled={status === 'sending'}
+                    className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-ruby-red transition-colors text-gray-500 bg-white disabled:opacity-60"
                     required
                   >
                     <option value="">Select service</option>
-                    <option value="partnership">Partnership</option>
-                    <option value="advertising">Advertising</option>
-                    <option value="listing">Business Listing</option>
-                    <option value="support">General Support</option>
-                    <option value="other">Other</option>
+                    {SERVICES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                {status === 'success' && (
+                  <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                    Thank you! Your message has been sent — we&apos;ll be in touch shortly.
+                  </div>
+                )}
+                {status === 'error' && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                    {errorMsg}
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  className="btn-ruby w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 bg-ruby-red text-white text-sm font-semibold rounded-lg"
+                  disabled={status === 'sending'}
+                  className="btn-ruby w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3 bg-ruby-red text-white text-sm font-semibold rounded-lg disabled:opacity-60"
                 >
-                  Submit
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
+                  {status === 'sending' ? (
+                    'Sending…'
+                  ) : (
+                    <>
+                      Submit
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </>
+                  )}
                 </button>
               </form>
             </ScrollReveal>

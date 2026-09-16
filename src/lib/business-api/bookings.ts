@@ -154,7 +154,9 @@ export function useBookings(params: {
   // Deps must be primitive for stable memoisation.
   const statusesKey = params.statuses?.join(',') ?? '';
   const fetcher = useCallback(
-    () => api.businessBookings.list(params),
+    // Scope to the selected branch so the merchant sees that branch's bookings
+    // (backend falls back to the JWT business when omitted) — mirrors mobile.
+    () => api.businessBookings.list({ ...params, businessId }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       businessId,

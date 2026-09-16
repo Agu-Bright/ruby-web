@@ -293,8 +293,9 @@ export default function TemplatesPage() {
       const validFields = (form.fields || [])
         .filter(f => f.key && f.label)
         .map((f, i) => {
-          // Strip Mongo-internal fields — backend DTO uses whitelist + forbidNonWhitelisted
-          const { _id, __v, createdAt, updatedAt, ...clean } = f as any;
+          // Strip Mongo-internal fields + the UI-only `optionsText` raw buffer —
+          // backend DTO uses whitelist + forbidNonWhitelisted (unknown fields 400).
+          const { _id, __v, createdAt, updatedAt, optionsText, ...clean } = f as any;
           return { ...clean, order: i };
         });
       const created = await api.templates.create({ ...form, fields: validFields });
@@ -326,7 +327,8 @@ export default function TemplatesPage() {
       const validFields = (form.fields || [])
         .filter(f => f.key && f.label)
         .map((f, i) => {
-          const { _id, __v, createdAt, updatedAt, ...clean } = f as any;
+          // Also drop the UI-only `optionsText` raw buffer (see handleCreate).
+          const { _id, __v, createdAt, updatedAt, optionsText, ...clean } = f as any;
           return { ...clean, order: i };
         });
       await api.templates.update(editTemplate._id, { ...form, fields: validFields });
@@ -445,10 +447,23 @@ export default function TemplatesPage() {
                 <input
                   type="text"
                   className="input-field text-sm"
-                  value={(field.options || []).map(o => typeof o === 'string' ? o : o.label).join(', ')}
-                  onChange={(e) => updateField(index, {
-                    options: e.target.value.split(',').map(s => s.trim()).filter(Boolean).map(s => ({ value: s.toLowerCase().replace(/[^a-z0-9_]/g, '_'), label: s })),
-                  })}
+                  // Show the RAW text the user is typing (optionsText) as the
+                  // source of truth. Deriving the value from the parsed+trimmed
+                  // `options` array on every keystroke was stripping trailing
+                  // spaces (.trim) and trailing commas (.filter(Boolean)) the
+                  // instant they were typed — so space and comma appeared dead.
+                  // Falls back to the joined array when editing an existing
+                  // template (optionsText not yet set).
+                  value={(field as any).optionsText ?? (field.options || []).map(o => typeof o === 'string' ? o : o.label).join(', ')}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    updateField(index, {
+                      // Keep raw text intact for display; derive the clean
+                      // options array (used at save) separately.
+                      optionsText: raw,
+                      options: raw.split(',').map(s => s.trim()).filter(Boolean).map(s => ({ value: s.toLowerCase().replace(/[^a-z0-9_]/g, '_'), label: s })),
+                    } as any);
+                  }}
                   placeholder="Option 1, Option 2, Option 3"
                 />
                 <p className="text-[10px] text-gray-400 mt-1">Comma-separated list of options</p>

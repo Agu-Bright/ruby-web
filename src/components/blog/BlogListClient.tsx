@@ -13,8 +13,8 @@ function readingLabel(post: BlogPost): string | null {
 function Card({ post }: { post: BlogPost }) {
   const mins = readingLabel(post);
   return (
-    <article className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
-      <Link href={`/blog/${post.slug}`}>
+    <article className="group flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-md">
+      <Link href={`/blog/${post.slug}`} className="block overflow-hidden">
         {post.coverImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -23,35 +23,33 @@ function Card({ post }: { post: BlogPost }) {
             className="aspect-[16/9] w-full object-cover transition duration-500 group-hover:scale-105"
           />
         ) : (
-          <div className="flex aspect-[16/9] items-center justify-center bg-gradient-to-br from-ruby-red/15 to-rose-100 text-4xl">
+          <div className="flex aspect-[16/9] items-center justify-center bg-gradient-to-br from-ruby-red/15 to-rose-100 text-3xl">
             ♦
           </div>
         )}
       </Link>
-      <div className="p-6">
+      <div className="flex flex-1 flex-col p-4">
         {post.category && (
-          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-ruby-red">
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-ruby-red">
             {post.category}
           </p>
         )}
-        <h2 className="text-xl font-bold leading-snug text-gray-900">
-          <Link href={`/blog/${post.slug}`} className="hover:text-ruby-red">
+        <h2 className="text-base font-bold leading-snug text-gray-900">
+          <Link href={`/blog/${post.slug}`} className="line-clamp-2 hover:text-ruby-red">
             {post.title}
           </Link>
         </h2>
-        <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">{post.excerpt}</p>
-        <div className="mt-5 flex items-center justify-between text-xs text-gray-500">
-          <span className="flex items-center gap-3">
-            <span>{formatBlogDate(post.publishedAt)}</span>
-            {mins && (
+        <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 text-gray-500">{post.excerpt}</p>
+        <div className="mt-auto flex items-center gap-2.5 pt-3 text-[11px] text-gray-400">
+          <span>{formatBlogDate(post.publishedAt)}</span>
+          {mins && (
+            <>
+              <span aria-hidden>•</span>
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" /> {mins}
               </span>
-            )}
-          </span>
-          <Link href={`/blog/${post.slug}`} className="font-semibold text-ruby-red">
-            Read →
-          </Link>
+            </>
+          )}
         </div>
       </div>
     </article>
@@ -151,7 +149,7 @@ export function BlogListClient({ posts }: { posts: BlogPost[] }) {
 
       {/* Grid */}
       {rest.length > 0 ? (
-        <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {rest.map((post) => (
             <Card key={post._id} post={post} />
           ))}

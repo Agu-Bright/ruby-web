@@ -33,8 +33,12 @@ export function MarkdownArticle({ content }: { content: string }) {
               </a>
             );
           },
-          // eslint-disable-next-line @next/next/no-img-element
-          img: ({ src, alt }) => <img src={typeof src === 'string' ? src : ''} alt={alt || ''} loading="lazy" />,
+          img: ({ src, alt }) => {
+            const url = typeof src === 'string' ? src : '';
+            if (!url) return null; // skip malformed/empty images instead of a broken icon
+            // eslint-disable-next-line @next/next/no-img-element
+            return <img src={url} alt={alt || ''} loading="lazy" />;
+          },
         }}
       >
         {content}

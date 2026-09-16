@@ -5,9 +5,13 @@ import type { BlogPost } from '@/lib/blog';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
+// Always render fresh so a newly published/edited post shows immediately.
+// (ISR was caching an empty list from build time → "Stories are coming soon".)
+export const dynamic = 'force-dynamic';
+
 async function getPosts(): Promise<BlogPost[]> {
   try {
-    const response = await fetch(`${apiUrl}/public/blog-posts?limit=48`, { next: { revalidate: 60 } });
+    const response = await fetch(`${apiUrl}/public/blog-posts?limit=48`, { cache: 'no-store' });
     if (!response.ok) return [];
     const json = await response.json();
     const data = json.data || json;

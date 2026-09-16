@@ -67,25 +67,24 @@ export function BlogEditor({
   // textarea, append as fallback). This does NOT rely on the editor's internal
   // text API, which loses the selection across the async upload — that was why
   // inline images silently failed before.
-  const insertMarkdown = (md: string) => {
+  const insertImageBlock = (markdown: string) => {
     const textarea = editorWrapRef.current?.querySelector<HTMLTextAreaElement>('textarea');
     setContent((prev) => {
+      // Insert the image as a STANDALONE BLOCK at the end of the current line,
+      // surrounded by blank lines. Inserting at the raw caret offset could land
+      // inside an existing markdown token (e.g. an unfinished `![...]()`),
+      // producing broken nested image syntax — this can't.
+      let pos = prev.length;
       if (textarea && typeof textarea.selectionStart === 'number') {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const next = prev.slice(0, start) + md + prev.slice(end);
-        requestAnimationFrame(() => {
-          try {
-            textarea.focus();
-            const pos = start + md.length;
-            textarea.setSelectionRange(pos, pos);
-          } catch {
-            /* noop */
-          }
-        });
-        return next;
+        const caret = textarea.selectionStart;
+        const nextNewline = prev.indexOf('\n', caret);
+        pos = nextNewline === -1 ? prev.length : nextNewline;
       }
-      return prev + md;
+      const before = prev.slice(0, pos);
+      const after = prev.slice(pos);
+      const lead = before === '' || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+      const trail = after === '' || after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+      return before + lead + markdown + trail + after;
     });
   };
 
@@ -102,7 +101,7 @@ export function BlogEditor({
       const url = uploadedUrl(res);
       if (!url) throw new Error('no url');
       const alt = file.name.replace(/\.[^.]+$/, '');
-      insertMarkdown(`\n![${alt}](${url})\n`);
+      insertImageBlock(`![${alt}](${url})`);
       toast.success('Image added', { id: toastId });
     } catch {
       toast.error('Image upload failed', { id: toastId });

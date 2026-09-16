@@ -18,10 +18,13 @@ import {
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
+// Render fresh so edits and new posts are visible immediately.
+export const dynamic = 'force-dynamic';
+
 async function getPost(slug: string): Promise<BlogPost | null> {
   try {
     const res = await fetch(`${apiUrl}/public/blog-posts/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
+      cache: 'no-store',
     });
     if (!res.ok) return null;
     const json = await res.json();
@@ -34,7 +37,7 @@ async function getPost(slug: string): Promise<BlogPost | null> {
 async function getRelated(category: string | undefined, excludeSlug: string): Promise<BlogPost[]> {
   try {
     const qs = category ? `&category=${encodeURIComponent(category)}` : '';
-    const res = await fetch(`${apiUrl}/public/blog-posts?limit=4${qs}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${apiUrl}/public/blog-posts?limit=4${qs}`, { cache: 'no-store' });
     if (!res.ok) return [];
     const json = await res.json();
     const data = json.data || json;

@@ -735,8 +735,8 @@ function CategoriesTab() {
       autoFilled.current.clear();
       setForm(defaultForm());
       refetch();
-    } catch {
-      toast.error('Failed to create category');
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Failed to create category');
     } finally {
       setIsSubmitting(false);
     }
@@ -752,8 +752,8 @@ function CategoriesTab() {
       setEditCategory(null);
       autoFilled.current.clear();
       refetch();
-    } catch {
-      toast.error('Failed to update category');
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Failed to update category');
     } finally {
       setIsSubmitting(false);
     }
@@ -1342,8 +1342,8 @@ function SubcategoriesTab() {
       setForm(defaultForm());
       setSynonymInput('');
       refetch();
-    } catch {
-      toast.error('Failed to create subcategory');
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Failed to create subcategory');
     } finally {
       setIsSubmitting(false);
     }
@@ -1360,8 +1360,8 @@ function SubcategoriesTab() {
       autoFilled.current.clear();
       setSynonymInput('');
       refetch();
-    } catch {
-      toast.error('Failed to update subcategory');
+    } catch (err) {
+      toast.error((err as Error)?.message || 'Failed to update subcategory');
     } finally {
       setIsSubmitting(false);
     }

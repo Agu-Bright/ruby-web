@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Drawer } from '@/components/ui/drawer';
 import { ImageUpload } from '@/components/ui/image-upload';
+import { BusinessSearchSelect } from '@/components/ui/business-search-select';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import type {
@@ -397,17 +398,14 @@ export default function RubySelectPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
-                CTA URL
+                Link to merchant profile
               </label>
-              <input
-                type="text"
+              <BusinessSearchSelect
                 value={form.ctaUrl || ''}
-                onChange={(e) => setForm((f) => ({ ...f, ctaUrl: e.target.value }))}
-                placeholder="/(tabs)/business/<id> or https://…"
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-ruby-red"
+                onChange={(ctaUrl) => setForm((f) => ({ ...f, ctaUrl }))}
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                Empty = display-only banner (no tap navigation).
+                Image and video posts can open the selected customer business profile.
               </p>
             </div>
             <div>
@@ -423,6 +421,22 @@ export default function RubySelectPage() {
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-ruby-red"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1 uppercase tracking-wider">
+              Custom CTA URL
+            </label>
+            <input
+              type="text"
+              value={form.ctaUrl || ''}
+              onChange={(e) => setForm((f) => ({ ...f, ctaUrl: e.target.value }))}
+              placeholder="https://… or an in-app route"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-ruby-red"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Optional override for an external link or another in-app destination. Leave empty for display-only.
+            </p>
           </div>
 
           <div>

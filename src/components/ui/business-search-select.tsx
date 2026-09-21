@@ -58,7 +58,10 @@ export function BusinessSearchSelect({
     }
     api.businesses
       .get(selectedId)
-      .then((biz: any) => {
+      .then((res: any) => {
+        // request() returns the { success, data, meta } envelope — the
+        // business is at `.data`.
+        const biz = res?.data ?? res;
         if (!cancelled) setSelectedLabel(biz?.name || 'Selected business');
       })
       .catch(() => {
@@ -84,8 +87,12 @@ export function BusinessSearchSelect({
     const myReq = ++reqIdRef.current;
     debounceRef.current = setTimeout(async () => {
       try {
-        const list = await api.businesses.list({ search: q, status: 'LIVE' as any, limit: 20 });
-        const items = Array.isArray(list) ? list : ((list as any)?.items ?? []);
+        const res = await api.businesses.list({ search: q, status: 'LIVE' as any, limit: 20 });
+        // request() returns the { success, data, meta } envelope; the business
+        // array is at `.data`. (Kept array/items fallbacks for safety.)
+        const items = Array.isArray(res)
+          ? res
+          : ((res as any)?.data ?? (res as any)?.items ?? []);
         if (myReq === reqIdRef.current) setResults(items);
       } catch {
         if (myReq === reqIdRef.current) setResults([]);

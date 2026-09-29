@@ -188,7 +188,17 @@ function EmptyState({ icon: Icon, title, description, actionLabel, onAction }: {
 // ─── Main Page ─────────────────────────────────────────────
 
 export default function TemplatesPage() {
-  const { data: templates, isLoading, error, refetch } = useApi<Template[]>(() => api.templates.list(), []);
+  // Load the FULL template set for this management screen (search, stats, the
+  // status filter and the subcategory-linkage map all run client-side over this
+  // array). Without an explicit limit the backend capped the response at 20, so
+  // any template past the first 20 was invisible here yet still tripped the
+  // create-time duplicate check ("Active template with this name already
+  // exists" for a template that wasn't in the list). includeAllVersions returns
+  // inactive/older templates too, so the "Inactive" status filter actually works.
+  const { data: templates, isLoading, error, refetch } = useApi<Template[]>(
+    () => api.templates.list({ limit: 500, includeAllVersions: true }),
+    [],
+  );
   const { data: categories } = useApi<Category[]>(() => api.categories.list(), []);
   const { data: subcategories, refetch: refetchSubs } = useApi<Subcategory[]>(() => api.subcategories.list(), []);
 

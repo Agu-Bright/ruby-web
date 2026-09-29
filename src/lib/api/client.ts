@@ -1112,12 +1112,18 @@ export const api = {
   },
 
   // Business uploads must not be sent to admin-only media endpoints.
+  //
+  // These go straight through the backend multipart proxy rather than the
+  // browser→R2 presigned-PUT path. The direct-to-R2 PUT needs the R2 bucket's
+  // CORS policy to allowlist EVERY browser origin; the business dashboard
+  // (business.rubyplus.net) is a separate origin from the admin app, so its
+  // direct PUT was being blocked by CORS while admin uploads worked. The
+  // proxy performs the identical server-side R2 PutObject with no per-origin
+  // CORS dependency, so merchant image uploads (logo, cover, gallery, room
+  // and catalogue photos — all small) are reliable from any origin. Large
+  // admin/video uploads keep using `uploadDirect` where offloading matters.
   businessMedia: {
-    upload: (file: File) =>
-      uploadDirect(file, undefined, {
-        presignedUrl: "/business/media/presigned-url",
-        uploadUrl: "/business/media/upload",
-      }),
+    upload: (file: File) => uploadFile("/business/media/upload", file),
   },
 
   // Admin Users
@@ -2826,6 +2832,37 @@ export const api = {
 
     /** Single subscription detail. */
     get: (id: string) => request<any>(`/admin/ad-subscriptions/${id}`),
+
+    /**
+     * Charge log — every Paystack ad-subscription money movement (initial
+     * charge, renewals, failed attempts), matched or orphaned. `orphansOnly`
+     * narrows to charges billed with no live subscription.
+     */
+    charges: (params?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      orphansOnly?: boolean;
+      businessId?: string;
+    }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set("page", String(params.page));
+      if (params?.limit) qs.set("limit", String(params.limit));
+      if (params?.status) qs.set("status", params.status);
+      if (params?.orphansOnly) qs.set("orphansOnly", "true");
+      if (params?.businessId) qs.set("businessId", params.businessId);
+      const q = qs.toString();
+      return request<any>(
+        `/admin/ad-subscriptions/charges${q ? `?${q}` : ""}`,
+      );
+    },
+
+    /** Refund a charge (and, by default, disable its Paystack subscription). */
+    refundCharge: (reference: string, body?: { disableSubscription?: boolean }) =>
+      request<any>(
+        `/admin/ad-subscriptions/charges/${encodeURIComponent(reference)}/refund`,
+        { method: "POST", body: JSON.stringify(body || {}) },
+      ),
 
     /**
      * Force-cancel — admin-only since P124 (merchant-facing cancel was

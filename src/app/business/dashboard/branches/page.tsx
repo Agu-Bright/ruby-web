@@ -8,7 +8,6 @@ import { LocationSelector } from '@/components/business/onboarding/LocationSelec
 import { useBusinessAuth } from '@/lib/business-auth';
 import {
   useBranches,
-  useCatalogMode,
   useCreateBranch,
   useEnableMultiBranch,
 } from '@/lib/business-api/organization';
@@ -48,7 +47,8 @@ const initial: BranchForm = {
   state: '',
   country: 'Nigeria',
   phone: '',
-  catalogMode: 'INHERIT',
+  // Every branch runs an independent catalog — inherit/mixed are not offered.
+  catalogMode: 'INDEPENDENT',
 };
 
 export default function BranchesPage() {
@@ -67,10 +67,6 @@ export default function BranchesPage() {
     toast.success('Branch created');
     setForm(initial);
     setShowCreate(false);
-    refresh();
-  });
-  const catalog = useCatalogMode(() => {
-    toast.success('Catalog mode updated');
     refresh();
   });
 
@@ -221,11 +217,6 @@ export default function BranchesPage() {
             <input value={form.city} onChange={(event) => set('city', event.target.value)} placeholder="City" className="rounded-lg border p-3" />
             <input value={form.state} onChange={(event) => set('state', event.target.value)} placeholder="State" className="rounded-lg border p-3" />
             <input value={form.phone} onChange={(event) => set('phone', event.target.value)} placeholder="Contact phone (optional)" className="rounded-lg border p-3" />
-            <select value={form.catalogMode} onChange={(event) => set('catalogMode', event.target.value)} className="rounded-lg border p-3">
-              <option value="INHERIT">Inherit parent catalog</option>
-              <option value="INDEPENDENT">Independent catalog</option>
-              <option value="MIXED">Mixed catalog</option>
-            </select>
             <button disabled={create.isLoading} className="rounded-lg bg-ruby-red p-3 text-sm font-semibold text-white">
               {create.isLoading ? 'Creating…' : 'Create branch'}
             </button>
@@ -250,17 +241,12 @@ export default function BranchesPage() {
                     {branch.address?.street ?? branch.address?.city ?? 'Address pending'} · {branch.status}
                   </p>
                 </div>
-                <select
-                  aria-label="Catalog mode"
-                  value={branch.catalogMode ?? 'INHERIT'}
-                  onChange={(event) => void catalog.mutate({ branchId: branch._id, catalogMode: event.target.value })}
-                  disabled={catalog.isLoading}
-                  className="rounded-lg border p-2 text-sm"
-                >
-                  <option value="INHERIT">Inherit</option>
-                  <option value="INDEPENDENT">Independent</option>
-                  <option value="MIXED">Mixed</option>
-                </select>
+                {/* Every branch runs an independent catalog. The inherit/mixed
+                    modes are intentionally not offered — each branch manages its
+                    own products and services. */}
+                <span className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600">
+                  Independent catalog
+                </span>
               </div>
             ))}
           </div>

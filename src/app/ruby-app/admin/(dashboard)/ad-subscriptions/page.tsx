@@ -19,7 +19,8 @@
  * Subscriptions tab row action.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Sparkles,
   Filter,
@@ -53,6 +54,7 @@ type AdStatus =
   | "EXPIRED";
 type Tab =
   | "subscriptions"
+  | "transactions"
   | "pendingReview"
   | "pushBlastRequests"
   | "onboarding"
@@ -103,6 +105,7 @@ export default function AdSubscriptionsPage() {
           {(
             [
               { key: "subscriptions", label: "Subscriptions" },
+              { key: "transactions", label: "Transactions" },
               { key: "pendingReview", label: "Pending review" },
               { key: "pushBlastRequests", label: "Push blast inbox" },
               { key: "onboarding", label: "Onboarding queue" },
@@ -125,6 +128,7 @@ export default function AdSubscriptionsPage() {
       </div>
 
       {tab === "subscriptions" && <SubscriptionsTab />}
+      {tab === "transactions" && <TransactionsTab />}
       {tab === "pendingReview" && <PendingReviewTab />}
       {tab === "pushBlastRequests" && <PushBlastRequestsTab />}
       {tab === "onboarding" && <OnboardingTab />}
@@ -404,23 +408,42 @@ function RowMenu({
   onUpgrade: (tier: AdTier) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
   const isActive = sub.status === "ACTIVE" || sub.status === "IN_GRACE_PERIOD";
   const isPaused = sub.status === "PAUSED";
+
+  // The row lives inside the table's `overflow-x-auto`/`overflow-hidden`
+  // wrappers, which clip an absolutely-positioned menu (bumping z-index does
+  // nothing against overflow clipping). Render the menu in a portal with
+  // fixed positioning derived from the trigger's viewport rect so it escapes
+  // every clipping ancestor.
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setCoords({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+  }, [open]);
+
   return (
     <div className="relative inline-block">
       <button
+        ref={btnRef}
         onClick={() => setOpen((s) => !s)}
         className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded"
       >
         ⋮
       </button>
-      {open && (
+      {open && coords && createPortal(
         <>
           <div
-            className="fixed inset-0 z-30"
+            className="fixed inset-0 z-[100]"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-40">
+          <div
+            className="fixed w-48 bg-white border border-gray-200 rounded-md shadow-lg z-[101]"
+            style={{ top: coords.top, right: coords.right }}
+          >
             {sub.tier !== "STARTER" && isActive && (
               <button
                 onClick={() => {
@@ -492,8 +515,180 @@ function RowMenu({
               </button>
             )}
           </div>
-        </>
+        </>,
+        document.body
       )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// Transactions tab — every Paystack subscription charge (matched + orphan)
+// ──────────────────────────────────────────────────────────────
+
+function TransactionsTab() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [orphansOnly, setOrphansOnly] = useState(false);
+  const [refunding, setRefunding] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res: any = await api.adSubscriptions.charges({
+        orphansOnly,
+        limit: 100,
+      });
+      setRows(res?.data || []);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load transactions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orphansOnly]);
+
+  const handleRefund = async (ref: string) => {
+    if (
+      !window.confirm(
+        "Refund this charge via Paystack AND disable its subscription so the card is never billed again?",
+      )
+    )
+      return;
+    setRefunding(ref);
+    try {
+      const res: any = await api.adSubscriptions.refundCharge(ref, {
+        disableSubscription: true,
+      });
+      toast.success(res?.data?.message || "Refund initiated");
+      await load();
+    } catch (err: any) {
+      toast.error(err?.message || "Refund failed");
+    } finally {
+      setRefunding(null);
+    }
+  };
+
+  const statusBadge = (s: string) => {
+    if (s === "SUCCESS") return "bg-green-100 text-green-700";
+    if (s === "REFUNDED") return "bg-gray-100 text-gray-600";
+    return "bg-red-100 text-red-700"; // FAILED
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={orphansOnly}
+            onChange={(e) => setOrphansOnly(e.target.checked)}
+            className="rounded border-gray-300"
+          />
+          Show only orphaned charges (billed with no live subscription)
+        </label>
+        <button
+          onClick={load}
+          className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              <tr>
+                <th className="text-left px-4 py-3">When</th>
+                <th className="text-left px-4 py-3">Business / Customer</th>
+                <th className="text-left px-4 py-3">Reference</th>
+                <th className="text-right px-4 py-3">Amount</th>
+                <th className="text-left px-4 py-3">Status</th>
+                <th className="text-right px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    Loading…
+                  </td>
+                </tr>
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    No charges recorded yet.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((c) => (
+                  <tr
+                    key={c._id}
+                    className={!c.matchedToSubscription ? "bg-red-50/40" : ""}
+                  >
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                      {formatDate(c.paidAt || c.createdAt)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">
+                        {c.businessName || (
+                          <span className="text-red-600">
+                            Unknown (orphaned)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {c.customerEmail || c.customerCode || "—"}
+                        {c.tier ? ` · ${c.tier}` : ""}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 font-mono">
+                      {c.reference}
+                      {!c.matchedToSubscription && (
+                        <span className="ml-2 inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                          ORPHAN
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
+                      {formatCurrency(c.amountNgn)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${statusBadge(
+                          c.status,
+                        )}`}
+                      >
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {c.status === "SUCCESS" ? (
+                        <button
+                          onClick={() => handleRefund(c.reference)}
+                          disabled={refunding === c.reference}
+                          className="text-xs font-semibold text-red-600 hover:text-red-800 disabled:opacity-50"
+                        >
+                          {refunding === c.reference
+                            ? "Refunding…"
+                            : "Refund & stop"}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

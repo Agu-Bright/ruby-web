@@ -15,20 +15,29 @@ type PostRow = {
   createdAt?: string;
 };
 
+// The public endpoint caps `limit` at 50 (BlogPublicQueryDto @Max(50)), so page
+// through it until a short page signals the end. Returns PUBLISHED posts only.
 async function getPublishedPosts(): Promise<PostRow[]> {
+  const PAGE_SIZE = 50;
+  const MAX_PAGES = 40; // safety ceiling (≈2000 posts)
+  const all: PostRow[] = [];
   try {
-    // Public endpoint already returns PUBLISHED posts only.
-    const res = await fetch(`${apiUrl}/public/blog-posts?limit=1000`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) return [];
-    const json = await res.json();
-    const data = json.data ?? json;
-    const items = Array.isArray(data) ? data : data.items || [];
-    return items as PostRow[];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const res = await fetch(
+        `${apiUrl}/public/blog-posts?limit=${PAGE_SIZE}&page=${page}`,
+        { cache: 'no-store' },
+      );
+      if (!res.ok) break;
+      const json = await res.json();
+      const data = json.data ?? json;
+      const items: PostRow[] = Array.isArray(data) ? data : data.items || [];
+      all.push(...items);
+      if (items.length < PAGE_SIZE) break;
+    }
   } catch {
-    return [];
+    // Return whatever was collected before the failure.
   }
+  return all;
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

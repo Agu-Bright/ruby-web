@@ -3,9 +3,10 @@ import type { MetadataRoute } from 'next';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://rubyplus.net';
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
-// Served at /sitemap.xml. Refreshed hourly so newly published posts are
-// discoverable by Google without a redeploy.
-export const revalidate = 3600;
+// Served at /sitemap.xml. Rendered fresh on every request so newly published
+// posts appear immediately — static/ISR prerender caches an empty list from
+// build time (same reason the blog pages are force-dynamic).
+export const dynamic = 'force-dynamic';
 
 type PostRow = {
   slug?: string;
@@ -18,7 +19,7 @@ async function getPublishedPosts(): Promise<PostRow[]> {
   try {
     // Public endpoint already returns PUBLISHED posts only.
     const res = await fetch(`${apiUrl}/public/blog-posts?limit=1000`, {
-      next: { revalidate: 3600 },
+      cache: 'no-store',
     });
     if (!res.ok) return [];
     const json = await res.json();

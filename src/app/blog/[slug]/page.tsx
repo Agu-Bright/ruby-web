@@ -17,6 +17,13 @@ import {
 } from '@/lib/blog';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://rubyplus.net';
+
+// Make any relative image URL absolute for OG tags / structured data.
+function absoluteUrl(u?: string): string | undefined {
+  if (!u) return undefined;
+  return /^https?:\/\//i.test(u) ? u : `${SITE_URL}${u.startsWith('/') ? '' : '/'}${u}`;
+}
 
 // Render fresh so edits and new posts are visible immediately.
 export const dynamic = 'force-dynamic';
@@ -57,22 +64,25 @@ export async function generateMetadata({
   const post = await getPost(slug);
   if (!post) return { title: 'Article not found | Ruby+' };
   const description = post.excerpt || markdownToPlainText(post.content).slice(0, 155);
+  const ogImage = absoluteUrl(post.coverImageUrl);
   return {
     title: `${post.title} | Ruby+ Journal`,
     description,
+    alternates: { canonical: `/blog/${post.slug}` },
     openGraph: {
       title: post.title,
       description,
       type: 'article',
+      url: `${SITE_URL}/blog/${post.slug}`,
       publishedTime: post.publishedAt,
       authors: post.authorName ? [post.authorName] : undefined,
-      images: post.coverImageUrl ? [{ url: post.coverImageUrl }] : undefined,
+      images: ogImage ? [{ url: ogImage }] : undefined,
     },
     twitter: {
-      card: post.coverImageUrl ? 'summary_large_image' : 'summary',
+      card: ogImage ? 'summary_large_image' : 'summary',
       title: post.title,
       description,
-      images: post.coverImageUrl ? [post.coverImageUrl] : undefined,
+      images: ogImage ? [ogImage] : undefined,
     },
   };
 }
@@ -86,8 +96,34 @@ export default async function BlogArticle({ params }: { params: Promise<{ slug: 
   const minutes = readingTimeMinutes(post.content);
   const related = await getRelated(post.category, post.slug);
 
+  // BlogPosting structured data → eligible for Google article rich results.
+  const description = post.excerpt || markdownToPlainText(post.content).slice(0, 155);
+  const ogImage = absoluteUrl(post.coverImageUrl);
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description,
+    ...(ogImage ? { image: [ogImage] } : {}),
+    datePublished: post.publishedAt,
+    dateModified: (post as { updatedAt?: string }).updatedAt || post.publishedAt,
+    author: { '@type': 'Person', name: post.authorName || 'Ruby+' },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Ruby+',
+      logo: { '@type': 'ImageObject', url: `${SITE_URL}/icon.png` },
+    },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/blog/${post.slug}` },
+    ...(post.category ? { articleSection: post.category } : {}),
+    ...(post.tags?.length ? { keywords: post.tags.join(', ') } : {}),
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Navbar />
       <ReadingProgress />
       <main className="min-h-screen bg-white pt-16">

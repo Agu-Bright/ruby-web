@@ -21,9 +21,18 @@ async function getPosts(): Promise<BlogPost[]> {
   }
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://rubyplus.net';
+
 export const metadata = {
   title: 'Ruby+ Blog | Stories, guides and Nigeria updates',
   description: 'Stories, guides and local discoveries from the Ruby+ community.',
+  alternates: { canonical: '/blog' },
+  openGraph: {
+    title: 'Ruby+ Blog | Stories, guides and Nigeria updates',
+    description: 'Stories, guides and local discoveries from the Ruby+ community.',
+    type: 'website',
+    url: `${SITE_URL}/blog`,
+  },
 };
 
 export default async function BlogPage() {

@@ -18,6 +18,9 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  // Absolutizes every relative canonical / OG / Twitter image URL across the
+  // site (blog posts especially), which Google and social crawlers require.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://rubyplus.net'),
   title: 'Ruby+ | Connecting the World to Verified Nigerian Businesses',
   description:
     'Discover trusted Nigerian brands, products, and services. Ruby+ enables businesses to reach a global audience.',

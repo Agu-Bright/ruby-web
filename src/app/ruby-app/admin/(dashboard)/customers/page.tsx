@@ -284,8 +284,6 @@ export default function CustomersPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-1 flex-wrap">
               <span className="font-semibold text-gray-900 text-sm">{c.firstName} {c.lastName}</span>
-              {c.isEmailVerified && <span title="Email verified"><BadgeCheck className="w-3.5 h-3.5 text-emerald-500" /></span>}
-              {c.isPhoneVerified && <span title="Phone verified"><PhoneCall className="w-3.5 h-3.5 text-blue-500" /></span>}
               {/* Phase 44 — business-owner badge. Click → jumps to the
                   business detail page (single) or the customer's
                   Businesses tab (multi). Violet keeps it visually distinct
@@ -307,7 +305,14 @@ export default function CustomersPage() {
                 </button>
               )}
             </div>
-            <div className="text-xs text-gray-400">{c.email}</div>
+            <div className="flex items-center gap-1 text-xs text-gray-400">
+              <span className="truncate">{c.email}</span>
+              {c.isEmailVerified ? (
+                <span title="Email verified"><BadgeCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" /></span>
+              ) : (
+                <span title="Email not verified"><AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" /></span>
+              )}
+            </div>
           </div>
         </div>
       ),
@@ -315,7 +320,17 @@ export default function CustomersPage() {
     {
       key: 'phone',
       header: 'Phone',
-      render: (c) => <span className="text-sm text-gray-500">{c.phone || '—'}</span>,
+      render: (c) => (
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm text-gray-500">{c.phone || '—'}</span>
+          {c.phone &&
+            (c.isPhoneVerified ? (
+              <span title="Phone verified"><BadgeCheck className="w-3.5 h-3.5 text-emerald-500" /></span>
+            ) : (
+              <span title="Phone not verified"><AlertCircle className="w-3.5 h-3.5 text-amber-500" /></span>
+            ))}
+        </div>
+      ),
     },
     {
       key: 'provider',

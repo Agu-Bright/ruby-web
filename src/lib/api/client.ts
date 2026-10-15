@@ -1928,6 +1928,21 @@ export const api = {
         channel: "SMS" | "WHATSAPP";
         provider: "twilio" | "termii" | "chain";
       }>("/admin/health/sms/test", { method: "POST", body }),
+    /**
+     * Admin-editable provider ordering (primary/secondary). GET returns
+     * the saved + effective chains; PUT reorders them live (no redeploy).
+     */
+    getMessagingConfig: () =>
+      request<import("@/lib/types").MessagingChainConfig>(
+        "/admin/health/messaging-config",
+      ),
+    updateMessagingConfig: (
+      body: import("@/lib/types").UpdateMessagingChainConfigRequest,
+    ) =>
+      request<import("@/lib/types").MessagingChainConfig>(
+        "/admin/health/messaging-config",
+        { method: "PUT", body },
+      ),
   },
 
   feeConfigs: {

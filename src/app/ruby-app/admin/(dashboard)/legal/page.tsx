@@ -184,9 +184,11 @@ export default function LegalDocumentsPage() {
       toast.success(editingDoc ? 'Document updated' : 'Document created');
       setFormModalOpen(false);
       refetch();
-    } else {
-      toast.error('Failed to save document');
     }
+    // On failure, useMutation already surfaced the real backend reason via a
+    // toast (e.g. "A MERCHANT_AGREEMENT document with version "2" already
+    // exists…"). A second generic "Failed to save document" toast would only
+    // bury that message, so we don't add one here.
   };
 
   // Toggle active

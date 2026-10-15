@@ -19,13 +19,16 @@
  *   - Health:  GET  /admin/health/{sms,whatsapp}
  *   - Auth:    SUPER_ADMIN only
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   MessageSquare,
   Send,
   Loader2,
   AlertTriangle,
   CheckCircle2,
+  ListOrdered,
+  ArrowRight,
+  Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui';
@@ -33,11 +36,17 @@ import { useApi } from '@/lib/hooks';
 import { api, ApiClientError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type {
+  MessagingChainConfig,
   MessagingHealth,
   MessagingProviderName,
   WhatsAppTemplateKey,
 } from '@/lib/types';
 import { formatDateTime } from '@/lib/utils';
+
+const PROVIDER_LABELS: Record<MessagingProviderName, string> = {
+  termii: 'Termii',
+  twilio: 'Twilio',
+};
 
 /**
  * Static registry mirroring the backend WHATSAPP_TEMPLATE_REGISTRY. We
@@ -98,6 +107,69 @@ export default function MessagingPage() {
     () => (channel === 'SMS' ? api.health.sms() : api.health.whatsapp()),
     [channel],
   );
+
+  // ── Provider order (primary / secondary) — admin control plane ──────────
+  const {
+    data: chainConfig,
+    refetch: refetchConfig,
+  } = useApi<MessagingChainConfig>(() => api.health.getMessagingConfig(), []);
+
+  const [primary, setPrimary] = useState<MessagingProviderName>('termii');
+  const [secondary, setSecondary] = useState<MessagingProviderName | 'none'>(
+    'none',
+  );
+  const [savingOrder, setSavingOrder] = useState(false);
+
+  // Sync the primary/secondary selectors to the stored chain whenever the
+  // config loads or the admin flips channel (SMS vs WhatsApp each have
+  // their own chain).
+  useEffect(() => {
+    const stored =
+      channel === 'SMS' ? chainConfig?.smsChain : chainConfig?.whatsappChain;
+    setPrimary((stored && stored[0]) || 'termii');
+    setSecondary((stored && stored[1]) || 'none');
+  }, [chainConfig, channel]);
+
+  const orderDirty = useMemo(() => {
+    const stored =
+      (channel === 'SMS'
+        ? chainConfig?.smsChain
+        : chainConfig?.whatsappChain) || [];
+    const next =
+      secondary !== 'none' && secondary !== primary
+        ? [primary, secondary]
+        : [primary];
+    return JSON.stringify(stored) !== JSON.stringify(next);
+  }, [chainConfig, channel, primary, secondary]);
+
+  const handleSaveOrder = async () => {
+    const next =
+      secondary !== 'none' && secondary !== primary
+        ? [primary, secondary]
+        : [primary];
+    setSavingOrder(true);
+    try {
+      await api.health.updateMessagingConfig(
+        channel === 'SMS' ? { smsChain: next } : { whatsappChain: next },
+      );
+      toast.success(
+        `${channel} provider order saved: ${next
+          .map((p) => PROVIDER_LABELS[p])
+          .join(' → ')}`,
+      );
+      await Promise.all([refetchConfig(), refetch()]);
+    } catch (err) {
+      const detail =
+        err instanceof ApiClientError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : 'Failed to save provider order';
+      toast.error(detail);
+    } finally {
+      setSavingOrder(false);
+    }
+  };
 
   const templateConfig = WHATSAPP_TEMPLATES[templateKey];
 
@@ -235,6 +307,141 @@ export default function MessagingPage() {
               {isLoading ? 'Loading…' : 'Refresh'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Provider order (primary / secondary) — admin control plane */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mt-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+            <ListOrdered size={18} className="text-indigo-600" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-gray-900">
+              {channel === 'SMS' ? 'SMS' : 'WhatsApp'} provider order
+            </h2>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              Choose which gateway is tried first (primary) and which takes
+              over if it fails (secondary). Saved changes apply to the next
+              send immediately — no redeploy. Switch the Channel selector
+              below to configure the other channel.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] items-end gap-3">
+          {/* Primary */}
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+              Primary provider
+            </label>
+            <select
+              value={primary}
+              onChange={(e) => {
+                const next = e.target.value as MessagingProviderName;
+                setPrimary(next);
+                if (secondary === next) setSecondary('none');
+              }}
+              disabled={savingOrder}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:border-gray-300 outline-none"
+            >
+              {(['termii', 'twilio'] as MessagingProviderName[]).map((p) => (
+                <option key={p} value={p}>
+                  {PROVIDER_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="hidden sm:flex items-center justify-center pb-2.5 text-gray-400">
+            <ArrowRight size={16} />
+          </div>
+
+          {/* Secondary / failover */}
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+              Secondary (failover)
+            </label>
+            <select
+              value={secondary}
+              onChange={(e) =>
+                setSecondary(e.target.value as MessagingProviderName | 'none')
+              }
+              disabled={savingOrder}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:border-gray-300 outline-none"
+            >
+              <option value="none">None (no failover)</option>
+              {(['termii', 'twilio'] as MessagingProviderName[])
+                .filter((p) => p !== primary)
+                .map((p) => (
+                  <option key={p} value={p}>
+                    {PROVIDER_LABELS[p]}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Not-configured warnings */}
+        {chainConfig &&
+          (() => {
+            const selected: MessagingProviderName[] =
+              secondary !== 'none' && secondary !== primary
+                ? [primary, secondary]
+                : [primary];
+            const unconfigured = selected.filter(
+              (p) => chainConfig.providersConfigured?.[p] === false,
+            );
+            if (unconfigured.length === 0) return null;
+            return (
+              <div className="mt-3 flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                <span>
+                  {unconfigured.map((p) => PROVIDER_LABELS[p]).join(' and ')}{' '}
+                  {unconfigured.length > 1 ? 'are' : 'is'} selected but{' '}
+                  {unconfigured.length > 1 ? 'have' : 'has'} no credentials
+                  configured — {unconfigured.length > 1 ? 'they' : 'it'} will be
+                  skipped until the env keys are set, so the live chain may be
+                  shorter than shown.
+                </span>
+              </div>
+            );
+          })()}
+
+        <div className="mt-4 flex items-center gap-3 flex-wrap">
+          <button
+            onClick={handleSaveOrder}
+            disabled={savingOrder || !orderDirty}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {savingOrder ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            {savingOrder ? 'Saving…' : 'Save order'}
+          </button>
+          <p className="text-[11px] text-gray-500">
+            Live chain:{' '}
+            <span className="font-mono">
+              {(channel === 'SMS'
+                ? chainConfig?.effectiveSmsChain
+                : chainConfig?.effectiveWhatsappChain
+              )?.length
+                ? (channel === 'SMS'
+                    ? chainConfig!.effectiveSmsChain
+                    : chainConfig!.effectiveWhatsappChain
+                  )
+                    .map((p) => PROVIDER_LABELS[p])
+                    .join(' → ')
+                : 'none'}
+            </span>
+            {chainConfig?.updatedAt && (
+              <>
+                {' · '}updated {formatDateTime(chainConfig.updatedAt)}
+              </>
+            )}
+          </p>
         </div>
       </div>
 

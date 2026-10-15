@@ -3074,6 +3074,29 @@ export interface MessagingHealth {
   stats24h: MessagingStats24h;
 }
 
+/**
+ * Admin-editable provider ordering (primary/secondary) returned by
+ * `GET /admin/health/messaging-config`. `smsChain` / `whatsappChain` are
+ * what the admin saved; the `effective*` variants are those same chains
+ * after dropping any provider that is selected but missing credentials —
+ * so the UI can warn "you picked Twilio but it isn't configured".
+ */
+export interface MessagingChainConfig {
+  smsChain: MessagingProviderName[];
+  whatsappChain: MessagingProviderName[];
+  effectiveSmsChain: MessagingProviderName[];
+  effectiveWhatsappChain: MessagingProviderName[];
+  providersConfigured: Record<MessagingProviderName, boolean>;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+/** Body for `PUT /admin/health/messaging-config`. Patch one or both channels. */
+export interface UpdateMessagingChainConfigRequest {
+  smsChain?: MessagingProviderName[];
+  whatsappChain?: MessagingProviderName[];
+}
+
 export type WhatsAppTemplateKey =
   | 'NEW_ORDER_ALERT'
   | 'NEW_BOOKING_ALERT'

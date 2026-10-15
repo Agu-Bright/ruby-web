@@ -608,6 +608,7 @@ function CustomerDetailView({
   const [selectedTx, setSelectedTx] = useState<LedgerEntry | null>(null);
   const [otpData, setOtpData] = useState<{ code: string; purpose: string; createdAt: string; expiresAt: string } | null>(null);
   const [otpLoading, setOtpLoading] = useState(true);
+  const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
 
   const fetchOtp = useCallback(async () => {
     setOtpLoading(true);
@@ -624,6 +625,22 @@ function CustomerDetailView({
   useEffect(() => {
     fetchOtp();
   }, [fetchOtp]);
+
+  // Admin support: send a fresh phone verification code to the user's own
+  // number (bypasses cooldown/lockout). The admin never sees the code — it
+  // goes to the user's phone; the user reads it off their SMS and enters it.
+  const handleSendPhoneOtp = useCallback(async () => {
+    setSendingPhoneOtp(true);
+    try {
+      const res = await api.customers.sendPhoneOtp(customer._id);
+      toast.success(res.data?.message || 'Verification code sent to the user’s phone.');
+      fetchOtp();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not send the code. Please try again.');
+    } finally {
+      setSendingPhoneOtp(false);
+    }
+  }, [customer._id, fetchOtp]);
 
   const fetchWallet = useCallback(async () => {
     setWalletLoading(true);
@@ -801,6 +818,19 @@ function CustomerDetailView({
                 Phone {customer.isPhoneVerified ? 'Verified' : 'Unverified'}
               </div>
             </div>
+            {/* Support action — resend a phone verification code to the user's
+                number when their code isn't arriving. Admin never sees the code. */}
+            {!customer.isPhoneVerified && (
+              <button
+                onClick={handleSendPhoneOtp}
+                disabled={sendingPhoneOtp || !customer.phone}
+                title={!customer.phone ? 'No phone number on file' : 'Send a fresh verification code to the user’s phone'}
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-ruby-red border border-rose-200 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <PhoneCall className="w-3.5 h-3.5" />
+                {sendingPhoneOtp ? 'Sending…' : 'Send phone verification code'}
+              </button>
+            )}
           </div>
 
           {/* Active OTP Code (admin visibility) */}

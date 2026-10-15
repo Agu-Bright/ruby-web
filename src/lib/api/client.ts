@@ -2003,6 +2003,10 @@ export const api = {
       request<import("@/lib/types").CustomerStats>("/users/stats"),
     getOtp: (id: string) =>
       request<{ code: string; purpose: string; createdAt: string; expiresAt: string } | null>(`/users/${id}/otp`),
+    sendPhoneOtp: (id: string) =>
+      request<{ message: string; phone: string; expiresInMinutes: number }>(`/users/${id}/phone-otp`, {
+        method: "POST",
+      }),
   },
 
   // Audit Logs

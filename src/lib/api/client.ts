@@ -174,7 +174,13 @@ async function request<T>(
   let json: any;
   if (!rawBody) {
     json = res.ok
-      ? { success: true, data: null as unknown as T }
+      ? // Empty body on a 2xx (e.g. a 204 No Content DELETE). Return a
+        // truthy `data` ({} not null) so callers that gate success UX on
+        // `if (result)` — success toast, closing the confirm modal,
+        // refetching the list — still fire. `null` would be read as a
+        // failure by those callers and the action would appear to do
+        // nothing even though it succeeded.
+        { success: true, data: {} as unknown as T }
       : {
           success: false,
           data: null as unknown as T,

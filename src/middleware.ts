@@ -120,6 +120,13 @@ function isLocalHost(host: string): boolean {
   if (host.endsWith('.local')) return true;
   if (host.startsWith('192.168.')) return true;
   if (host.startsWith('10.')) return true;
+  // Coolify sandbox default domains (e.g. <uuid>.217.77.11.92.sslip.io).
+  // The subdomain-routing below is specific to the rubyplus.net domain
+  // family; on a sandbox host there is no admin/business subdomain, so we
+  // skip routing and serve the internal paths directly
+  // (e.g. /ruby-app/admin/login) instead of 301-ing admin traffic to the
+  // PRODUCTION xyzadmin.rubyplus.net subdomain.
+  if (host.endsWith('.sslip.io')) return true;
   return false;
 }
 

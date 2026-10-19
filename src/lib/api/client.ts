@@ -165,11 +165,35 @@ async function request<T>(
     }
   }
 
-  const json = await res.json().catch(() => ({
-    success: false,
-    data: null as unknown as T,
-    error: { code: "PARSE_ERROR", message: "Failed to parse response" },
-  }));
+  // Read the raw body first. A 204 No Content (or any empty-body success,
+  // e.g. some DELETE endpoints) has nothing to parse — calling res.json()
+  // on it throws, which previously surfaced as a bogus "Failed to parse
+  // response" error AND suppressed the success toast even though the
+  // request succeeded. Parse only when there is a body.
+  const rawBody = await res.text();
+  let json: any;
+  if (!rawBody) {
+    json = res.ok
+      ? { success: true, data: null as unknown as T }
+      : {
+          success: false,
+          data: null as unknown as T,
+          error: {
+            code: "EMPTY_RESPONSE",
+            message: `Request failed with status ${res.status}`,
+          },
+        };
+  } else {
+    try {
+      json = JSON.parse(rawBody);
+    } catch {
+      json = {
+        success: false,
+        data: null as unknown as T,
+        error: { code: "PARSE_ERROR", message: "Failed to parse response" },
+      };
+    }
+  }
 
   if (!res.ok) {
     throw new ApiClientError(

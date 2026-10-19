@@ -137,6 +137,25 @@ export function middleware(request: NextRequest) {
   // Local dev — short-circuit. No rewriting, no redirects. Everything
   // works on localhost:3000 the way it did before subdomains existed.
   if (isLocalHost(host)) {
+    // Sandbox convenience: a Coolify sandbox runs on ONE host (e.g.
+    // <uuid>.sslip.io) with no admin subdomain, so the clean admin URLs
+    // (/admin/login, /login) that production serves via
+    // xyzadmin.rubyplus.net would otherwise 404 here. Rewrite them to the
+    // internal /ruby-app/admin/* prefix so the admin dashboard is reachable
+    // at the familiar path. (/ruby-app/admin/* also still works directly.)
+    // True localhost keeps plain passthrough.
+    if (host.endsWith('.sslip.io')) {
+      if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+        const url = request.nextUrl.clone();
+        url.pathname = `/ruby-app${pathname}`;
+        return NextResponse.rewrite(url);
+      }
+      if (pathname === '/login') {
+        const url = request.nextUrl.clone();
+        url.pathname = '/ruby-app/admin/login';
+        return NextResponse.rewrite(url);
+      }
+    }
     return NextResponse.next();
   }
 

@@ -8,7 +8,11 @@ import { formatCurrency } from '@/lib/utils';
 
 const dateOnly = (date: Date) => date.toISOString().slice(0, 10);
 export default function HotelRoomsPage() {
-  const roomsQuery = useHotelRooms(); const rooms = (roomsQuery.data ?? []) as HotelRoom[];
+  // Archiving a room soft-deletes it (status → INACTIVE) rather than removing
+  // the row, so bookings stay intact. Hide archived rooms from the merchant's
+  // active inventory view — otherwise "deleted" rooms linger on screen as
+  // INACTIVE. DRAFT + ACTIVE rooms still show.
+  const roomsQuery = useHotelRooms(); const rooms = ((roomsQuery.data ?? []) as HotelRoom[]).filter((room) => room.status !== 'INACTIVE');
   const [startDate, setStartDate] = useState(() => dateOnly(new Date()));
   const [endDate, setEndDate] = useState(() => dateOnly(new Date(Date.now() + 24 * 60 * 60 * 1000)));
   const occupancy = useRoomOccupancy(startDate, endDate); const archive = useArchiveHotelRoom(roomsQuery.refetch);

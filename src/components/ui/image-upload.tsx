@@ -16,8 +16,14 @@ interface ImageUploadProps {
   scope?: 'admin' | 'business';
 }
 
-const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
-const ACCEPTED_EXTENSIONS = '.jpg,.jpeg,.png,.webp,.svg';
+// HEIC/HEIF included because iPhones capture in HEIC by default. compressImage
+// rasterizes them to JPEG (iOS Safari decodes HEIC on canvas) before upload.
+const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml', 'image/heic', 'image/heif'];
+const ACCEPTED_EXTENSIONS = '.jpg,.jpeg,.png,.webp,.svg,.heic,.heif';
+// Generous pre-compression ceiling — only blocks absurd files. The real
+// per-upload limit (maxSizeMB) is enforced AFTER compression, since phone
+// photos are often several MB raw but compress far below it.
+const MAX_INPUT_MB = 30;
 
 export function ImageUpload({
   value,
@@ -56,15 +62,23 @@ export function ImageUpload({
 
   const validateFile = useCallback(
     (file: File): string | null => {
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        return `Invalid file type: ${file.type}. Accepted: JPEG, PNG, WebP, SVG`;
+      // Accept by MIME type, or fall back to the file extension — some mobile
+      // browsers report an empty/omitted MIME type (notably HEIC on iOS), which
+      // would otherwise fail a strict type check and block the upload.
+      const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? '';
+      const typeOk =
+        ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.split(',').includes(ext);
+      if (!typeOk) {
+        return 'Unsupported file type. Please upload a JPEG, PNG, WebP, HEIC or SVG image.';
       }
-      if (file.size > maxSizeMB * 1024 * 1024) {
-        return `File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB. Maximum: ${maxSizeMB}MB`;
+      // Only a generous pre-compression ceiling here; the per-upload limit is
+      // checked after compression in handleUpload.
+      if (file.size > MAX_INPUT_MB * 1024 * 1024) {
+        return `File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB. Maximum: ${MAX_INPUT_MB}MB`;
       }
       return null;
     },
-    [maxSizeMB],
+    [],
   );
 
   const handleUpload = useCallback(
@@ -78,10 +92,19 @@ export function ImageUpload({
       setError(null);
 
       try {
-        // Compress image before uploading (skips SVGs and small files)
+        // Compress first — this also converts iPhone HEIC → JPEG via canvas and
+        // resizes large phone photos. Then enforce the per-upload size limit on
+        // the compressed result (raw phone photos routinely exceed it).
         setIsCompressing(true);
         const compressed = await compressImage(file);
         setIsCompressing(false);
+
+        if (compressed.size > maxSizeMB * 1024 * 1024) {
+          setError(
+            `This image is ${(compressed.size / 1024 / 1024).toFixed(1)}MB after compression (max ${maxSizeMB}MB). Please use a smaller photo.`,
+          );
+          return;
+        }
 
         setIsUploading(true);
         const res = resolvedScope === 'business'
@@ -97,7 +120,7 @@ export function ImageUpload({
         setIsUploading(false);
       }
     },
-    [folder, onChange, resolvedScope, validateFile],
+    [folder, maxSizeMB, onChange, resolvedScope, validateFile],
   );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

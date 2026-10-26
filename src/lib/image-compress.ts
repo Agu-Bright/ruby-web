@@ -27,14 +27,31 @@ export async function compressImage(
   // Skip SVGs — they're vector and shouldn't be rasterized
   if (file.type === 'image/svg+xml') return file;
 
-  // Skip already-small files
-  if (file.size <= SKIP_THRESHOLD) return file;
+  // iPhone HEIC/HEIF must ALWAYS be rasterized to a web-renderable JPEG — even
+  // when small or already small-dimensioned — otherwise a stored .heic won't
+  // display in browsers. So the "skip" fast-paths below don't apply to HEIC.
+  const isHeic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
 
-  const bitmap = await createImageBitmap(file);
+  // Skip already-small files (non-HEIC only)
+  if (!isHeic && file.size <= SKIP_THRESHOLD) return file;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch (err) {
+    if (isHeic) {
+      // Browsers other than Safari can't decode HEIC on canvas.
+      throw new Error(
+        'This photo is in HEIC format and could not be processed in your browser. On iPhone, set Camera → Formats → "Most Compatible", or upload a JPEG/PNG.',
+      );
+    }
+    throw err;
+  }
   const { width, height } = bitmap;
 
-  // Skip if already within target dimensions
-  if (width <= maxDimension && height <= maxDimension && file.size <= SKIP_THRESHOLD * 5) {
+  // Skip if already within target dimensions (non-HEIC only — HEIC still needs
+  // the JPEG re-encode below)
+  if (!isHeic && width <= maxDimension && height <= maxDimension && file.size <= SKIP_THRESHOLD * 5) {
     bitmap.close();
     return file;
   }
@@ -65,8 +82,10 @@ export async function compressImage(
     );
   });
 
-  // If compression actually made it larger, return the original
-  if (blob.size >= file.size) return file;
+  // If compression actually made it larger, return the original — except for
+  // HEIC, where the original won't render in a browser, so we keep the JPEG
+  // even if it's larger.
+  if (!isHeic && blob.size >= file.size) return file;
 
   // Build a new File with the same name but compressed content
   const ext = isPng ? '.png' : '.jpg';

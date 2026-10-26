@@ -37,8 +37,19 @@ export function ImageUpload({
   // A shared uploader is used in both dashboards. Infer the business portal
   // when callers do not provide a scope so its token is never sent to admin
   // media routes.
+  //
+  // IMPORTANT: on business.rubyplus.net the middleware rewrites requests to
+  // /business/* SERVER-side, but the browser URL stays clean (e.g.
+  // /dashboard/rooms), so `pathname.startsWith('/business/')` is false there.
+  // We must also detect the `business.` subdomain by hostname, otherwise a
+  // business user's upload wrongly hits /admin/media/upload (admin auth) and
+  // fails — which blocked hotel room / service photo uploads. Callers should
+  // still pass scope explicitly; this is the safety net.
   const resolvedScope = scope ?? (
-    typeof window !== 'undefined' && window.location.pathname.startsWith('/business/')
+    typeof window !== 'undefined' && (
+      window.location.hostname.startsWith('business.') ||
+      window.location.pathname.startsWith('/business/')
+    )
       ? 'business'
       : 'admin'
   );

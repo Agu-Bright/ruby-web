@@ -1134,7 +1134,13 @@ export const api = {
   // Media
   media: {
     upload: (file: File, folder?: string) =>
-      uploadDirect(file, folder),
+      // HEIC/HEIF (iPhone photos) must go through the backend multipart proxy,
+      // which normalizes them to JPEG. The direct-to-R2 PUT path would store
+      // the raw .heic unchanged (non-displayable in browsers). Everything else
+      // keeps the direct path where offloading large uploads matters.
+      /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name)
+        ? uploadFile("/admin/media/upload", file, folder)
+        : uploadDirect(file, folder),
     delete: (key: string) =>
       request<void>(`/admin/media/${encodeURIComponent(key)}`, {
         method: "DELETE",

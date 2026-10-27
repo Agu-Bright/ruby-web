@@ -92,24 +92,36 @@ export function ImageUpload({
       setError(null);
 
       try {
-        // Compress first — this also converts iPhone HEIC → JPEG via canvas and
-        // resizes large phone photos. Then enforce the per-upload size limit on
-        // the compressed result (raw phone photos routinely exceed it).
-        setIsCompressing(true);
-        const compressed = await compressImage(file);
-        setIsCompressing(false);
+        // iPhone photos are HEIC. Browsers cannot reliably decode HEIC on a
+        // canvas (createImageBitmap throws on several iOS Safari versions, and
+        // Android can't decode it at all), so we must NOT run client-side
+        // compression on it — that was silently blocking phone uploads. HEIC
+        // files are already small, so we upload the original and let the
+        // backend normalize it to JPEG. Everything else compresses as before.
+        const isHeic =
+          /heic|heif/i.test(file.type) ||
+          /\.(heic|heif)$/i.test(file.name);
 
-        if (compressed.size > maxSizeMB * 1024 * 1024) {
-          setError(
-            `This image is ${(compressed.size / 1024 / 1024).toFixed(1)}MB after compression (max ${maxSizeMB}MB). Please use a smaller photo.`,
-          );
-          return;
+        let toUpload = file;
+        if (!isHeic) {
+          setIsCompressing(true);
+          toUpload = await compressImage(file);
+          setIsCompressing(false);
+
+          if (toUpload.size > maxSizeMB * 1024 * 1024) {
+            setError(
+              `This image is ${(toUpload.size / 1024 / 1024).toFixed(1)}MB after compression (max ${maxSizeMB}MB). Please use a smaller photo.`,
+            );
+            return;
+          }
         }
+        // HEIC uploads the original, already bounded by MAX_INPUT_MB in
+        // validateFile; the backend converts + stores a compact JPEG.
 
         setIsUploading(true);
         const res = resolvedScope === 'business'
-          ? await api.businessMedia.upload(compressed)
-          : await api.media.upload(compressed, folder);
+          ? await api.businessMedia.upload(toUpload)
+          : await api.media.upload(toUpload, folder);
         onChange(res.data.url);
       } catch (err: unknown) {
         const message =

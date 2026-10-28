@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Eye,
   MoreHorizontal, ChevronDown, CheckCircle, XCircle,
-  Loader2, FileText, List, Upload,
+  Loader2, FileText, List, Upload, Download,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -14,7 +14,9 @@ import { api } from '@/lib/api';
 import { PageHeader, DataTable, Modal, type Column } from '@/components/ui';
 import type { LegalDocument, LegalDocumentType, LegalSection, LegalDocumentFilterParams } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
-import { extractPdfText } from '@/lib/pdf-extract';
+import { extractTextFromFile, markdownToDocxBlob, slugifyFilename, downloadBlob } from '@/lib/doc-io';
+
+const ACCEPTED_UPLOAD_EXT = ['pdf', 'docx', 'md', 'markdown', 'txt'];
 
 const TYPE_OPTIONS: { value: LegalDocumentType; label: string }[] = [
   { value: 'MERCHANT_AGREEMENT', label: 'Merchant Agreement' },
@@ -71,7 +73,8 @@ export default function LegalDocumentsPage() {
   const [editorMode, setEditorMode] = useState<EditorMode>('document');
   const [documentText, setDocumentText] = useState('');
   const [showPreview, setShowPreview] = useState(false);
-  const [pdfParsing, setPdfParsing] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [actionMenuDoc, setActionMenuDoc] = useState<LegalDocument | null>(null);
   const [actionMenuPosition, setActionMenuPosition] = useState<{ top: number; right: number } | null>(null);
@@ -131,33 +134,72 @@ export default function LegalDocumentsPage() {
     setFormModalOpen(true);
   };
 
-  // Extract text from a chosen PDF entirely in the browser, then drop it into
-  // the Document editor for review. The PDF itself is never uploaded.
-  const handlePdfSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Read a chosen file (.pdf / .docx / .md / .txt) entirely in the browser and
+  // drop its text into the Document editor for review. Nothing is uploaded.
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-selecting the same file later
     if (!file) return;
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      toast.error('Please choose a PDF file.');
+    const ext = (file.name.toLowerCase().split('.').pop() || '');
+    if (!ACCEPTED_UPLOAD_EXT.includes(ext)) {
+      toast.error('Unsupported file. Upload a PDF, Word (.docx), Markdown (.md) or text (.txt) file.');
       return;
     }
-    setPdfParsing(true);
+    setUploadBusy(true);
     try {
-      const text = await extractPdfText(file);
+      const text = await extractTextFromFile(file);
       if (!text) {
-        toast.error('No selectable text found — this PDF looks like a scanned image. Paste the text in manually.');
+        toast.error(
+          ext === 'pdf'
+            ? 'No selectable text found — this PDF looks like a scanned image. Paste the text in manually.'
+            : 'That file had no readable text. Paste the text in manually.',
+        );
         return;
       }
       setEditorMode('document');
       setDocumentText((prev) => (prev.trim() ? `${prev.trimEnd()}\n\n${text}` : text));
       setShowPreview(false);
-      toast.success('PDF text extracted — review and edit it before saving.');
+      toast.success('Text extracted — review and edit it before saving.');
     } catch (err) {
-      console.error('PDF extraction failed', err);
-      toast.error('Could not read that PDF. Try copying the text in manually.');
+      console.error('File extraction failed', err);
+      toast.error('Could not read that file. Try a different format, or paste the text in manually.');
     } finally {
-      setPdfParsing(false);
+      setUploadBusy(false);
     }
+  };
+
+  // Build a Word (.docx) file from a title + content so the admin can edit it
+  // in Word / Google Docs and re-upload it. Shared by the editor toolbar and
+  // the row action menu.
+  const downloadDocx = async (title: string, version: string, content: string) => {
+    const body = content.trim();
+    if (!body) {
+      toast.error('Nothing to download yet.');
+      return;
+    }
+    setDownloadBusy(true);
+    try {
+      const blob = await markdownToDocxBlob(title, body);
+      const base = slugifyFilename(title);
+      downloadBlob(blob, `${base}${version ? `-v${version}` : ''}.docx`);
+    } catch (err) {
+      console.error('DOCX export failed', err);
+      toast.error('Could not generate the Word file.');
+    } finally {
+      setDownloadBusy(false);
+    }
+  };
+
+  // Download the current editor contents (unsaved edits included).
+  const handleDownloadCurrent = () =>
+    void downloadDocx(formData.title || 'legal-document', formData.version, documentText);
+
+  // Download a saved doc straight from the list — uses its content, or a text
+  // rendering of its sections for legacy section-only docs.
+  const handleDownloadDoc = (doc: LegalDocument) => {
+    setActionMenuDoc(null);
+    const content = doc.content && doc.content.trim() ? doc.content : sectionsToText(doc.sections || []);
+    void downloadDocx(doc.title, doc.version, content);
   };
 
   const switchToDocument = () => {
@@ -474,6 +516,7 @@ export default function LegalDocumentsPage() {
           <div role="menu" aria-label={`Actions for ${actionMenuDoc.title}`} className="fixed z-[100] min-w-[172px] rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl" style={actionMenuPosition}>
             <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setActionMenuDoc(null); setViewModal(actionMenuDoc); }}><Eye className="w-4 h-4" /> View</button>
             <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setActionMenuDoc(null); openEdit(actionMenuDoc); }}><Pencil className="w-4 h-4" /> Edit</button>
+            <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" onClick={() => handleDownloadDoc(actionMenuDoc)}><Download className="w-4 h-4" /> Download Word</button>
             <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50" onClick={() => void handleToggleActive(actionMenuDoc)}>{actionMenuDoc.isActive ? <><XCircle className="w-4 h-4 text-amber-500" /><span className="text-amber-700">Deactivate</span></> : <><CheckCircle className="w-4 h-4 text-green-500" /><span className="text-green-700">Activate</span></>}</button>
             <div className="my-1 border-t border-gray-100" />
             <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50" onClick={() => { setActionMenuDoc(null); setDeleteModal(actionMenuDoc); }}><Trash2 className="w-4 h-4" /> Delete</button>
@@ -555,23 +598,32 @@ export default function LegalDocumentsPage() {
             {editorMode === 'document' ? (
               <div className="space-y-2">
                 {/* Toolbar: upload PDF + preview toggle + char count */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={pdfParsing}
+                    disabled={uploadBusy}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-60"
                   >
-                    {pdfParsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    {pdfParsing ? 'Reading PDF…' : 'Upload PDF'}
+                    {uploadBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    {uploadBusy ? 'Reading…' : 'Upload file'}
                   </button>
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="application/pdf,.pdf"
+                    accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
                     className="hidden"
-                    onChange={handlePdfSelected}
+                    onChange={handleFileSelected}
                   />
+                  <button
+                    type="button"
+                    onClick={handleDownloadCurrent}
+                    disabled={downloadBusy || !documentText.trim()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-60"
+                  >
+                    {downloadBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                    Download Word
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowPreview((p) => !p)}
@@ -602,7 +654,7 @@ export default function LegalDocumentsPage() {
                   />
                 )}
                 <p className="text-[11px] text-gray-400">
-                  Paste the whole document at once, or upload a PDF to pull its text in. Basic Markdown (headings with #, bullets with -, **bold**) is rendered in the apps; plain text works too.
+                  Paste the whole document at once, or upload a PDF / Word / text file to pull its text in. Use “Download Word” to export it, edit in Word or Google Docs, then re-upload. Basic Markdown (headings with #, bullets with -, **bold**) is rendered in the apps; plain text works too.
                 </p>
               </div>
             ) : (

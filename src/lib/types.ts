@@ -1882,6 +1882,10 @@ export interface LegalDocument {
   type: LegalDocumentType;
   title: string;
   sections: LegalSection[];
+  // Free-form document body (Markdown / plain text). When present (non-empty),
+  // consumers render this and ignore `sections`. Populated by the "Document"
+  // editor mode (paste-all-at-once or PDF text extraction) in the admin.
+  content?: string;
   version: string;
   isActive: boolean;
   publishedAt?: string;

@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
-  Scale, Search, Plus, Pencil, Trash2, Eye,
+  Search, Plus, Pencil, Trash2, Eye,
   MoreHorizontal, ChevronDown, CheckCircle, XCircle,
-  Loader2, FileText, Type, List,
+  Loader2, FileText, List, Upload,
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import { useApi, useMutation } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { PageHeader, DataTable, Modal, type Column } from '@/components/ui';
 import type { LegalDocument, LegalDocumentType, LegalSection, LegalDocumentFilterParams } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
+import { extractPdfText } from '@/lib/pdf-extract';
 
 const TYPE_OPTIONS: { value: LegalDocumentType; label: string }[] = [
   { value: 'MERCHANT_AGREEMENT', label: 'Merchant Agreement' },
@@ -30,11 +33,16 @@ const EMPTY_FORM = {
   title: '',
   version: '',
   sections: [] as LegalSection[],
+  content: '',
   isActive: false,
   changelog: '',
 };
 
-// Convert sections array to plain text for the text editor
+type EditorMode = 'document' | 'sections';
+
+// Convert a structured sections array to plain text — used to seed the
+// Document editor when an admin opens a legacy section-based doc and wants to
+// switch to free-form editing (so no work is lost in the hand-off).
 function sectionsToText(sections: LegalSection[]): string {
   if (!sections.length) return '';
   return sections.map((s) => {
@@ -42,47 +50,6 @@ function sectionsToText(sections: LegalSection[]): string {
     const items = s.items.map((item) => `- ${item}`).join('\n');
     return `${header}\n${items}`;
   }).join('\n\n');
-}
-
-// Parse plain text into sections array
-function textToSections(text: string): LegalSection[] {
-  const sections: LegalSection[] = [];
-  const lines = text.split('\n');
-  let current: LegalSection | null = null;
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      // blank line — just continue
-      continue;
-    }
-
-    // Check if it's a section header: "1. Title" or "1) Title" or just a numbered line
-    const headerMatch = line.match(/^(\d+)[.)]\s+(.+)$/);
-    if (headerMatch) {
-      if (current) sections.push(current);
-      current = { number: headerMatch[1], title: headerMatch[2], items: [] };
-      continue;
-    }
-
-    // Check if it's a bullet item: "- item" or "• item" or "* item"
-    const bulletMatch = line.match(/^[-•*]\s+(.+)$/);
-    if (bulletMatch) {
-      if (!current) {
-        // Bullet without a section header — create an auto-numbered section
-        current = { number: String(sections.length + 1), title: 'Untitled Section', items: [] };
-      }
-      current.items.push(bulletMatch[1]);
-      continue;
-    }
-
-    // Plain text line — treat as a new section header (auto-numbered)
-    if (current) sections.push(current);
-    current = { number: String(sections.length + 1), title: line, items: [] };
-  }
-
-  if (current) sections.push(current);
-  return sections;
 }
 
 export default function LegalDocumentsPage() {
@@ -93,8 +60,19 @@ export default function LegalDocumentsPage() {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [deleteModal, setDeleteModal] = useState<LegalDocument | null>(null);
   const [viewModal, setViewModal] = useState<LegalDocument | null>(null);
-  const [editorMode, setEditorMode] = useState<'text' | 'form'>('text');
-  const [editorText, setEditorText] = useState('');
+  // The editor has two mutually-exclusive modes:
+  //  • 'document' — one free-form body (Markdown / plain text). This is the
+  //    paste-the-whole-thing-at-once path, and also where extracted PDF text
+  //    lands. Saved to `content`.
+  //  • 'sections' — the structured number + title + bullets builder. Saved to
+  //    `sections`.
+  // Whichever mode is active at save time wins; the other field is cleared so
+  // consumers have an unambiguous choice (content present → render content).
+  const [editorMode, setEditorMode] = useState<EditorMode>('document');
+  const [documentText, setDocumentText] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [pdfParsing, setPdfParsing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [actionMenuDoc, setActionMenuDoc] = useState<LegalDocument | null>(null);
   const [actionMenuPosition, setActionMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
@@ -122,28 +100,81 @@ export default function LegalDocumentsPage() {
   const openCreate = () => {
     setEditingDoc(null);
     setFormData({ ...EMPTY_FORM, sections: [] });
-    setEditorText('');
-    setEditorMode('text');
+    setDocumentText('');
+    setEditorMode('document');
+    setShowPreview(false);
     setFormModalOpen(true);
   };
 
-  // Open edit modal
+  // Open edit modal. A doc with a non-empty `content` opens in Document mode;
+  // a legacy section-only doc opens in Sections mode, but we still pre-seed the
+  // Document editor with a text rendering of its sections so switching modes
+  // never starts from a blank page.
   const openEdit = (doc: LegalDocument) => {
     setEditingDoc(doc);
     const sections = doc.sections?.length
       ? doc.sections.map((s) => ({ ...s, items: [...s.items] }))
       : [];
+    const hasContent = !!doc.content && doc.content.trim().length > 0;
     setFormData({
       type: doc.type,
       title: doc.title,
       version: doc.version,
       sections,
+      content: doc.content || '',
       isActive: doc.isActive,
       changelog: doc.changelog || '',
     });
-    setEditorText(sectionsToText(sections));
-    setEditorMode('text');
+    setDocumentText(hasContent ? (doc.content as string) : sectionsToText(sections));
+    setEditorMode(hasContent ? 'document' : 'sections');
+    setShowPreview(false);
     setFormModalOpen(true);
+  };
+
+  // Extract text from a chosen PDF entirely in the browser, then drop it into
+  // the Document editor for review. The PDF itself is never uploaded.
+  const handlePdfSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('Please choose a PDF file.');
+      return;
+    }
+    setPdfParsing(true);
+    try {
+      const text = await extractPdfText(file);
+      if (!text) {
+        toast.error('No selectable text found — this PDF looks like a scanned image. Paste the text in manually.');
+        return;
+      }
+      setEditorMode('document');
+      setDocumentText((prev) => (prev.trim() ? `${prev.trimEnd()}\n\n${text}` : text));
+      setShowPreview(false);
+      toast.success('PDF text extracted — review and edit it before saving.');
+    } catch (err) {
+      console.error('PDF extraction failed', err);
+      toast.error('Could not read that PDF. Try copying the text in manually.');
+    } finally {
+      setPdfParsing(false);
+    }
+  };
+
+  const switchToDocument = () => {
+    // Don't lose builder work: if the document box is empty but sections exist,
+    // seed it from the sections.
+    setDocumentText((prev) => (prev.trim() ? prev : sectionsToText(formData.sections)));
+    setEditorMode('document');
+  };
+
+  const switchToSections = () => {
+    // Start the builder with one empty section if there's nothing to edit yet.
+    setFormData((prev) => (
+      prev.sections.length
+        ? prev
+        : { ...prev, sections: [{ number: '1', title: '', items: [''] }] }
+    ));
+    setEditorMode('sections');
   };
 
   // Submit form
@@ -153,26 +184,40 @@ export default function LegalDocumentsPage() {
       return;
     }
 
-    // Parse sections from text editor if in text mode
-    const rawSections = editorMode === 'text' ? textToSections(editorText) : formData.sections;
-
-    // Clean empty sections/items
-    const cleanedSections = rawSections
-      .filter((s) => s.title.trim())
-      .map((s, i) => ({
-        number: s.number || String(i + 1),
-        title: s.title.trim(),
-        items: s.items.filter((item) => item.trim()),
-      }));
-
     const payload: any = {
       type: formData.type,
       title: formData.title.trim(),
       version: formData.version.trim(),
-      sections: cleanedSections,
       isActive: formData.isActive,
       changelog: formData.changelog.trim() || undefined,
     };
+
+    if (editorMode === 'document') {
+      const content = documentText.trim();
+      if (!content) {
+        toast.error('Add the document text, or switch to Sections.');
+        return;
+      }
+      // Document mode wins: store the free-form body and clear sections so
+      // consumers unambiguously render `content`.
+      payload.content = documentText;
+      payload.sections = [];
+    } else {
+      const cleanedSections = formData.sections
+        .filter((s) => s.title.trim())
+        .map((s, i) => ({
+          number: s.number || String(i + 1),
+          title: s.title.trim(),
+          items: s.items.filter((item) => item.trim()),
+        }));
+      if (!cleanedSections.length) {
+        toast.error('Add at least one section, or switch to Document.');
+        return;
+      }
+      // Sections mode wins: clear `content` so consumers fall back to sections.
+      payload.sections = cleanedSections;
+      payload.content = '';
+    }
 
     let result;
     if (editingDoc) {
@@ -310,9 +355,19 @@ export default function LegalDocumentsPage() {
       ),
     },
     {
-      key: 'sections',
-      header: 'Sections',
-      render: (doc) => <span className="text-sm text-gray-600">{doc.sections?.length || 0}</span>,
+      key: 'content',
+      header: 'Format',
+      render: (doc) => (
+        doc.content && doc.content.trim() ? (
+          <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+            <FileText className="w-3 h-3" /> Full text
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+            <List className="w-3 h-3" /> {doc.sections?.length || 0} sections
+          </span>
+        )
+      ),
     },
     {
       key: 'publishedAt',
@@ -471,53 +526,83 @@ export default function LegalDocumentsPage() {
             </div>
           </div>
 
-          {/* Sections Editor */}
+          {/* Content Editor */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Sections</label>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Content</label>
               <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
                 <button
                   type="button"
                   className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                    editorMode === 'text' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    editorMode === 'document' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
-                  onClick={() => {
-                    if (editorMode === 'form') {
-                      setEditorText(sectionsToText(formData.sections));
-                    }
-                    setEditorMode('text');
-                  }}
+                  onClick={switchToDocument}
                 >
-                  <Type className="w-3 h-3" /> Text Editor
+                  <FileText className="w-3 h-3" /> Document
                 </button>
                 <button
                   type="button"
                   className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                    editorMode === 'form' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    editorMode === 'sections' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
-                  onClick={() => {
-                    if (editorMode === 'text') {
-                      setFormData((prev) => ({ ...prev, sections: textToSections(editorText) }));
-                    }
-                    setEditorMode('form');
-                  }}
+                  onClick={switchToSections}
                 >
-                  <List className="w-3 h-3" /> Form Builder
+                  <List className="w-3 h-3" /> Sections
                 </button>
               </div>
             </div>
 
-            {editorMode === 'text' ? (
-              <div>
-                <textarea
-                  className="w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-ruby-500 font-mono leading-relaxed"
-                  rows={16}
-                  placeholder={`Type or paste your document content here.\n\nFormat:\n1. Section Title\n- Bullet point one\n- Bullet point two\n\n2. Another Section\n- More content here`}
-                  value={editorText}
-                  onChange={(e) => setEditorText(e.target.value)}
-                />
-                <p className="text-[11px] text-gray-400 mt-1.5">
-                  Use numbered headers (e.g. &quot;1. Title&quot;) and bullet points (e.g. &quot;- item&quot;) to structure your document.
+            {editorMode === 'document' ? (
+              <div className="space-y-2">
+                {/* Toolbar: upload PDF + preview toggle + char count */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={pdfParsing}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-60"
+                  >
+                    {pdfParsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    {pdfParsing ? 'Reading PDF…' : 'Upload PDF'}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={handlePdfSelected}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPreview((p) => !p)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> {showPreview ? 'Edit text' : 'Preview'}
+                  </button>
+                  <span className="ml-auto text-[11px] text-gray-400">
+                    {documentText.length.toLocaleString()} chars
+                  </span>
+                </div>
+
+                {showPreview ? (
+                  <div className="border rounded-lg p-4 max-h-[340px] overflow-y-auto bg-white prose prose-sm max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-p:text-gray-700 prose-li:text-gray-700 prose-a:text-ruby-600 prose-strong:text-gray-900">
+                    {documentText.trim() ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{documentText}</ReactMarkdown>
+                    ) : (
+                      <p className="text-sm text-gray-400">Nothing to preview yet.</p>
+                    )}
+                  </div>
+                ) : (
+                  <textarea
+                    className="w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-ruby-500 leading-relaxed"
+                    rows={16}
+                    placeholder={'Paste the full text of the agreement or policy here, or upload a PDF above.\n\nBasic Markdown is supported:\n# A heading\n## A sub-heading\n- A bullet point\n**bold text**'}
+                    value={documentText}
+                    onChange={(e) => setDocumentText(e.target.value)}
+                  />
+                )}
+                <p className="text-[11px] text-gray-400">
+                  Paste the whole document at once, or upload a PDF to pull its text in. Basic Markdown (headings with #, bullets with -, **bold**) is rendered in the apps; plain text works too.
                 </p>
               </div>
             ) : (
@@ -649,21 +734,27 @@ export default function LegalDocumentsPage() {
               <div className="mb-4 px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-lg">Draft — not published</div>
             )}
 
-            {viewModal.sections?.map((section, idx) => (
-              <div key={idx} className="mb-4">
-                <h3 className="font-semibold text-gray-900 mb-2">
-                  {section.number}. {section.title}
-                </h3>
-                <ul className="space-y-1.5 ml-4">
-                  {section.items.map((item, iIdx) => (
-                    <li key={iIdx} className="text-sm text-gray-600 flex items-start gap-2">
-                      <span className="text-gray-400 mt-1">•</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+            {viewModal.content && viewModal.content.trim() ? (
+              <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-p:text-gray-700 prose-li:text-gray-700 prose-a:text-ruby-600 prose-strong:text-gray-900">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewModal.content}</ReactMarkdown>
               </div>
-            ))}
+            ) : (
+              viewModal.sections?.map((section, idx) => (
+                <div key={idx} className="mb-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">
+                    {section.number}. {section.title}
+                  </h3>
+                  <ul className="space-y-1.5 ml-4">
+                    {section.items.map((item, iIdx) => (
+                      <li key={iIdx} className="text-sm text-gray-600 flex items-start gap-2">
+                        <span className="text-gray-400 mt-1">•</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            )}
 
             {viewModal.changelog && (
               <div className="mt-4 pt-4 border-t">

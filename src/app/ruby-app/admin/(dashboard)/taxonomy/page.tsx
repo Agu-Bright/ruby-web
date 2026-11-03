@@ -13,6 +13,7 @@ import { useApi } from '@/lib/hooks';
 import { api } from '@/lib/api';
 import { Modal, StatCard, StatusBadge, ImageUpload } from '@/components/ui';
 import { FieldBuilder } from '@/components/ui/field-builder';
+import { getDefaultCreationFields } from '@/lib/taxonomy-seed-data';
 import type {
   CategoryGroup, CategoryGroupType, Category, Subcategory, Template,
   CreateCategoryRequest, CreateSubcategoryRequest, CreateCategoryGroupRequest,
@@ -1234,6 +1235,9 @@ function SubcategoriesTab() {
   const [viewSubcategory, setViewSubcategory] = useState<Subcategory | null>(null);
   const [editSubcategory, setEditSubcategory] = useState<Subcategory | null>(null);
   const [synonymInput, setSynonymInput] = useState('');
+  // Tracks whether the creation-field builders were pre-filled from template
+  // defaults (vs loaded from saved DB values), so we can show a hint banner.
+  const [prefilledFields, setPrefilledFields] = useState<{ product: boolean; service: boolean }>({ product: false, service: false });
 
   const autoFilled = useRef<Set<string>>(new Set());
 
@@ -1388,6 +1392,18 @@ function SubcategoriesTab() {
     autoFilled.current.clear();
     const catId = typeof sub.categoryId === 'object' ? sub.categoryId._id : sub.categoryId;
     const tmplId = typeof sub.templateId === 'object' ? sub.templateId._id : sub.templateId;
+    // When this subcategory has never been customised, pre-fill the creation-field
+    // builders with the defaults the apps currently render for it ("what the
+    // template currently looks like"), so the admin sees and can edit them. These
+    // are only persisted once the admin hits Save — until then the apps keep
+    // falling back to the same defaults, so nothing changes behind the scenes.
+    const defaults = getDefaultCreationFields(sub.slug);
+    const productFields = sub.productFields?.length ? sub.productFields : (defaults?.productFields || []);
+    const serviceFields = sub.serviceFields?.length ? sub.serviceFields : (defaults?.serviceFields || []);
+    setPrefilledFields({
+      product: !sub.productFields?.length && !!defaults?.productFields.length,
+      service: !sub.serviceFields?.length && !!defaults?.serviceFields.length,
+    });
     setForm({
       categoryId: catId, name: sub.name, slug: sub.slug,
       iconKey: sub.iconKey, iconUrl: sub.iconUrl,
@@ -1395,8 +1411,8 @@ function SubcategoriesTab() {
       featureOnHome: sub.featureOnHome ?? false,
       synonyms: sub.synonyms || [], businessModel: sub.businessModel,
       riskTier: sub.riskTier, templateId: tmplId,
-      productFields: sub.productFields || [],
-      serviceFields: sub.serviceFields || [],
+      productFields,
+      serviceFields,
     });
     setSynonymInput('');
     setEditSubcategory(sub);
@@ -1676,7 +1692,10 @@ function SubcategoriesTab() {
           </div>
 
           {/* Custom Product Fields */}
-          <div className="space-y-4">
+          <div className="space-y-2">
+            {(() => { const d = getDefaultCreationFields(form.slug); return d?.productFields.length ? (
+              <button type="button" onClick={() => setForm({ ...form, productFields: d.productFields })} className="text-[11px] text-ruby-red hover:underline">Load default fields for “{form.slug}”</button>
+            ) : null; })()}
             <FieldBuilder
               label="Product Creation Fields"
               description="Custom fields business owners fill when creating a product in this subcategory"
@@ -1686,7 +1705,10 @@ function SubcategoriesTab() {
           </div>
 
           {/* Custom Service Fields */}
-          <div className="space-y-4">
+          <div className="space-y-2">
+            {(() => { const d = getDefaultCreationFields(form.slug); return d?.serviceFields.length ? (
+              <button type="button" onClick={() => setForm({ ...form, serviceFields: d.serviceFields })} className="text-[11px] text-ruby-red hover:underline">Load default fields for “{form.slug}”</button>
+            ) : null; })()}
             <FieldBuilder
               label="Service Creation Fields"
               description="Custom fields business owners fill when creating a service in this subcategory"
@@ -1813,7 +1835,7 @@ function SubcategoriesTab() {
 
       {/* Edit Modal */}
       {editSubcategory && (
-        <Modal isOpen onClose={() => { setEditSubcategory(null); autoFilled.current.clear(); }} title={`Edit: ${editSubcategory.name || editSubcategory.slug}`} size="lg">
+        <Modal isOpen onClose={() => { setEditSubcategory(null); autoFilled.current.clear(); setPrefilledFields({ product: false, service: false }); }} title={`Edit: ${editSubcategory.name || editSubcategory.slug}`} size="lg">
           <form onSubmit={handleEditSubmit} className="space-y-6">
             <div className="space-y-4">
               <SectionHeader icon={Tag} title="Basic Information" />
@@ -1899,22 +1921,40 @@ function SubcategoriesTab() {
             </div>
 
             {/* Custom Product Fields */}
-            <div className="space-y-4">
+            <div className="space-y-2">
+              {prefilledFields.product && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                  <AlertCircle className="w-3.5 h-3.5 mt-px shrink-0" />
+                  <span>Pre-filled with the default fields this subcategory currently shows. Edit as needed and <strong>Save</strong> to make them the live, admin-managed fields.</span>
+                </div>
+              )}
+              {(() => { const d = getDefaultCreationFields(form.slug); return d?.productFields.length ? (
+                <button type="button" onClick={() => { setForm({ ...form, productFields: d.productFields }); setPrefilledFields((p) => ({ ...p, product: false })); }} className="text-[11px] text-ruby-red hover:underline">Reset to template defaults</button>
+              ) : null; })()}
               <FieldBuilder
                 label="Product Creation Fields"
                 description="Custom fields business owners fill when creating a product"
                 fields={form.productFields || []}
-                onChange={(f) => setForm({ ...form, productFields: f })}
+                onChange={(f) => { setForm({ ...form, productFields: f }); setPrefilledFields((p) => ({ ...p, product: false })); }}
               />
             </div>
 
             {/* Custom Service Fields */}
-            <div className="space-y-4">
+            <div className="space-y-2">
+              {prefilledFields.service && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
+                  <AlertCircle className="w-3.5 h-3.5 mt-px shrink-0" />
+                  <span>Pre-filled with the default fields this subcategory currently shows. Edit as needed and <strong>Save</strong> to make them the live, admin-managed fields.</span>
+                </div>
+              )}
+              {(() => { const d = getDefaultCreationFields(form.slug); return d?.serviceFields.length ? (
+                <button type="button" onClick={() => { setForm({ ...form, serviceFields: d.serviceFields }); setPrefilledFields((p) => ({ ...p, service: false })); }} className="text-[11px] text-ruby-red hover:underline">Reset to template defaults</button>
+              ) : null; })()}
               <FieldBuilder
                 label="Service Creation Fields"
                 description="Custom fields business owners fill when creating a service"
                 fields={form.serviceFields || []}
-                onChange={(f) => setForm({ ...form, serviceFields: f })}
+                onChange={(f) => { setForm({ ...form, serviceFields: f }); setPrefilledFields((p) => ({ ...p, service: false })); }}
               />
             </div>
 
@@ -1966,7 +2006,7 @@ function SubcategoriesTab() {
             </div>
 
             <div className="flex justify-end gap-3 pt-5 border-t border-gray-200">
-              <button type="button" onClick={() => { setEditSubcategory(null); autoFilled.current.clear(); }} className="btn-secondary">Cancel</button>
+              <button type="button" onClick={() => { setEditSubcategory(null); autoFilled.current.clear(); setPrefilledFields({ product: false, service: false }); }} className="btn-secondary">Cancel</button>
               <button type="submit" disabled={isSubmitting} className="btn-primary flex items-center gap-2">
                 {isSubmitting ? <><RefreshCw className="w-4 h-4 animate-spin" /> Saving...</> : <><Check className="w-4 h-4" /> Save Changes</>}
               </button>

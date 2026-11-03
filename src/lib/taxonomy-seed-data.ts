@@ -555,3 +555,42 @@ export const TEMPLATE_SUBCATEGORY_MAP: Record<string, string[]> = {
   // Phase 49.C1 — auto-repair shares the car_services template with car-wash.
   car_services: ['car-wash', 'auto-repair'],
 };
+
+// ─── Default creation-field lookup ─────────────────────────
+// The seed subcategories above carry the product/service creation fields each
+// subcategory ships with out of the box — the same fields the apps render for
+// product/service creation. This map keys them by slug so the admin editor can
+// pre-fill an as-yet-uncustomised subcategory with "what the template currently
+// looks like", which the admin can then review, edit and persist.
+
+export interface DefaultCreationFields {
+  productFields: CustomField[];
+  serviceFields: CustomField[];
+}
+
+const DEFAULT_CREATION_FIELDS_BY_SLUG: Record<string, DefaultCreationFields> =
+  SEED_SUBCATEGORIES.reduce((acc, sub) => {
+    acc[sub.slug] = {
+      productFields: sub.productFields ?? [],
+      serviceFields: sub.serviceFields ?? [],
+    };
+    return acc;
+  }, {} as Record<string, DefaultCreationFields>);
+
+/**
+ * Returns the default (seed) product & service creation fields for a subcategory
+ * slug, or `undefined` when the slug is not one of the official seeded
+ * subcategories (e.g. an admin-created custom subcategory). Returned arrays are
+ * fresh copies so callers can mutate them freely in form state.
+ */
+export function getDefaultCreationFields(
+  slug?: string,
+): DefaultCreationFields | undefined {
+  if (!slug) return undefined;
+  const found = DEFAULT_CREATION_FIELDS_BY_SLUG[slug.toLowerCase()];
+  if (!found) return undefined;
+  return {
+    productFields: found.productFields.map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })),
+    serviceFields: found.serviceFields.map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })),
+  };
+}

@@ -72,7 +72,7 @@ export interface PopulatedSubcategory {
   slug?: string;
   businessModel?: BusinessModel;
   productFields?: CustomField[];
-  serviceFields?: unknown[];
+  serviceFields?: CustomField[];
   allowedFulfillmentModes?: string[];
 }
 
@@ -95,6 +95,7 @@ export interface SelectedBusiness {
   subcategoryId?: string;
   subcategorySlug?: string;
   productFields?: CustomField[];
+  serviceFields?: CustomField[];
   categoryId?: string;
   locationId?: string;
 
@@ -194,6 +195,7 @@ export function BusinessAuthProvider({ children }: { children: React.ReactNode }
           (typeof sub === 'string' ? sub : current.subcategoryId),
         subcategorySlug: populatedSub?.slug ?? current.subcategorySlug,
         productFields: populatedSub?.productFields ?? current.productFields,
+        serviceFields: populatedSub?.serviceFields ?? current.serviceFields,
         categoryId:
           typeof profile.categoryId === 'object'
             ? profile.categoryId?._id

@@ -31,7 +31,10 @@ export function ProductImageGallery({ value, onChange }: { value: ProductImage[]
     for (const file of selected) {
       try {
         const compressed = await compressImage(file);
-        const result = await api.media.upload(compressed, 'products');
+        // Business portal (business.rubyplus.net) runs with a business-owner
+        // token, so uploads must use the auth-only /business/media endpoint —
+        // api.media.upload hits the admin-role-gated endpoint and 403s.
+        const result = await api.businessMedia.upload(compressed);
         uploaded.push({
           url: result.data.url,
           alt: file.name.replace(/\.[^.]+$/, ''),

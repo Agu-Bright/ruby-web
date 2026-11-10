@@ -151,7 +151,7 @@ function OnboardingContent() {
     if (!file || !id) return;
     setBusy(true);
     try {
-      const upload = await api.media.upload(file, 'business-verification');
+      const upload = await api.businessMedia.upload(file);
       const url = (upload.data as { url?: string; secureUrl?: string }).url ?? (upload.data as { secureUrl?: string }).secureUrl;
       if (!url) throw new Error('Upload did not return a URL');
       await api.businessOnboarding.update(id, { [field]: url });
@@ -167,7 +167,7 @@ function OnboardingContent() {
     setBusy(true);
     try {
       const urls = (await Promise.all(files.map(async (file) => {
-        const response = await api.media.upload(file, 'business-onboarding');
+        const response = await api.businessMedia.upload(file);
         return (response.data as { url?: string; secureUrl?: string }).url ?? (response.data as { secureUrl?: string }).secureUrl;
       }))).filter((url): url is string => !!url);
       if (!urls.length) throw new Error('Upload did not return a URL');

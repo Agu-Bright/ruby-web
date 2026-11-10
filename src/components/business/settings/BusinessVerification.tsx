@@ -23,7 +23,7 @@ export function BusinessVerification() {
     if (!file || !id) return;
     setUploading(field);
     try {
-      const response = await api.media.upload(file, 'business-verification');
+      const response = await api.businessMedia.upload(file);
       const url = (response.data as { url?: string; secureUrl?: string }).url ?? (response.data as { secureUrl?: string }).secureUrl;
       if (!url) throw new Error('Upload did not return a URL');
       await api.businessOnboarding.update(id, { [field]: url });

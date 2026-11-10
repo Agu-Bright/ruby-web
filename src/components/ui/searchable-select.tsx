@@ -19,6 +19,15 @@ interface SearchableSelectProps {
   disabled?: boolean;
   required?: boolean;
   icon?: React.ReactNode;
+  /**
+   * Optional server-side search. When provided, the dropdown fetches its
+   * options from this callback (debounced) instead of client-filtering the
+   * static `options` prop — use it for growable entity lists (e.g. all
+   * businesses) that must not be capped at a preloaded page. `options` is
+   * then only used to resolve the label of the currently-selected value.
+   * Called with '' when the dropdown first opens to load an initial page.
+   */
+  onSearch?: (query: string) => Promise<SelectOption[]>;
 }
 
 export function SearchableSelect({
@@ -30,17 +39,46 @@ export function SearchableSelect({
   disabled,
   required,
   icon,
+  onSearch,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlightIndex, setHighlightIndex] = useState(0);
+  const [remoteOptions, setRemoteOptions] = useState<SelectOption[]>([]);
+  const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const selected = useMemo(() => options.find(o => o.value === value), [options, value]);
+  // Resolve the selected label from both the static options (which carry the
+  // current selection) and any fetched remote results.
+  const selected = useMemo(
+    () => [...options, ...remoteOptions].find(o => o.value === value),
+    [options, remoteOptions, value]
+  );
+
+  // Server-side search mode: (re)fetch on open and whenever the query changes.
+  // No debounce on the initial '' load; 300ms while typing.
+  useEffect(() => {
+    if (!onSearch || !isOpen) return;
+    let cancelled = false;
+    const q = query.trim();
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const results = await onSearch(q);
+        if (!cancelled) setRemoteOptions(results);
+      } catch {
+        if (!cancelled) setRemoteOptions([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, q ? 300 : 0);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [onSearch, query, isOpen]);
 
   const filtered = useMemo(() => {
+    if (onSearch) return remoteOptions;
     if (!query.trim()) return options;
     const q = query.toLowerCase();
     return options.filter(
@@ -49,7 +87,7 @@ export function SearchableSelect({
         o.value.toLowerCase().includes(q) ||
         (o.description && o.description.toLowerCase().includes(q))
     );
-  }, [options, query]);
+  }, [onSearch, remoteOptions, options, query]);
 
   // Reset highlight when filtered list changes
   useEffect(() => {
@@ -194,7 +232,13 @@ export function SearchableSelect({
           {/* Options list */}
           <div ref={listRef} className="max-h-56 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <div className="px-3 py-4 text-center text-sm text-gray-400">No results found</div>
+              <div className="px-3 py-4 text-center text-sm text-gray-400">
+                {onSearch && loading
+                  ? 'Searching…'
+                  : onSearch && !query.trim()
+                    ? 'Type to search…'
+                    : 'No results found'}
+              </div>
             ) : (
               filtered.map((option, idx) => (
                 <button

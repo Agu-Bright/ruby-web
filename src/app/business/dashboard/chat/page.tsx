@@ -30,7 +30,7 @@ export default function ChatPage() {
     if (!file) return;
     setUploading(true);
     try {
-      const response = await api.media.upload(file, 'chat');
+      const response = await api.businessMedia.upload(file);
       const url = (response.data as any)?.url ?? (response.data as any)?.secureUrl;
       if (url) {
         setAttachment({

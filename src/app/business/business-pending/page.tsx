@@ -138,7 +138,7 @@ function BusinessPendingContent() {
               </a>
             )}
             <a
-              href="https://apps.apple.com/app/ruby-business/id0000000000"
+              href="https://apps.apple.com/app/ruby-business/id6760118324"
               target="_blank"
               rel="noreferrer"
               className="text-center py-2.5 rounded-lg bg-ruby-red text-white font-semibold text-sm hover:opacity-95 transition"

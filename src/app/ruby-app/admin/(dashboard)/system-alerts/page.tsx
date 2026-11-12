@@ -50,6 +50,7 @@ const FLAG_LABELS: Record<keyof SystemAlertRecipient["alerts"], string> = {
   eventPendingReview: "Event pending review",
   pushBlastRequested: "Push-blast request from merchant",
   contentReport: "Content report filed (review / reel / chat / user)",
+  newReview: "New review posted (approve / flag)",
   // Safety + fraud
   emergencySos: "Emergency SOS alert",
   clusterAlert: "Fraud cluster alert",
@@ -129,6 +130,7 @@ export default function SystemAlertsPage() {
           adCampaignSubmitted: r.alerts.adCampaignSubmitted ?? true,
           pushBlastRequested: r.alerts.pushBlastRequested ?? true,
           contentReport: r.alerts.contentReport ?? false,
+          newReview: r.alerts.newReview ?? false,
           clusterAlert: r.alerts.clusterAlert ?? false,
           subscriptionLifecycle: r.alerts.subscriptionLifecycle ?? false,
           newOrder: r.alerts.newOrder ?? false,
@@ -289,6 +291,7 @@ function RecipientFormModal({
     adCampaignSubmitted: recipient?.alerts?.adCampaignSubmitted ?? true,
     pushBlastRequested: recipient?.alerts?.pushBlastRequested ?? true,
     contentReport: recipient?.alerts?.contentReport ?? false,
+    newReview: recipient?.alerts?.newReview ?? false,
     clusterAlert: recipient?.alerts?.clusterAlert ?? false,
     subscriptionLifecycle: recipient?.alerts?.subscriptionLifecycle ?? false,
     newOrder: recipient?.alerts?.newOrder ?? false,

@@ -2785,6 +2785,8 @@ export interface SystemAlertRecipient {
     newOrder?: boolean;
     /** A customer created a new booking. High volume — default OFF. */
     newBooking?: boolean;
+    /** A customer posted a review, so admins can approve or flag it. Default OFF. */
+    newReview?: boolean;
   };
   createdAt: string;
   updatedAt: string;

@@ -59,7 +59,9 @@ export default function ServicesPage() {
               <p className="mt-3 text-xs text-gray-500">{service.duration.minutes} min · {service.fulfillmentMode.replace('_', ' ')}</p>
               <div className="mt-4 flex gap-2">
                 <Link href={`/business/dashboard/services/${service._id}`} className="flex-1 rounded-lg border border-gray-200 py-2 text-center text-xs font-semibold"><Pencil size={13} className="mr-1 inline" /> Edit</Link>
-                <button type="button" onClick={() => toggle.mutate({ id: service._id, isActive: !service.isActive })} className="rounded-lg border border-gray-200 px-3 text-xs">{service.isActive ? 'Pause' : 'Activate'}</button>
+                {(() => { const isActive = service.status === 'ACTIVE'; return (
+                <button type="button" onClick={() => toggle.mutate({ id: service._id, isActive: !isActive })} className={`rounded-lg border px-3 text-xs font-semibold ${isActive ? 'border-amber-200 text-amber-700' : 'border-emerald-200 text-emerald-700'}`}>{isActive ? 'Pause' : 'Activate'}</button>
+                ); })()}
                 <button type="button" onClick={() => { if (window.confirm(`Delete ${service.name}?`)) remove.mutate(service._id); }} className="rounded-lg border border-rose-200 px-3 text-rose-600"><Trash2 size={14} /></button>
               </div>
             </article>

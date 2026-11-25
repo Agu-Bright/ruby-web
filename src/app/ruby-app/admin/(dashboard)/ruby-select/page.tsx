@@ -92,10 +92,14 @@ export default function RubySelectPage() {
   const posts = listData?.items ?? [];
 
   const { data: locationsData } = useApi(
-    () => api.locations.list({ limit: 200 } as any),
+    () => api.locations.list({ limit: 200, type: 'CITY' as any } as any),
     [],
   );
-  const cities = (locationsData as any)?.items ?? (locationsData as any)?.locations ?? [];
+  // api.locations.list already resolves to a Location[] (the request helper
+  // unwraps the pagination envelope) — treat it as an array, same as every
+  // other city picker. The old `.items ?? .locations` read the wrong shape
+  // and always produced [], leaving the Target Cities select empty.
+  const cities = ((locationsData as any) || []) as any[];
 
   const create = useMutation((data: CreateRubySelectPostRequest) =>
     api.rubySelect.create(data),

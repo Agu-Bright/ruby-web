@@ -2212,6 +2212,14 @@ export const api = {
         body: data,
       }),
 
+    // Hide/unhide a review from the HOME screen reviews marquee only.
+    // Does not affect the business's own reviews list.
+    setHomeVisibility: (id: string, hidden: boolean) =>
+      request<any>(`/admin/reviews/${id}/home-visibility`, {
+        method: "PATCH",
+        body: { hidden },
+      }),
+
     // P51 §7 — moderation queue + trust dashboard.
     listQuarantined: (params?: {
       businessId?: string;

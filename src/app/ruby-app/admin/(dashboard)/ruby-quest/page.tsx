@@ -1406,11 +1406,11 @@ function ConfigTab() {
     <div className="space-y-4">
       <div className="card p-4 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-bold text-gray-800">Customer app tab</h3>
+          <h3 className="text-sm font-bold text-gray-800">Ruby Quest visibility</h3>
           <p className="mt-1 text-sm text-gray-600">
             {customerTabEnabled
-              ? 'Ruby Quest is visible in the customer app tab bar.'
-              : 'Ruby Quest is hidden from the customer app tab bar.'}
+              ? 'Ruby Quest is live — the Quest button and “Rubies near you” show on the customer home screen.'
+              : 'Ruby Quest is hidden — the Quest button and “Rubies near you” are removed from the customer home screen until you turn this on.'}
           </p>
         </div>
         <button

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Star, ShieldCheck, Flag, Trash2, Eye, Search, ChevronDown, Sparkles } from 'lucide-react';
+import { Star, ShieldCheck, Flag, Trash2, Eye, EyeOff, Search, ChevronDown, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { useApi, useMutation } from '@/lib/hooks';
@@ -37,6 +37,9 @@ interface Review {
   // sort FIRST and get a purple "Featured" pill on the customer card.
   isFeatured?: boolean;
   featuredUntil?: string;
+  // Admin hid this review from the HOME screen reviews marquee only.
+  // It still shows in the business's own reviews list.
+  hiddenFromHome?: boolean;
   isFlagged: boolean;
   flagReason?: string;
   reply?: { text: string; repliedAt: string };
@@ -78,6 +81,13 @@ export default function ReviewsPage() {
     (id: string) => api.reviews.delete(id)
   );
 
+  // Hide/unhide a review from the customer HOME screen reviews marquee only
+  // (does not touch the business's own reviews list).
+  const { mutate: setHomeHidden, isLoading: hiding } = useMutation(
+    ({ id, hidden }: { id: string; hidden: boolean }) =>
+      api.reviews.setHomeVisibility(id, hidden)
+  );
+
   const handleStatusFilter = (status: FilterStatus) => {
     setStatusFilter(status);
     const newFilters: typeof filters = { ...filters, page: 1 };
@@ -114,6 +124,21 @@ export default function ReviewsPage() {
       refetch();
     }
   }, [featureReview, refetch]);
+
+  const handleHideFromHome = useCallback(async (review: Review) => {
+    const result = await setHomeHidden({
+      id: review._id,
+      hidden: !review.hiddenFromHome,
+    });
+    if (result) {
+      toast.success(
+        review.hiddenFromHome
+          ? 'Review shown on the home screen again'
+          : 'Review hidden from the home screen',
+      );
+      refetch();
+    }
+  }, [setHomeHidden, refetch]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteConfirm) return;
@@ -212,7 +237,12 @@ export default function ReviewsPage() {
               <Flag className="w-3 h-3" /> Flagged
             </span>
           )}
-          {!r.isVerified && !r.isFlagged && !r.isFeatured && (
+          {r.hiddenFromHome && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              <EyeOff className="w-3 h-3" /> Hidden from home
+            </span>
+          )}
+          {!r.isVerified && !r.isFlagged && !r.isFeatured && !r.hiddenFromHome && (
             <span className="text-xs text-gray-400">—</span>
           )}
         </div>
@@ -259,6 +289,21 @@ export default function ReviewsPage() {
             }
           >
             <Sparkles className="w-4 h-4" />
+          </button>
+          {/* Hide / unhide from the customer home screen reviews marquee only. */}
+          <button
+            onClick={() => handleHideFromHome(r)}
+            disabled={hiding}
+            className={`p-1.5 rounded-md hover:bg-gray-100 ${
+              r.hiddenFromHome ? 'text-amber-600' : 'text-gray-400'
+            }`}
+            title={
+              r.hiddenFromHome
+                ? 'Unhide — show on home screen again'
+                : 'Hide from home screen (stays in business reviews)'
+            }
+          >
+            {r.hiddenFromHome ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
           {admin?.roles?.includes('super_admin') && (
             <button

@@ -532,6 +532,7 @@ export default function ReviewsPage() {
         data={reviews || []}
         isLoading={isLoading}
         meta={meta}
+        currentPage={filters.page}
         onPageChange={(page) => setFilters(prev => ({ ...prev, page }))}
         emptyMessage="No reviews found"
       />

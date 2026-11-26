@@ -1,7 +1,58 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { ApiMeta } from '@/lib/types';
+
+/**
+ * Build the list of page numbers to render for numbered pagination, inserting
+ * 'dots' where the range is collapsed. Always shows the first + last page and
+ * a window of `siblings` pages around the current page. Classic 1 2 … n layout.
+ */
+function getPaginationRange(
+  current: number,
+  total: number,
+  siblings = 1,
+): (number | 'dots')[] {
+  // first + last + current + 2*siblings + 2 dots slots
+  const totalPageNumbers = siblings * 2 + 5;
+  if (totalPageNumbers >= total) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const leftSibling = Math.max(current - siblings, 1);
+  const rightSibling = Math.min(current + siblings, total);
+  const showLeftDots = leftSibling > 2;
+  const showRightDots = rightSibling < total - 2;
+
+  if (!showLeftDots && showRightDots) {
+    const leftCount = 3 + 2 * siblings;
+    return [
+      ...Array.from({ length: leftCount }, (_, i) => i + 1),
+      'dots',
+      total,
+    ];
+  }
+  if (showLeftDots && !showRightDots) {
+    const rightCount = 3 + 2 * siblings;
+    return [
+      1,
+      'dots',
+      ...Array.from(
+        { length: rightCount },
+        (_, i) => total - rightCount + 1 + i,
+      ),
+    ];
+  }
+  return [
+    1,
+    'dots',
+    ...Array.from(
+      { length: rightSibling - leftSibling + 1 },
+      (_, i) => leftSibling + i,
+    ),
+    'dots',
+    total,
+  ];
+}
 
 export interface Column<T> {
   key: string;
@@ -119,36 +170,47 @@ export function DataTable<T>({
           <div className="text-xs text-gray-500">
             Page {currentPage} of {totalPages} · {meta.total} total
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => onPageChange(1)}
-              disabled={currentPage <= 1}
-              className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronsLeft className="w-4 h-4" />
-            </button>
+          <nav className="flex items-center gap-1 flex-wrap" aria-label="Pagination">
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage <= 1}
-              className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Previous page"
+              className="p-1.5 rounded-md hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
+            {getPaginationRange(currentPage, totalPages).map((p, idx) =>
+              p === 'dots' ? (
+                <span
+                  key={`dots-${idx}`}
+                  className="px-1.5 text-gray-400 select-none"
+                >
+                  …
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => onPageChange(p)}
+                  aria-current={p === currentPage ? 'page' : undefined}
+                  className={`min-w-[32px] h-8 px-2 rounded-md text-sm font-medium transition-colors ${
+                    p === currentPage
+                      ? 'bg-ruby-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {p}
+                </button>
+              ),
+            )}
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
-              className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Next page"
+              className="p-1.5 rounded-md hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => onPageChange(totalPages)}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronsRight className="w-4 h-4" />
-            </button>
-          </div>
+          </nav>
         </div>
       )}
     </div>

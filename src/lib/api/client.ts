@@ -2220,6 +2220,14 @@ export const api = {
         body: { hidden },
       }),
 
+    // Bulk hide/unhide many reviews from the HOME screen reviews marquee in
+    // one request (single updateMany on the backend).
+    bulkSetHomeVisibility: (ids: string[], hidden: boolean) =>
+      request<any>(`/admin/reviews/bulk/home-visibility`, {
+        method: "PATCH",
+        body: { ids, hidden },
+      }),
+
     // P51 §7 — moderation queue + trust dashboard.
     listQuarantined: (params?: {
       businessId?: string;

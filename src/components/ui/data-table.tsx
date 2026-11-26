@@ -5,7 +5,8 @@ import type { ApiMeta } from '@/lib/types';
 
 export interface Column<T> {
   key: string;
-  header: string;
+  /** String, or any node (e.g. a select-all checkbox) for the header cell. */
+  header: React.ReactNode;
   render: (item: T) => React.ReactNode;
   className?: string;
 }

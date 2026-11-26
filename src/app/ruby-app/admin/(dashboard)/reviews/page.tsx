@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Star, ShieldCheck, Flag, Trash2, Eye, EyeOff, Search, ChevronDown, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
@@ -97,6 +97,8 @@ export default function ReviewsPage() {
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Review | null>(null);
+  // Multi-select: ids of reviews ticked for a bulk action.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: reviews, meta, isLoading, refetch } = useApi<Review[]>(
     () => api.reviews.list(filters),
@@ -123,6 +125,12 @@ export default function ReviewsPage() {
   const { mutate: setHomeHidden, isLoading: hiding } = useMutation(
     ({ id, hidden }: { id: string; hidden: boolean }) =>
       api.reviews.setHomeVisibility(id, hidden)
+  );
+
+  // Bulk hide/unhide the selected reviews from the home screen in one request.
+  const { mutate: bulkHide, isLoading: bulkHiding } = useMutation(
+    ({ ids, hidden }: { ids: string[]; hidden: boolean }) =>
+      api.reviews.bulkSetHomeVisibility(ids, hidden)
   );
 
   const handleStatusFilter = (status: FilterStatus) => {
@@ -187,6 +195,58 @@ export default function ReviewsPage() {
     }
   }, [deleteConfirm, deleteReview, refetch]);
 
+  // ─── Multi-select / bulk actions ──────────────────────────────────
+  const pageIds = useMemo(() => (reviews || []).map((r) => r._id), [reviews]);
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAllPage = useCallback(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const all = pageIds.length > 0 && pageIds.every((id) => next.has(id));
+      if (all) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [pageIds]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // Selection is per result-set: reset it when filters/page change so a bulk
+  // action can never hit rows the admin can no longer see.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filters]);
+
+  const handleBulkHome = useCallback(
+    async (hidden: boolean) => {
+      const ids = Array.from(selectedIds);
+      if (ids.length === 0) return;
+      const result = await bulkHide({ ids, hidden });
+      if (result) {
+        const n = ids.length;
+        toast.success(
+          hidden
+            ? `${n} review${n > 1 ? 's' : ''} hidden from the home screen`
+            : `${n} review${n > 1 ? 's' : ''} shown on the home screen again`,
+        );
+        clearSelection();
+        refetch();
+      }
+    },
+    [selectedIds, bulkHide, clearSelection, refetch],
+  );
+
   const getUserName = (user: string | ReviewUser) => {
     if (typeof user === 'object' && user) {
       return [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Unknown User';
@@ -205,6 +265,32 @@ export default function ReviewsPage() {
   const flaggedCount = reviews?.filter(r => r.isFlagged).length || 0;
 
   const columns: Column<Review>[] = [
+    {
+      key: 'select',
+      className: 'w-10',
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Select all reviews on this page"
+          checked={allPageSelected}
+          ref={(el) => {
+            if (el) el.indeterminate = !allPageSelected && somePageSelected;
+          }}
+          onChange={toggleSelectAllPage}
+          className="w-4 h-4 accent-ruby-600 cursor-pointer align-middle"
+        />
+      ),
+      render: (r) => (
+        <input
+          type="checkbox"
+          aria-label="Select review"
+          checked={selectedIds.has(r._id)}
+          onChange={() => toggleSelect(r._id)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 accent-ruby-600 cursor-pointer align-middle"
+        />
+      ),
+    },
     {
       key: 'reviewer',
       header: 'Reviewer',
@@ -409,6 +495,36 @@ export default function ReviewsPage() {
           </div>
         </div>
       </div>
+
+      {/* Bulk action bar — appears when one or more reviews are selected. */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 bg-ruby-50 border border-ruby-200 rounded-xl px-4 py-3">
+          <span className="text-sm font-medium text-gray-700">
+            {selectedIds.size} selected
+          </span>
+          <div className="h-4 w-px bg-ruby-200" />
+          <button
+            onClick={() => handleBulkHome(true)}
+            disabled={bulkHiding}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50"
+          >
+            <EyeOff className="w-3.5 h-3.5" /> Hide from home
+          </button>
+          <button
+            onClick={() => handleBulkHome(false)}
+            disabled={bulkHiding}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+          >
+            <Eye className="w-3.5 h-3.5" /> Unhide
+          </button>
+          <button
+            onClick={clearSelection}
+            className="ml-auto text-xs text-gray-500 hover:text-gray-700"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <DataTable

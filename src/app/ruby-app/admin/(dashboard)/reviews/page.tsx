@@ -48,6 +48,43 @@ interface Review {
 
 type FilterStatus = 'all' | 'verified' | 'flagged';
 
+/**
+ * Reviewer avatar — shows the user's profile picture (same `avatarUrl` the
+ * mobile app renders) and falls back to initials when there's no avatar OR
+ * the image fails to load, so a broken URL never shows a broken-image icon.
+ */
+function ReviewerAvatar({
+  user,
+  size = 'sm',
+}: {
+  user: ReviewUser | null;
+  size?: 'sm' | 'md';
+}) {
+  const [errored, setErrored] = useState(false);
+  const dim = size === 'md' ? 'w-10 h-10 text-sm' : 'w-8 h-8 text-xs';
+  const initials =
+    `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() ||
+    '?';
+  const showImg = !!user?.avatarUrl && !errored;
+  return (
+    <div
+      className={`${dim} rounded-full overflow-hidden bg-gray-100 flex items-center justify-center font-medium text-gray-600 shrink-0 ring-1 ring-gray-200`}
+    >
+      {showImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={user!.avatarUrl}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={() => setErrored(true)}
+        />
+      ) : (
+        <span>{initials}</span>
+      )}
+    </div>
+  );
+}
+
 export default function ReviewsPage() {
   const { admin } = useAuth();
   const [filters, setFilters] = useState<{
@@ -175,9 +212,7 @@ export default function ReviewsPage() {
         const user = typeof r.userId === 'object' ? r.userId : null;
         return (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-              {user?.firstName?.[0]}{user?.lastName?.[0]}
-            </div>
+            <ReviewerAvatar user={user} />
             <div>
               <div className="font-medium text-gray-900 text-sm">{getUserName(r.userId)}</div>
               <div className="text-xs text-gray-500">{user?.email || ''}</div>
@@ -396,9 +431,15 @@ export default function ReviewsPage() {
           <div className="space-y-4">
             {/* Reviewer info */}
             <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-gray-900">{getUserName(selectedReview.userId)}</div>
-                <div className="text-sm text-gray-500">on {getBusinessName(selectedReview.businessId)}</div>
+              <div className="flex items-center gap-3">
+                <ReviewerAvatar
+                  user={typeof selectedReview.userId === 'object' ? selectedReview.userId : null}
+                  size="md"
+                />
+                <div>
+                  <div className="font-medium text-gray-900">{getUserName(selectedReview.userId)}</div>
+                  <div className="text-sm text-gray-500">on {getBusinessName(selectedReview.businessId)}</div>
+                </div>
               </div>
               <div className="text-sm text-gray-400">{formatDate(selectedReview.createdAt)}</div>
             </div>
